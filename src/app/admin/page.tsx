@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { getDb, schema } from "@/db";
 import { CATEGORY_INFO } from "@/lib/categories";
-import { approveSubmission, rejectSubmission, setProjectFlags } from "./actions";
+import { approveGateway, approveSubmission, rejectGateway, rejectSubmission, setProjectFlags } from "./actions";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
 export default async function AdminPage() {
   await connection();
   const db = await getDb();
-  const [pending, recent] = await Promise.all([
+  const [pending, recent, gatewayRequests] = await Promise.all([
     db
       .select()
       .from(schema.submissions)
@@ -23,6 +23,12 @@ export default async function AdminPage() {
       .where(eq(schema.submissions.status, "approved"))
       .orderBy(desc(schema.submissions.reviewedAt))
       .limit(10),
+    db
+      .select()
+      .from(schema.gateways)
+      .where(eq(schema.gateways.listing, "pending"))
+      .orderBy(desc(schema.gateways.updatedAt))
+      .limit(100),
   ]);
 
   return (
@@ -71,6 +77,44 @@ export default async function AdminPage() {
           </li>
         ))}
       </ul>
+
+      <section className="mt-12">
+        <h2 className="text-lg font-semibold">Gateway listing requests</h2>
+        <p className="mt-1 text-sm text-muted">{gatewayRequests.length} hosted APIs waiting to be listed in the catalog</p>
+        <ul className="mt-4 space-y-4">
+          {gatewayRequests.map((g) => (
+            <li key={g.id} className="rounded-lg border border-line bg-surface p-5">
+              <h3 className="font-medium">
+                {g.name} <span className="font-mono text-sm font-normal text-faint">/x/{g.slug}</span>
+              </h3>
+              {g.description && <p className="mt-1 text-sm text-muted">{g.description}</p>}
+              <dl className="mt-3 grid gap-1 font-mono text-xs text-muted">
+                {[
+                  ["upstream", g.upstreamUrl],
+                  ["owner", g.owner],
+                  ["price", `${g.acceptUsdg ? `$${Number(g.priceUsd)} USDG` : ""}${g.acceptUsdg && g.autonomoAmount ? " · " : ""}${g.autonomoAmount ? `${g.autonomoAmount} AUTONOMO` : ""}`],
+                  ["status", g.status],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <dt className="w-16 text-faint">{k}</dt>
+                    <dd className="break-all">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="mt-4 flex gap-2">
+                <form action={approveGateway}>
+                  <input type="hidden" name="id" value={g.id} />
+                  <button className="btn-brand px-3 py-1.5 text-sm">List in catalog</button>
+                </form>
+                <form action={rejectGateway}>
+                  <input type="hidden" name="id" value={g.id} />
+                  <button className="rounded-md border border-line px-3 py-1.5 text-sm">Reject</button>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="mt-12">
         <h2 className="text-lg font-semibold">Update a project</h2>

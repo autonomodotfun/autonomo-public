@@ -21,6 +21,7 @@ const NAV = [
   { href: "/projects?category=facilitator", label: "Facilitators" },
   { href: "/projects?category=sdk", label: "SDKs" },
   { href: "/docs", label: "Docs" },
+  { href: "/dashboard", label: "Dashboard" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -41,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               ))}
             </nav>
             <Link
-              href="/submit"
+              href="/dashboard"
               className="btn-brand ml-auto px-3 py-1.5 text-sm"
             >
               Launch your API
@@ -55,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <p className="flex gap-4">
               <Link href="/docs" className="hover:text-ink">Docs</Link>
               <Link href="/api-docs" className="hover:text-ink">API</Link>
-              <Link href="/submit" className="hover:text-ink">Launch</Link>
+              <Link href="/dashboard" className="hover:text-ink">Launch</Link>
               <a href="https://docs.x402.org" className="hover:text-ink">x402 docs</a>
             </p>
           </div>

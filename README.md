@@ -42,6 +42,14 @@ Without `DATABASE_URL`, the app uses an embedded Postgres in `./.pglite`. Only o
 
 No hosted facilitator covers Robinhood Chain, so the app settles USDG and $AUTONOMO payments itself with `FACILITATOR_PRIVATE_KEY`, a gas-only wallet that needs a little ETH on Robinhood Chain. Paid responses are sent with `Cache-Control: private, no-store`.
 
+## Hosted gateways
+
+Owners sign in at `/dashboard` with their wallet (Sign-In with Ethereum, `SESSION_SECRET`), paste an existing API URL and set a price. Agents call `/x/<slug>/<path>`; the gateway answers `402`, verifies the payment, forwards the request to `<upstream>/<path>` and settles only if the upstream answers below 400. Payments go to the owner's wallet (`payTo` = the signed-in address), in USDG or $AUTONOMO on Robinhood Chain, settled by the same `FACILITATOR_PRIVATE_KEY` wallet as the Pro API. Every paid attempt is logged in `gateway_calls` for the owner's dashboard.
+
+- Upstreams must be https and resolve to public addresses (checked when saved and on every call); redirects aren't followed; 1 MB request and 5 MB response limits; 25 s timeout.
+- An optional upstream auth header is stored encrypted with `GATEWAY_SECRET_KEY`.
+- Owners can request a catalog listing; approving it in `/admin` creates a `service` project with the gateway URL as its endpoint.
+
 ## Deploying (Vercel + Neon)
 
 1. Create a Neon project and copy its pooled connection string.

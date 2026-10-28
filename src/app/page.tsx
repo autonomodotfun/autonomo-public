@@ -41,7 +41,7 @@ export default async function Home() {
           launched.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/submit" className="btn-brand px-5 py-2.5 text-sm">Launch your API</Link>
+          <Link href="/dashboard" className="btn-brand px-5 py-2.5 text-sm">Launch your API</Link>
           <Link href="/docs#agents" className="rounded-md border border-line px-5 py-2.5 text-sm hover:bg-surface">
             Connect your agent
           </Link>

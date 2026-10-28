@@ -18,6 +18,8 @@ const NETWORKS: Record<string, NetworkInfo> = {
   "eip155:1328": { key: "sei-testnet", label: "Sei Testnet", testnet: true },
   "eip155:4689": { key: "iotex", label: "IoTeX", testnet: false },
   "eip155:196": { key: "xlayer", label: "X Layer", testnet: false },
+  // Key kept as the CAIP-2 id so existing rows and filters keep working.
+  "eip155:4663": { key: "eip155:4663", label: "Robinhood Chain", testnet: false },
   "eip155:2741": { key: "abstract", label: "Abstract", testnet: false },
   "eip155:3338": { key: "peaq", label: "peaq", testnet: false },
   "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": { key: "solana", label: "Solana", testnet: false },
