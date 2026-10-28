@@ -1,4 +1,4 @@
-// Autopad brand: an A-shaped chevron lifting off a launch pad, plus the AUTOPAD wordmark (Barlow Bold).
+// Autonomo brand: an A-shaped chevron lifting off a launch pad, plus the AUTONOMO wordmark (Barlow Bold).
 // The mark is always yellow with black ink; the wordmark uses currentColor.
 export function Mark({ className, size }: { className?: string; size?: number }) {
   return (
@@ -15,7 +15,7 @@ export function Mark({ className, size }: { className?: string; size?: number })
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 340 64" className={className} role="img" aria-label="Autopad">
+    <svg viewBox="0 0 384 64" className={className} role="img" aria-label="Autonomo">
       <Mark size={64} />
       <text
         x="82"
@@ -26,7 +26,7 @@ export function Logo({ className }: { className?: string }) {
         fontWeight="700"
         letterSpacing="1"
       >
-        AUTOPAD
+        AUTONOMO
       </text>
     </svg>
   );

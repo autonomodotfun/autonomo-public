@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "API",
-  description: "Free JSON API for agents to discover x402 APIs launched on Autopad.",
+  description: "Free JSON API for agents to discover x402 APIs launched on Autonomo.",
 };
 
 const ENDPOINTS = [

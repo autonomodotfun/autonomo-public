@@ -16,7 +16,7 @@ const LAUNCH_STEPS = [
   },
   {
     title: "Agents pay per call",
-    body: "Agents find you through the Autopad API, pay in stablecoins and retry. Settlement lands in your wallet.",
+    body: "Agents find you through the Autonomo API, pay in stablecoins and retry. Settlement lands in your wallet.",
   },
 ];
 

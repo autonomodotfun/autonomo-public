@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Autopad design system: launch-pad signage. Black, white and signal yellow; Barlow type; near-square corners. */
+/* Autonomo design system: launch-pad signage. Black, white and signal yellow; Barlow type; near-square corners. */
 @theme {
   --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-barlow-condensed), var(--font-barlow), ui-sans-serif, sans-serif;
