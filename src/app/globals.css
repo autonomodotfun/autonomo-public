@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* Autopad design system: launch-pad signage. Black, white and signal yellow; Barlow type; near-square corners. */
+@theme {
+  --font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+
+  --color-bg: #fafaf7;
+  --color-surface: #ffffff;
+  --color-ink: #111111;
+  --color-muted: #5f5f5a;
+  --color-faint: #9a9a93;
+  --color-line: #e3e3dc;
+  /* Accent for text and small marks; yellow fails contrast on white, so light mode uses a dark amber. */
+  --color-accent: #8a6800;
+  --color-accent-soft: #fff4c2;
+  /* Brand fill: buttons, the mark, highlights. Always paired with on-brand text. */
+  --color-brand: #ffce00;
+  --color-on-brand: #111111;
+  --color-warn: #b42318;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #111111;
+    --color-surface: #1c1c1c;
+    --color-ink: #ffffff;
+    --color-muted: #a8a8a8;
+    --color-faint: #6e6e6e;
+    --color-line: #2e2e2e;
+    --color-accent: #ffce00;
+    --color-accent-soft: #2b2508;
+    --color-warn: #ff8a7a;
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-sm placeholder:text-faint;
+  }
+
+  /* Signage headings: condensed, bold, uppercase. */
+  .heading {
+    @apply font-display font-bold tracking-wide uppercase;
+  }
+
+  .btn-brand {
+    @apply rounded-md bg-brand font-semibold tracking-wide text-on-brand uppercase hover:brightness-95 disabled:opacity-50;
+  }
+}

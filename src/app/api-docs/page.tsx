@@ -1,0 +1,75 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "API",
+  description: "Free JSON API for agents to discover x402 APIs launched on Autopad.",
+};
+
+const ENDPOINTS = [
+  {
+    path: "/api/v1/projects",
+    summary: "Search and filter projects.",
+    params: [
+      ["q", "Full-text search over name and description; also matches host and tags"],
+      ["category", "service · agent · facilitator · sdk · extension · tooling · wallet · explorer · infrastructure"],
+      ["network", "e.g. base, solana, polygon"],
+      ["sort", "popular (default) · relevance · new · price · name"],
+      ["page", "1-based page number"],
+      ["limit", "Results per page, max 100 (default 30)"],
+    ],
+    example: "/api/v1/projects?q=weather&network=base&limit=5",
+  },
+  {
+    path: "/api/v1/projects/{slug}",
+    summary: "One project, with up to 500 of its paid endpoints (price, network, facilitator, 30-day calls).",
+    params: [],
+    example: "/api/v1/projects/cdp-facilitator",
+  },
+  {
+    path: "/api/v1/stats",
+    summary: "Totals, counts per category and the most common networks.",
+    params: [],
+    example: "/api/v1/stats",
+  },
+];
+
+export default function ApiDocs() {
+  return (
+    <div className="mx-auto max-w-3xl px-4 pt-12 sm:px-6">
+      <h1 className="heading text-4xl">API</h1>
+      <p className="mt-3 text-muted">
+        Point your agent here to find APIs it can pay for. Read-only JSON, free while in beta. No key needed, CORS is
+        open, and responses are cached for 5 minutes. A paid tier using x402 itself is planned for higher volume.
+      </p>
+      <div className="mt-10 space-y-10">
+        {ENDPOINTS.map((e) => (
+          <section key={e.path}>
+            <h2 className="font-mono text-sm">
+              <span className="text-accent">GET</span> {e.path}
+            </h2>
+            <p className="mt-2 text-muted">{e.summary}</p>
+            {e.params.length > 0 && (
+              <table className="mt-4 w-full text-sm">
+                <tbody className="divide-y divide-line">
+                  {e.params.map(([name, desc]) => (
+                    <tr key={name}>
+                      <td className="w-24 py-2 align-top font-mono text-xs">{name}</td>
+                      <td className="py-2 text-muted">{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <a
+              href={e.example}
+              className="mt-4 block overflow-x-auto rounded-md border border-line bg-surface px-3 py-2 font-mono text-xs hover:border-faint"
+            >
+              curl {process.env.NEXT_PUBLIC_SITE_URL ?? ""}
+              {e.example}
+            </a>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
