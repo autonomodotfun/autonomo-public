@@ -10,3 +10,6 @@ next-env.d.ts
 .vercel
 .env*
 !.env.example
+
+# Marketing posts, images and videos stay local
+brand/launch/
