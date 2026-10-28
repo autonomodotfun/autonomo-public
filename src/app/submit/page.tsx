@@ -3,7 +3,7 @@ import { SubmitForm } from "./submit-form";
 
 export const metadata: Metadata = {
   title: "Launch your API",
-  description: "Launch an x402 API on Autopad so AI agents can find it and pay for it per call.",
+  description: "Launch an x402 API on Autonomo so AI agents can find it and pay for it per call.",
 };
 
 type Props = { searchParams: Promise<{ claim?: string }> };

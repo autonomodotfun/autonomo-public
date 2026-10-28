@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: { default: "Autopad: the agentic x402 launchpad for APIs", template: "%s · Autopad" },
+  title: { default: "Autonomo: the agentic x402 launchpad for APIs", template: "%s · Autonomo" },
   description:
     "Launch your API with x402 and let AI agents pay for it per call. Discover thousands of paid endpoints, facilitators and SDKs, with live pricing and usage from facilitator discovery data.",
 };
@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh font-sans">
         <header className="border-t-4 border-b border-t-brand border-b-line">
           <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-4 sm:px-6">
-            <Link href="/" className="flex items-center gap-2.5" aria-label="Autopad home">
+            <Link href="/" className="flex items-center gap-2.5" aria-label="Autonomo home">
               <Logo className="h-7 w-auto" />
             </Link>
             <nav className="hidden gap-5 text-sm text-muted sm:flex">

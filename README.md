@@ -1,6 +1,6 @@
-# Autopad
+# Autonomo
 
-The agentic x402 launchpad for APIs. Launch an endpoint with an x402 price and AI agents can discover it and pay per call. Autopad also tracks the ecosystem around it: facilitators, SDKs, extensions and explorers.
+The agentic x402 launchpad for APIs. Launch an endpoint with an x402 price and AI agents can discover it and pay per call. Autonomo also tracks the ecosystem around it: facilitators, SDKs, extensions and explorers.
 
 - **Paid services** are imported from facilitator discovery ("Bazaar") endpoints (Coinbase CDP and PayAI) and grouped into one project per host, with price, network, facilitator and 30-day usage for every endpoint.
 - **Ecosystem projects** (facilitators, SDKs, extensions, explorers) are hand-checked in [`src/data/curated.ts`](src/data/curated.ts).
