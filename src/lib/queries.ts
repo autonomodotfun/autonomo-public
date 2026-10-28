@@ -193,6 +193,41 @@ export async function searchEndpoints(query: EndpointQuery) {
   return { rows, total: count, page, limit, sort };
 }
 
+// Playground: the best-matching paid endpoints for a set of keywords, Autonomo gateways first.
+export async function findEndpointsForKeywords(keywords: string[], limit = 3) {
+  await connection();
+  const db = await getDb();
+  if (!keywords.length) return [];
+  const tsq = sql`websearch_to_tsquery('english', ${keywords.join(" or ")})`;
+  return db
+    .select({
+      url: endpoints.url,
+      method: endpoints.method,
+      description: endpoints.description,
+      network: endpoints.network,
+      priceUsd: endpoints.priceUsd,
+      facilitator: endpoints.facilitator,
+      project: { slug: projects.slug, name: projects.name, description: projects.description },
+    })
+    .from(endpoints)
+    .innerJoin(projects, eq(endpoints.projectId, projects.id))
+    .where(
+      and(
+        eq(projects.status, "approved"),
+        sql`coalesce(${endpoints.network}, '') !~* ${TESTNET_PATTERN}`,
+        sql`upper(coalesce(${endpoints.method}, 'GET')) = 'GET'`,
+        sql`${projects.search} @@ ${tsq}`,
+      ),
+    )
+    .orderBy(
+      sql`(${endpoints.facilitator} = 'autonomo') desc nulls last`,
+      sql`ts_rank(${projects.search}, ${tsq}) desc`,
+      desc(endpoints.calls30d),
+      asc(endpoints.id),
+    )
+    .limit(limit);
+}
+
 function escapeLike(s: string) {
   return s.replace(/[\\%_]/g, (c) => `\\${c}`);
 }

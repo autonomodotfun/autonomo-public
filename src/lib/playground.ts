@@ -1,0 +1,93 @@
+import "server-only";
+import { formatUnits } from "viem";
+import { TOKEN } from "@/lib/constants";
+import { checkUpstream } from "@/lib/gateway";
+import { USDG } from "@/lib/pro";
+
+// Words that say nothing about which API to pick.
+const STOPWORDS = new Set(
+  ("a an and are as at be by can could current currently do does for from get give how i in is it latest me my now " +
+    "of on or please price prices show tell the this to today use using what whats what's when where which who why " +
+    "will with would you your paid api apis need if one some right")
+    .split(" "),
+);
+
+/** Search keywords from a plain-language question. "price" is kept only when it's the only word left. */
+export function keywordsFrom(question: string) {
+  const words = question
+    .toLowerCase()
+    .replace(/[^a-z0-9$\s-]/g, " ")
+    .split(/\s+/)
+    .map((w) => w.replace(/^\$/, "").replace(/^-+|-+$/g, ""))
+    .filter((w) => w.length > 1);
+  const kept = [...new Set(words.filter((w) => !STOPWORDS.has(w)))].slice(0, 8);
+  if (/\bprices?\b/.test(question.toLowerCase())) kept.push("price");
+  return kept;
+}
+
+export type Offer = { token: string; amount: string; network: string; payTo?: string };
+
+const KNOWN: Record<string, { symbol: string; decimals: number }> = {
+  [USDG.address.toLowerCase()]: { symbol: "USDG", decimals: 6 },
+  [TOKEN.address.toLowerCase()]: { symbol: "$AUTONOMO", decimals: 18 },
+};
+
+function toOffer(a: { amount?: string; maxAmountRequired?: string; asset?: string; network?: string; payTo?: string; extra?: { name?: string } }): Offer | null {
+  const raw = a.amount ?? a.maxAmountRequired;
+  if (!raw || !/^\d+$/.test(raw)) return null;
+  const known = KNOWN[String(a.asset).toLowerCase()];
+  // Unknown assets are almost always USDC (6 decimals) in the x402 catalogs.
+  const symbol = known?.symbol ?? (/usd/i.test(a.extra?.name ?? "") || !a.extra?.name ? "USDC" : a.extra.name);
+  return { token: symbol, amount: formatUnits(BigInt(raw), known?.decimals ?? 6), network: a.network ?? "", payTo: a.payTo };
+}
+
+function decodeHeader(value: string | null) {
+  if (!value) return null;
+  try {
+    return JSON.parse(Buffer.from(value, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export type Quote = { ok: true; status: 402; offers: Offer[] } | { ok: false; status?: number; error: string };
+
+/** Calls an endpoint without paying and reads the x402 price list from its 402 response. */
+export async function quote(raw: string): Promise<Quote> {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, error: "Not a valid URL" };
+  }
+  // Same public-address check as gateway upstreams; it's run on the origin because endpoints may carry a query.
+  const safe = await checkUpstream(url.origin);
+  if (!safe.ok) return { ok: false, error: safe.error };
+  try {
+    const res = await fetch(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(8000),
+      headers: { accept: "application/json", "user-agent": "AutonomoPlayground/1.0" },
+    });
+    if (res.status !== 402) {
+      await res.body?.cancel();
+      return { ok: false, status: res.status, error: `Expected 402, got ${res.status}` };
+    }
+    let required = decodeHeader(res.headers.get("payment-required"));
+    if (!required) {
+      const text = (await res.text()).slice(0, 20_000);
+      try {
+        required = JSON.parse(text);
+      } catch {
+        required = null;
+      }
+    } else {
+      await res.body?.cancel();
+    }
+    const offers = (Array.isArray(required?.accepts) ? required.accepts : []).map(toOffer).filter(Boolean) as Offer[];
+    if (!offers.length) return { ok: false, status: 402, error: "The 402 response had no price list" };
+    return { ok: true, status: 402, offers: offers.slice(0, 4) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error && e.name === "TimeoutError" ? "The API didn't answer in time" : "Couldn't reach the API" };
+  }
+}
