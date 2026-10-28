@@ -4,5 +4,8 @@ export type PlaygroundEvent =
   | { step: "search"; state: "done"; detail: string; api: { name: string; slug: string; url: string; description: string | null; autonomo: boolean } }
   | { step: "quote"; state: "running" | "fail"; detail: string }
   | { step: "quote"; state: "done"; detail: string; offers: { token: string; amount: string; network: string }[]; acceptsAutonomo: boolean }
-  | { step: "pay" | "answer"; state: "soon"; detail: string }
+  | { step: "pay"; state: "running" | "fail" | "soon"; detail: string }
+  | { step: "pay"; state: "done"; detail: string; amount: string; tx: string | null; explorer: string | null }
+  | { step: "answer"; state: "fail" | "soon"; detail: string }
+  | { step: "answer"; state: "done"; detail: string; text: string }
   | { step: "end" };
