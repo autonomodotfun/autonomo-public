@@ -109,7 +109,8 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
     await db.insert(gateways).values({ ...fields, owner });
   }
   revalidatePath("/dashboard");
-  redirect(`/dashboard/${values.slug}`);
+  // The query flag drives the "saved" / "live" confirmation on the gateway page.
+  redirect(`/dashboard/${values.slug}?${existing ? "saved" : "launched"}=1`);
 }
 
 async function ownedId(form: FormData) {

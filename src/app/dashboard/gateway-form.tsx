@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { saveGateway, type GatewayFormState } from "./actions";
 
 export type GatewayDefaults = {
@@ -43,6 +44,12 @@ export function GatewayForm({
   const [slug, setSlug] = useState(v?.slug ?? defaults.slug);
   const [slugTouched, setSlugTouched] = useState(Boolean(defaults.slug));
   const [acceptAutonomo, setAcceptAutonomo] = useState(v ? v.acceptAutonomo === "on" : Boolean(defaults.autonomoAmount));
+  // Controlled so they survive a failed submit: React resets uncontrolled fields after a form action, and the
+  // server never sends the secret back.
+  const [acceptUsdg, setAcceptUsdg] = useState(v ? v.acceptUsdg === "on" : defaults.acceptUsdg);
+  const [priceUsd, setPriceUsd] = useState(v?.priceUsd ?? defaults.priceUsd);
+  const [autonomoAmount, setAutonomoAmount] = useState(v?.autonomoAmount ?? defaults.autonomoAmount);
+  const [secret, setSecret] = useState("");
 
   return (
     <form action={action} className="space-y-6" noValidate>
@@ -103,7 +110,16 @@ export function GatewayForm({
             optional
             hint={secretsEnabled ? (secretSet ? "A secret is saved. Leave blank to keep it." : "Encrypted at rest. Never shown again.") : "Not enabled on this deployment."}
           >
-            <input id="authSecret" name="authSecret" type="password" autoComplete="off" disabled={!secretsEnabled} className="field" />
+            <input
+              id="authSecret"
+              name="authSecret"
+              type="password"
+              autoComplete="off"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              disabled={!secretsEnabled}
+              className="field"
+            />
           </Field>
         </div>
         {secretSet && (
@@ -116,38 +132,98 @@ export function GatewayForm({
       <fieldset className="space-y-4 rounded-lg border border-line p-4">
         <legend className="px-1 text-sm font-medium">Price per call</legend>
         <p className="text-sm text-muted">Payments go straight to the wallet you signed in with. Autonomo takes no cut.</p>
-        <label className="flex items-start gap-3">
-          <input type="checkbox" name="acceptUsdg" defaultChecked={v ? v.acceptUsdg === "on" : defaults.acceptUsdg} className="mt-1" />
-          <span className="flex-1">
+        {/* Labels wrap only the checkbox and its title, so clicking near a price never toggles the option. */}
+        <div>
+          <label className="flex items-center gap-3">
+            <input type="checkbox" name="acceptUsdg" checked={acceptUsdg} onChange={(e) => setAcceptUsdg(e.target.checked)} />
             <span className="text-sm font-medium">USDG on Robinhood Chain</span>
-            <span className="mt-2 flex items-center gap-2">
-              <span className="font-mono text-sm text-faint">$</span>
-              <input name="priceUsd" defaultValue={v?.priceUsd ?? defaults.priceUsd} inputMode="decimal" className="field w-32" aria-label="Price in USD" />
-              <span className="text-sm text-muted">per call</span>
-            </span>
-            {err.priceUsd && <span className="mt-1 block text-sm text-warn">{err.priceUsd}</span>}
-          </span>
-        </label>
-        <label className="flex items-start gap-3">
-          <input type="checkbox" name="acceptAutonomo" checked={acceptAutonomo} onChange={(e) => setAcceptAutonomo(e.target.checked)} className="mt-1" />
-          <span className="flex-1">
+          </label>
+          <div className="mt-2 ml-7 flex items-center gap-2">
+            <span className="font-mono text-sm text-faint">$</span>
+            <input
+              name="priceUsd"
+              value={priceUsd}
+              onChange={(e) => setPriceUsd(e.target.value)}
+              disabled={!acceptUsdg}
+              inputMode="decimal"
+              className="field w-32 disabled:opacity-50"
+              aria-label="Price in USD"
+            />
+            <span className="text-sm text-muted">per call</span>
+          </div>
+          {err.priceUsd && <p className="mt-1 ml-7 text-sm text-warn">{err.priceUsd}</p>}
+        </div>
+        <div>
+          <label className="flex items-center gap-3">
+            <input type="checkbox" name="acceptAutonomo" checked={acceptAutonomo} onChange={(e) => setAcceptAutonomo(e.target.checked)} />
             <span className="text-sm font-medium">$AUTONOMO on Robinhood Chain</span>
-            {acceptAutonomo && (
-              <span className="mt-2 flex items-center gap-2">
-                <input name="autonomoAmount" defaultValue={v?.autonomoAmount ?? defaults.autonomoAmount} inputMode="decimal" placeholder="100" className="field w-32" aria-label="Price in AUTONOMO" />
-                <span className="text-sm text-muted">AUTONOMO per call</span>
-              </span>
-            )}
-            {err.autonomoAmount && <span className="mt-1 block text-sm text-warn">{err.autonomoAmount}</span>}
-          </span>
-        </label>
+          </label>
+          {acceptAutonomo && (
+            <div className="mt-2 ml-7 flex items-center gap-2">
+              <input
+                name="autonomoAmount"
+                value={autonomoAmount}
+                onChange={(e) => setAutonomoAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="1000"
+                className="field w-32"
+                aria-label="Price in AUTONOMO"
+              />
+              <span className="text-sm text-muted">AUTONOMO per call</span>
+            </div>
+          )}
+          {err.autonomoAmount && <p className="mt-1 ml-7 text-sm text-warn">{err.autonomoAmount}</p>}
+        </div>
         {err.acceptUsdg && <p className="text-sm text-warn">{err.acceptUsdg}</p>}
       </fieldset>
 
-      <button disabled={pending} className="btn-brand px-5 py-2.5 text-sm">
-        {pending ? "Saving…" : defaults.id ? "Save changes" : "Launch API"}
-      </button>
+      <div className="flex flex-wrap items-center gap-4">
+        <button disabled={pending} aria-busy={pending} className="btn-brand inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+          {pending && (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden>
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity=".25" strokeWidth="3" />
+              <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          )}
+          {pending ? (defaults.id ? "Saving changes…" : "Launching…") : defaults.id ? "Save changes" : "Launch API"}
+        </button>
+        {pending ? (
+          <span className="text-sm text-muted" role="status">
+            Checking your API&apos;s URL and saving. This takes a few seconds.
+          </span>
+        ) : (
+          <SavedNotice />
+        )}
+      </div>
+      {!pending && state.errors && Object.keys(state.errors).length > 0 && (
+        <p className="text-sm text-warn" role="alert">
+          Not saved yet. Fix the highlighted fields above and try again.
+        </p>
+      )}
     </form>
+  );
+}
+
+/** Shows "Changes saved" next to the button after a save, then clears the flag from the URL. */
+function SavedNotice() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [show, setShow] = useState(params.get("saved") === "1");
+  useEffect(() => {
+    if (params.get("saved") !== "1") return;
+    setShow(true);
+    const t = setTimeout(() => {
+      setShow(false);
+      router.replace(pathname, { scroll: false });
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [params, pathname, router]);
+  if (!show) return null;
+  return (
+    <span className="text-sm font-medium text-accent" role="status">
+      ✓ Changes saved. They&apos;re live now.
+    </span>
   );
 }
 
