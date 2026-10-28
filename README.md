@@ -6,6 +6,7 @@ The agentic x402 launchpad for APIs. Launch an endpoint with an x402 price and A
 - **Ecosystem projects** (facilitators, SDKs, extensions, explorers) are hand-checked in [`src/data/curated.ts`](src/data/curated.ts).
 - **Launch requests** (`/submit`) go into a review queue at `/admin`.
 - **Free JSON API** for agents at `/api/v1/*`, documented at `/api-docs`.
+- **Pro API** at `/api/v1/pro/endpoints`: endpoint-level search paid per call with x402, in USDG or $AUTONOMO on Robinhood Chain (optionally USDC). Off until configured; see below.
 
 Stack: Next.js 16 (App Router), Tailwind 4, Drizzle ORM, Postgres (Neon in production, embedded PGlite locally).
 
@@ -30,6 +31,16 @@ Without `DATABASE_URL`, the app uses an embedded Postgres in `./.pglite`. Only o
 | `npm run db:seed` | Upsert the curated projects |
 | `npm run db:import` | Re-import Bazaar data. Refreshes stats; keeps names, categories and visibility you've edited. `-- --dry-run` prints stats only |
 | `npm run db:remove -- <slug>` | Delete a project |
+
+## Paid API tier
+
+`/api/v1/pro/endpoints` is protected with x402 (`@x402/next`). It stays off, answering `503`, until `PRO_PAY_TO` and at least one payment rail are set (see `.env.example`):
+
+- **USDG:** `PRO_ACCEPT_USDG=1`, priced at `PRO_PRICE_USD`, on Robinhood Chain (`eip155:4663`). USDG supports EIP-3009, so each payment is one signature.
+- **$AUTONOMO:** `PRO_AUTONOMO_AMOUNT` whole tokens per call on Robinhood Chain. The token has no EIP-3009 or EIP-2612, so payments use Permit2; payers approve Permit2 once before their first payment.
+- **USDC (optional):** `PRO_USDC_NETWORK` (e.g. `eip155:8453`) and `PRO_USDC_FACILITATOR_URL`, priced at `PRO_PRICE_USD`.
+
+No hosted facilitator covers Robinhood Chain, so the app settles USDG and $AUTONOMO payments itself with `FACILITATOR_PRIVATE_KEY`, a gas-only wallet that needs a little ETH on Robinhood Chain. Paid responses are sent with `Cache-Control: private, no-store`.
 
 ## Deploying (Vercel + Neon)
 

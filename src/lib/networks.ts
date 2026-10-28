@@ -49,9 +49,12 @@ export function networkLabel(key: string): string {
   return BY_KEY[key]?.label ?? key.replace(/^eip155:(\d+)$/, "EVM chain $1");
 }
 
+// Name pattern for test networks; every known testnet key above matches it too.
+export const TESTNET_PATTERN = "(test|sepolia|devnet|fuji|amoy|goerli)";
+
 export function isTestnet(key: string): boolean {
   if (BY_KEY[key]) return BY_KEY[key].testnet;
-  return /(test|sepolia|devnet|fuji|amoy|goerli)/i.test(key);
+  return new RegExp(TESTNET_PATTERN, "i").test(key);
 }
 
 // Stablecoins we can price in USD. Keyed by lowercased asset address.
