@@ -1,8 +1,8 @@
 export const SOCIALS = [
   {
     label: "X",
-    handle: "@autonomodotfun",
-    href: "https://x.com/autonomodotfun",
+    handle: "@useautonomo",
+    href: "https://x.com/useautonomo",
     path: "M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.3l7.3-8.3L2.8 2h6.4l4.4 5.8L18.9 2Zm-1.1 18.1h1.7L8.3 3.8H6.5l11.3 16.3Z",
   },
   {
