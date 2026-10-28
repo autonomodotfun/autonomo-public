@@ -208,6 +208,22 @@ export default async function DocsPage() {
         </Section>
 
         <Section id="launch" title="Launch your API">
+          <div className="rounded-lg border border-line bg-surface p-5">
+            <h3 className="font-medium">Launch without code: hosted gateway</h3>
+            <p className="mt-2 text-muted">
+              Already have an API? Connect your wallet on the <Link href="/dashboard">dashboard</Link>, paste your API&apos;s
+              URL and set a price. Autonomo gives you a gateway at <code>autonomo.fun/x/your-api</code> that answers{" "}
+              <code>402</code>, takes payment in USDG or {TOKEN.symbol} on {TOKEN.chainName}, and forwards paid requests to your
+              API. Payments go straight to your wallet, and your dashboard shows calls and earnings.
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
+              <li>Your API must be public and use https. Gateways don&apos;t follow redirects.</li>
+              <li>If your API needs a key, add it as an auth header; it&apos;s encrypted and added to every forwarded call.</li>
+              <li>Requests up to 1 MB and responses up to 5 MB, with a 25-second timeout.</li>
+              <li>A payment only settles when your API answers successfully (status below 400).</li>
+            </ul>
+          </div>
+          <p>Or run x402 on your own server:</p>
           <Step n={1} title="Add x402 to your server">
             <p>Install the middleware for your framework. This example uses Express; Next.js, Hono, Fastify, Go and Python work the same way.</p>
             <Code code={SELLER_INSTALL} lang="bash" />
@@ -222,7 +238,7 @@ export default async function DocsPage() {
             <Code code={SELLER_TEST} lang="bash" />
           </Step>
           <Step n={3} title="Launch it on Autonomo">
-            <p>There are two ways to get listed:</p>
+            <p>There are two ways to get a self-hosted endpoint listed:</p>
             <ul className="list-disc space-y-2 pl-5">
               <li>
                 <b>Automatically.</b> Register your endpoint with a facilitator that supports Bazaar discovery. Autonomo

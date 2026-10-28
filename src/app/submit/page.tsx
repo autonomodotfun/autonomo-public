@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SubmitForm } from "./submit-form";
 
 export const metadata: Metadata = {
@@ -18,7 +19,8 @@ export default async function SubmitPage({ searchParams }: Props) {
           <>Send the corrected details for <span className="font-mono text-ink">{claim}</span> and we&apos;ll update the listing.</>
         ) : (
           <>
-            Put your x402 endpoint in front of agents that pay per call. Services registered with a Bazaar-enabled
+            Don&apos;t run x402 yet? <Link href="/dashboard" className="underline hover:text-ink">Launch through a hosted gateway</Link>{" "}
+            instead, no code needed. Put your x402 endpoint in front of agents that pay per call. Services registered with a Bazaar-enabled
             facilitator launch automatically. Use this form for anything else: a new API, an agent, an SDK, a tool or a
             wallet.
           </>

@@ -126,6 +126,68 @@ export const submissions = pgTable(
   (t) => [index("submissions_status_idx").on(t.status)],
 );
 
+// Hosted x402 gateways: an owner puts an existing API behind autonomo.fun/x/<slug>, priced per call.
+// Payments go straight to the owner's wallet (payTo = owner); Autonomo never holds funds.
+export const GATEWAY_STATUSES = ["active", "paused"] as const;
+export type GatewayStatus = (typeof GATEWAY_STATUSES)[number];
+export const GATEWAY_LISTINGS = ["unlisted", "pending", "listed", "rejected"] as const;
+export type GatewayListing = (typeof GATEWAY_LISTINGS)[number];
+
+export const gateways = pgTable(
+  "gateways",
+  {
+    id: serial("id").primaryKey(),
+    slug: text("slug").notNull(),
+    // Lowercased wallet address of the owner; also the payTo for every payment.
+    owner: text("owner").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    upstreamUrl: text("upstream_url").notNull(),
+    // Optional header Autonomo adds when calling the upstream; the value is AES-GCM encrypted at rest.
+    upstreamAuthHeader: text("upstream_auth_header"),
+    upstreamAuthSecret: text("upstream_auth_secret"),
+    priceUsd: numeric("price_usd", { precision: 18, scale: 6 }).notNull(),
+    acceptUsdg: boolean("accept_usdg").notNull().default(true),
+    // Whole $AUTONOMO tokens per call; null means $AUTONOMO is not accepted.
+    autonomoAmount: text("autonomo_amount"),
+    status: text("status").$type<GatewayStatus>().notNull().default("active"),
+    listing: text("listing").$type<GatewayListing>().notNull().default("unlisted"),
+    projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("gateways_slug_idx").on(t.slug),
+    index("gateways_owner_idx").on(t.owner),
+    index("gateways_listing_idx").on(t.listing),
+  ],
+);
+
+// One row per paid attempt through a gateway (requests that carried a payment).
+export const gatewayCalls = pgTable(
+  "gateway_calls",
+  {
+    id: serial("id").primaryKey(),
+    gatewayId: integer("gateway_id")
+      .notNull()
+      .references(() => gateways.id, { onDelete: "cascade" }),
+    method: text("method").notNull(),
+    path: text("path").notNull(),
+    status: integer("status").notNull(),
+    latencyMs: integer("latency_ms").notNull(),
+    rail: text("rail"),
+    asset: text("asset"),
+    amount: text("amount"),
+    payer: text("payer"),
+    settled: boolean("settled").notNull().default(false),
+    tx: text("tx"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("gateway_calls_gateway_created_idx").on(t.gatewayId, t.createdAt)],
+);
+
+export type Gateway = typeof gateways.$inferSelect;
+export type GatewayCall = typeof gatewayCalls.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type Endpoint = typeof endpoints.$inferSelect;
 export type Submission = typeof submissions.$inferSelect;
