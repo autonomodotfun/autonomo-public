@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "API",
@@ -40,6 +41,9 @@ export default function ApiDocs() {
       <p className="mt-3 text-muted">
         Point your agent here to find APIs it can pay for. Read-only JSON, free while in beta. No key needed, CORS is
         open, and responses are cached for 5 minutes. A paid tier using x402 itself is planned for higher volume.
+      </p>
+      <p className="mt-3 text-sm text-muted">
+        New to Autonomo? Start with the <Link href="/docs" className="underline hover:text-ink">docs</Link>.
       </p>
       <div className="mt-10 space-y-10">
         {ENDPOINTS.map((e) => (

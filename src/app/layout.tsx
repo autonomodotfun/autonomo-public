@@ -20,7 +20,7 @@ const NAV = [
   { href: "/projects", label: "Explore APIs" },
   { href: "/projects?category=facilitator", label: "Facilitators" },
   { href: "/projects?category=sdk", label: "SDKs" },
-  { href: "/api-docs", label: "API" },
+  { href: "/docs", label: "Docs" },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -53,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:justify-between sm:px-6">
             <p>Service data comes from the Coinbase CDP and PayAI discovery endpoints and is refreshed regularly.</p>
             <p className="flex gap-4">
+              <Link href="/docs" className="hover:text-ink">Docs</Link>
               <Link href="/api-docs" className="hover:text-ink">API</Link>
               <Link href="/submit" className="hover:text-ink">Launch</Link>
               <a href="https://docs.x402.org" className="hover:text-ink">x402 docs</a>

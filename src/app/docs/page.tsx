@@ -1,0 +1,353 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { TOKEN } from "@/lib/constants";
+import { getStats } from "@/lib/queries";
+import { compact } from "@/components/project-row";
+import { CopyButton } from "@/components/copy-button";
+
+export const metadata: Metadata = {
+  title: "Docs",
+  description:
+    "How Autonomo works: launch an x402 API that AI agents pay per call, connect your agent to the free discovery API, and find your way around the catalog.",
+};
+
+const SECTIONS = [
+  { id: "overview", label: "Overview" },
+  { id: "how-x402-works", label: "How x402 works" },
+  { id: "launch", label: "Launch your API" },
+  { id: "agents", label: "Connect your agent" },
+  { id: "api", label: "API reference" },
+  { id: "data", label: "Where the data comes from" },
+  { id: "token", label: `${TOKEN.symbol} token` },
+  { id: "faq", label: "FAQ" },
+];
+
+const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun";
+
+// Seller example follows the x402 seller quickstart (docs.x402.org), on testnet.
+const SELLER_INSTALL = "npm install @x402/express @x402/core @x402/evm";
+
+const SELLER_CODE = `import express from "express";
+import { paymentMiddleware, x402ResourceServer } from "@x402/express";
+import { ExactEvmScheme } from "@x402/evm/exact/server";
+import { HTTPFacilitatorClient } from "@x402/core/server";
+
+const app = express();
+const payTo = "0xYourWalletAddress"; // where payments land
+
+// Testnet facilitator (Base Sepolia). Switch to a mainnet facilitator to go live.
+const facilitator = new HTTPFacilitatorClient({ url: "https://x402.org/facilitator" });
+
+app.use(
+  paymentMiddleware(
+    {
+      "GET /weather": {
+        accepts: [{ scheme: "exact", price: "$0.001", network: "eip155:84532", payTo }],
+        description: "Current weather for a city",
+        mimeType: "application/json",
+      },
+    },
+    new x402ResourceServer(facilitator).register("eip155:84532", new ExactEvmScheme()),
+  ),
+);
+
+app.get("/weather", (req, res) => {
+  res.json({ city: "Lisbon", weather: "sunny", tempC: 24 });
+});
+
+app.listen(4021);`;
+
+const SELLER_TEST = `curl -i http://localhost:4021/weather
+# HTTP/1.1 402 Payment Required
+# PAYMENT-REQUIRED: <price, network and payTo, base64-encoded>`;
+
+const DISCOVER_CODE = `const res = await fetch(
+  "${SITE}/api/v1/projects?q=weather&network=base&sort=price&limit=5",
+);
+const { data } = await res.json();
+
+for (const p of data) {
+  console.log(p.name, p.website, p.minPriceUsd);
+}`;
+
+const BUYER_INSTALL = "npm install @x402/fetch @x402/core @x402/evm viem";
+
+const BUYER_CODE = `import { wrapFetchWithPayment } from "@x402/fetch";
+import { x402Client } from "@x402/core/client";
+import { ExactEvmScheme } from "@x402/evm/exact/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+// A dedicated agent wallet holding a small USDC balance.
+const signer = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as \`0x\${string}\`);
+
+const client = new x402Client();
+client.register("eip155:*", new ExactEvmScheme(signer));
+
+const fetchWithPayment = wrapFetchWithPayment(fetch, client);
+
+// Pays automatically when the API answers 402, then retries.
+const res = await fetchWithPayment("https://api.example.com/weather");
+console.log(await res.json());`;
+
+const ENDPOINTS: [string, string][] = [
+  ["GET /api/v1/projects", "Search and filter projects: q, category, network, sort, page, limit"],
+  ["GET /api/v1/projects/{slug}", "One project with up to 500 paid endpoints, prices, networks and 30-day calls"],
+  ["GET /api/v1/stats", "Totals, counts per category and the most common networks"],
+];
+
+const FAQ: [string, React.ReactNode][] = [
+  [
+    "Does Autonomo take a cut of payments?",
+    <>No. Agents pay your <code>payTo</code> wallet directly through the facilitator. Autonomo never holds or routes funds.</>,
+  ],
+  [
+    "Does Autonomo host my API?",
+    <>No. Your API runs wherever it runs today. Autonomo lists it so agents can find it, with its price, network and usage.</>,
+  ],
+  [
+    "How much does it cost to launch?",
+    <>Nothing. Listing is free, whether your API is picked up from a facilitator catalog or launched through the form.</>,
+  ],
+  [
+    "Is the discovery API free?",
+    <>Yes, while in beta, with no key. A paid tier that uses x402 itself is planned for high-volume use.</>,
+  ],
+  [
+    "My listing is wrong or out of date. How do I fix it?",
+    <>Open your project page and use <b>Suggest an edit</b>, or send the details through the <Link href="/submit">launch form</Link>. Edits are reviewed by hand.</>,
+  ],
+  [
+    "Which networks are supported?",
+    <>Whatever your facilitator supports. Most listed endpoints settle on Base, followed by Solana, Polygon, Arbitrum and others. Testnet-only services are hidden.</>,
+  ],
+];
+
+export default async function DocsPage() {
+  const stats = await getStats();
+
+  return (
+    <div className="mx-auto grid max-w-6xl gap-10 px-4 pt-10 sm:px-6 lg:grid-cols-[13rem_1fr]">
+      <aside className="text-sm lg:sticky lg:top-6 lg:self-start">
+        <h2 className="mb-2 text-xs font-medium tracking-wide text-faint uppercase">On this page</h2>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 lg:block lg:space-y-0.5">
+          {SECTIONS.map((s) => (
+            <li key={s.id}>
+              <a href={`#${s.id}`} className="block rounded py-1 text-muted hover:text-ink lg:px-2">
+                {s.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <article className="min-w-0 max-w-3xl">
+        <p className="font-mono text-xs tracking-wide text-accent uppercase">Docs</p>
+        <h1 className="heading mt-2 text-4xl sm:text-5xl">Launch an API agents pay for</h1>
+
+        <Section id="overview" title="Overview">
+          <p>
+            Autonomo is the agentic x402 launchpad for APIs. You put a price on an endpoint with x402, launch it here,
+            and AI agents can find it and pay for each call in stablecoins. Agents need no API keys, accounts or
+            invoices.
+          </p>
+          <p>
+            Autonomo currently lists {compact(stats.projects)} projects and {compact(stats.endpoints)} paid endpoints,
+            which handled {compact(stats.calls30d)} paid calls in the last 30 days.
+          </p>
+          <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2">
+            <Card title="I have an API" href="#launch" body="Charge agents per call and get discovered." />
+            <Card title="I'm building an agent" href="#agents" body="Find paid APIs and pay for them automatically." />
+          </div>
+        </Section>
+
+        <Section id="how-x402-works" title="How x402 works">
+          <p>
+            x402 uses the HTTP status code <code>402 Payment Required</code>. Payment happens inside a normal HTTP
+            request:
+          </p>
+          <ol className="list-decimal space-y-2 pl-5">
+            <li>The agent calls your endpoint.</li>
+            <li>
+              Your server answers <code>402</code> with a <code>PAYMENT-REQUIRED</code> header: the price, the network
+              and your <code>payTo</code> wallet.
+            </li>
+            <li>
+              The agent signs a stablecoin payment and retries with a <code>PAYMENT-SIGNATURE</code> header.
+            </li>
+            <li>
+              A facilitator verifies and settles the payment on-chain, and your server returns the data. The money lands
+              in your wallet.
+            </li>
+          </ol>
+          <p>
+            Prices can be fractions of a cent, so per-call pricing works for data, inference and tools that would never
+            justify a subscription.
+          </p>
+        </Section>
+
+        <Section id="launch" title="Launch your API">
+          <Step n={1} title="Add x402 to your server">
+            <p>Install the middleware for your framework. This example uses Express; Next.js, Hono, Fastify, Go and Python work the same way.</p>
+            <Code code={SELLER_INSTALL} lang="bash" />
+            <Code code={SELLER_CODE} lang="ts" />
+            <p>
+              This runs on Base Sepolia, a testnet, so you can try it without real money. To go live, switch to a
+              mainnet network (Base is <code>eip155:8453</code>) and a mainnet facilitator, as described in the{" "}
+              <a href="https://docs.x402.org/getting-started/quickstart-for-sellers">x402 seller quickstart</a>.
+            </p>
+          </Step>
+          <Step n={2} title="Check that it answers 402">
+            <Code code={SELLER_TEST} lang="bash" />
+          </Step>
+          <Step n={3} title="Launch it on Autonomo">
+            <p>There are two ways to get listed:</p>
+            <ul className="list-disc space-y-2 pl-5">
+              <li>
+                <b>Automatically.</b> Register your endpoint with a facilitator that supports Bazaar discovery. Autonomo
+                imports the Coinbase CDP and PayAI catalogs, groups endpoints by host and shows price, network and
+                usage.
+              </li>
+              <li>
+                <b>Through the launch form.</b> <Link href="/submit">Request a launch</Link> with your website and a paid
+                endpoint URL. Every request is reviewed by hand, and APIs with a live <code>402</code> endpoint go
+                fastest.
+              </li>
+            </ul>
+          </Step>
+        </Section>
+
+        <Section id="agents" title="Connect your agent">
+          <Step n={1} title="Find APIs to pay for">
+            <p>
+              Search the catalog through the free discovery API. No key is needed and CORS is open, so it works from
+              servers, browsers and agent tools.
+            </p>
+            <Code code={DISCOVER_CODE} lang="ts" />
+          </Step>
+          <Step n={2} title="Pay per call">
+            <p>
+              Wrap <code>fetch</code> with an x402 client. When an API answers <code>402</code>, the client pays and
+              retries automatically.
+            </p>
+            <Code code={BUYER_INSTALL} lang="bash" />
+            <Code code={BUYER_CODE} lang="ts" />
+            <p className="text-sm text-muted">
+              Use a dedicated wallet for your agent and keep only a small balance in it. Never commit private keys.
+            </p>
+          </Step>
+        </Section>
+
+        <Section id="api" title="API reference">
+          <p>
+            Read-only JSON, free while in beta. No key, open CORS, and responses are cached for 5 minutes. Full
+            parameters and examples are on the <Link href="/api-docs">API reference page</Link>.
+          </p>
+          <div className="overflow-x-auto rounded-lg border border-line">
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-line">
+                {ENDPOINTS.map(([path, desc]) => (
+                  <tr key={path}>
+                    <td className="py-2.5 pr-4 pl-4 align-top font-mono text-xs whitespace-nowrap">{path}</td>
+                    <td className="py-2.5 pr-4 text-muted">{desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        <Section id="data" title="Where the data comes from">
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <b>Paid services</b> come from the Coinbase CDP and PayAI Bazaar discovery catalogs. Endpoints are grouped
+              into one project per host, with price, network, facilitator and 30-day usage for each.
+            </li>
+            <li>
+              <b>Ecosystem projects</b> such as facilitators, SDKs, extensions and explorers are checked by hand.
+            </li>
+            <li>
+              <b>Testnet-only</b> services are hidden. The catalog is re-imported periodically, so new endpoints can take
+              a while to appear.
+            </li>
+            <li>
+              <b>Usage numbers</b> are paid calls reported by facilitators over the last 30 days.
+            </li>
+          </ul>
+        </Section>
+
+        <Section id="token" title={`${TOKEN.symbol} token`}>
+          <p>The official {TOKEN.symbol} contract address is:</p>
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3">
+            <code className="min-w-0 flex-1 overflow-x-auto font-mono text-sm whitespace-nowrap select-all">
+              {TOKEN.address}
+            </code>
+            <CopyButton
+              text={TOKEN.address}
+              label={`Copy ${TOKEN.symbol} contract address`}
+              className="btn-brand shrink-0 px-3 py-1.5 text-xs"
+            />
+          </div>
+          <p>
+            It is also in the bar at the top of every page. Always check the address on autonomo.fun before you buy:
+            copies posted elsewhere can be fake. Nothing on this site is financial advice.
+          </p>
+        </Section>
+
+        <Section id="faq" title="FAQ">
+          <dl className="divide-y divide-line border-y border-line">
+            {FAQ.map(([q, a]) => (
+              <div key={q} className="py-4">
+                <dt className="font-medium">{q}</dt>
+                <dd className="mt-1 text-muted">{a}</dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      </article>
+    </div>
+  );
+}
+
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="mt-14 scroll-mt-6">
+      <h2 className="heading text-2xl">{title}</h2>
+      <div className="docs-body mt-4 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3 pt-2">
+      <h3 className="flex items-baseline gap-2 font-medium">
+        <span className="font-mono text-xs text-accent">0{n}</span>
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function Card({ title, body, href }: { title: string; body: string; href: string }) {
+  return (
+    <a href={href} className="bg-bg p-4 no-underline hover:bg-surface">
+      <span className="font-medium text-ink">{title} →</span>
+      <span className="mt-1 block text-sm text-muted">{body}</span>
+    </a>
+  );
+}
+
+function Code({ code, lang }: { code: string; lang: string }) {
+  return (
+    <div className="relative rounded-lg border border-line bg-surface">
+      <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+        <span className="font-mono text-xs text-faint">{lang}</span>
+        <CopyButton text={code} label="Copy code" className="font-mono text-xs text-muted uppercase hover:text-ink" />
+      </div>
+      <pre className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
