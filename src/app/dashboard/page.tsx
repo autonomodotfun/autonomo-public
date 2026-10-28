@@ -3,9 +3,11 @@ import Link from "next/link";
 import { listOwnerGateways } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 import { platform } from "@/lib/pro";
+import { privyEnabled } from "@/lib/privy";
 import { authEnabled, currentOwner } from "@/lib/session";
 import { Badge } from "./badge";
 import { ConnectWallet, SignOut } from "./connect-wallet";
+import { PrivySignIn, PrivySignOut } from "./privy";
 
 export const metadata: Metadata = { title: "Dashboard", robots: { index: false } };
 
@@ -22,12 +24,22 @@ export default async function DashboardPage() {
           $AUTONOMO with every request. No code changes, and payments go straight to your wallet.
         </p>
         <ol className="mt-6 list-decimal space-y-1.5 pl-5 text-sm text-muted">
-          <li>Connect the wallet you want to get paid in.</li>
+          <li>Sign in. Payments go to your wallet; if you don&apos;t have one, we create it for you.</li>
           <li>Paste your API&apos;s URL and set a price.</li>
           <li>Share your gateway URL with agents, or list it in the catalog.</li>
         </ol>
         <div className="mt-8">
-          {authEnabled() ? (
+          {authEnabled() && privyEnabled() ? (
+            <>
+              <PrivySignIn />
+              <details className="mt-6 text-sm text-muted">
+                <summary className="cursor-pointer hover:text-ink">Or sign in directly with a browser wallet</summary>
+                <div className="mt-3">
+                  <ConnectWallet />
+                </div>
+              </details>
+            </>
+          ) : authEnabled() ? (
             <ConnectWallet />
           ) : (
             <p className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted">
@@ -51,7 +63,7 @@ export default async function DashboardPage() {
           <p className="font-mono text-xs tracking-wide text-accent uppercase">Launch dashboard</p>
           <h1 className="heading mt-1 text-4xl">Your APIs</h1>
           <p className="mt-1 font-mono text-xs text-muted">
-            {shortAddr(owner)} · <SignOut />
+            {shortAddr(owner)} · {privyEnabled() ? <PrivySignOut /> : <SignOut />}
           </p>
         </div>
         <Link href="/dashboard/new" className="btn-brand px-4 py-2 text-sm">

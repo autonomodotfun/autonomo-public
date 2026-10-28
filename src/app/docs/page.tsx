@@ -5,6 +5,7 @@ import { getStats } from "@/lib/queries";
 import { compact } from "@/components/project-row";
 import { CopyButton } from "@/components/copy-button";
 import { networkLabel, normalizeNetwork } from "@/lib/networks";
+import { privyEnabled } from "@/lib/privy";
 import { proConfig } from "@/lib/pro";
 
 export const metadata: Metadata = {
@@ -211,8 +212,9 @@ export default async function DocsPage() {
           <div className="rounded-lg border border-line bg-surface p-5">
             <h3 className="font-medium">Launch without code: hosted gateway</h3>
             <p className="mt-2 text-muted">
-              Already have an API? Connect your wallet on the <Link href="/dashboard">dashboard</Link>, paste your API&apos;s
-              URL and set a price. Autonomo gives you a gateway at <code>autonomo.fun/x/your-api</code> that answers{" "}
+              Already have an API? Sign in on the <Link href="/dashboard">dashboard</Link>
+              {privyEnabled() ? " with email, Google, X or a wallet" : " with your wallet"}, paste your API&apos;s URL and set a
+              price.{privyEnabled() ? " If you don't have a wallet, one is created for your earnings." : ""} Autonomo gives you a gateway at <code>autonomo.fun/x/your-api</code> that answers{" "}
               <code>402</code>, takes payment in USDG or {TOKEN.symbol} on {TOKEN.chainName}, and forwards paid requests to your
               API. Payments go straight to your wallet, and your dashboard shows calls and earnings.
             </p>
