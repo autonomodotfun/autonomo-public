@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   title: { default: "Autonomo: the agentic x402 launchpad for APIs", template: "%s · Autonomo" },
   description:
     "Launch your API with x402 and let AI agents pay for it per call. Discover thousands of paid endpoints, facilitators and SDKs, with live pricing and usage from facilitator discovery data.",
-  twitter: { site: "@autonomodotfun", creator: "@autonomodotfun" },
+  twitter: { site: "@useautonomo", creator: "@useautonomo" },
 };
 
 const NAV = [
