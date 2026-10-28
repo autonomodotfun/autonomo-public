@@ -19,4 +19,7 @@ export const TOKEN = {
   // Robinhood Chain mainnet (Arbitrum Orbit), CAIP-2 id used by x402.
   network: "eip155:4663",
   chainName: "Robinhood Chain",
+  chainId: 4663,
+  rpcUrl: "https://rpc.mainnet.chain.robinhood.com",
+  explorer: "https://robinhoodchain.blockscout.com",
 } as const;

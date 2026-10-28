@@ -18,6 +18,9 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",
     "@neondatabase/serverless": "^1.2.0",
+    "@privy-io/node": "^0.37.0",
+    "@privy-io/react-auth": "^3.51.0",
+    "@stripe/stripe-js": "^1.54.2",
     "@x402/core": "^2.28.0",
     "@x402/evm": "^2.28.0",
     "@x402/next": "^2.28.0",

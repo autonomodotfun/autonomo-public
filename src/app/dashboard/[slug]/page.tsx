@@ -118,7 +118,15 @@ export default async function GatewayDashboard({ params }: { params: Promise<{ s
                     <td className={`px-3 py-2 ${c.status < 400 ? "" : "text-warn"}`}>{c.status}</td>
                     <td className="px-3 py-2 whitespace-nowrap">{c.settled ? fmtRail(c.rail, c.amount) : <span className="text-faint">not settled</span>}</td>
                     <td className="px-3 py-2">{shortAddr(c.payer)}</td>
-                    <td className="px-3 py-2" title={c.tx ?? ""}>{c.tx ? shortAddr(c.tx) : "—"}</td>
+                    <td className="px-3 py-2">
+                      {c.tx ? (
+                        <a href={`${TOKEN.explorer}/tx/${c.tx}`} target="_blank" rel="noreferrer" className="underline hover:text-ink">
+                          {shortAddr(c.tx)}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
