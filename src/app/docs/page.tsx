@@ -4,6 +4,8 @@ import { TOKEN } from "@/lib/constants";
 import { getStats } from "@/lib/queries";
 import { compact } from "@/components/project-row";
 import { CopyButton } from "@/components/copy-button";
+import { networkLabel, normalizeNetwork } from "@/lib/networks";
+import { proConfig } from "@/lib/pro";
 
 export const metadata: Metadata = {
   title: "Docs",
@@ -17,6 +19,7 @@ const SECTIONS = [
   { id: "launch", label: "Launch your API" },
   { id: "agents", label: "Connect your agent" },
   { id: "api", label: "API reference" },
+  { id: "pro", label: "Pro API" },
   { id: "data", label: "Where the data comes from" },
   { id: "token", label: `${TOKEN.symbol} token` },
   { id: "faq", label: "FAQ" },
@@ -89,16 +92,35 @@ const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 const res = await fetchWithPayment("https://api.example.com/weather");
 console.log(await res.json());`;
 
+const PRO_CODE = `import { wrapFetchWithPayment } from "@x402/fetch";
+import { x402Client } from "@x402/core/client";
+import { ExactEvmScheme } from "@x402/evm/exact/client";
+import { privateKeyToAccount } from "viem/accounts";
+
+const signer = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as \`0x\${string}\`);
+const client = new x402Client();
+client.register("eip155:*", new ExactEvmScheme(signer));
+const fetchWithPayment = wrapFetchWithPayment(fetch, client);
+
+// Endpoints under $0.01 matching "weather", cheapest first
+const res = await fetchWithPayment(
+  "${SITE}/api/v1/pro/endpoints?q=weather&maxPrice=0.01&sort=price",
+);
+const { data } = await res.json(); // url, method, priceUsd, network, payTo, ...`;
+
+const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
+
 const ENDPOINTS: [string, string][] = [
   ["GET /api/v1/projects", "Search and filter projects: q, category, network, sort, page, limit"],
   ["GET /api/v1/projects/{slug}", "One project with up to 500 paid endpoints, prices, networks and 30-day calls"],
   ["GET /api/v1/stats", "Totals, counts per category and the most common networks"],
+  ["GET /api/v1/pro/endpoints", "Paid: endpoint-level search with payment details (see Pro API)"],
 ];
 
 const FAQ: [string, React.ReactNode][] = [
   [
     "Does Autonomo take a cut of payments?",
-    <>No. Agents pay your <code>payTo</code> wallet directly through the facilitator. Autonomo never holds or routes funds.</>,
+    <>No. Agents pay your <code>payTo</code> wallet directly through the facilitator; Autonomo never holds or routes payments for listed APIs. The only payments Autonomo receives are for its own <a href="#pro">Pro API</a>.</>,
   ],
   [
     "Does Autonomo host my API?",
@@ -110,7 +132,7 @@ const FAQ: [string, React.ReactNode][] = [
   ],
   [
     "Is the discovery API free?",
-    <>Yes, while in beta, with no key. A paid tier that uses x402 itself is planned for high-volume use.</>,
+    <>Yes, with no key. The <a href="#pro">Pro API</a> adds paid, endpoint-level search, paid per call with x402.</>,
   ],
   [
     "My listing is wrong or out of date. How do I fix it?",
@@ -256,6 +278,56 @@ export default async function DocsPage() {
           </div>
         </Section>
 
+        <Section id="pro" title="Pro API">
+          <p>
+            <code>GET /api/v1/pro/endpoints</code> searches individual endpoints across the whole catalog and returns
+            what an agent needs to call and pay them: URL, method, price, network, asset, <code>payTo</code>, scheme,
+            facilitator and 30-day usage. Filter by <code>q</code>, <code>network</code> and <code>maxPrice</code>{" "}
+            (USD), sort by <code>popular</code> or <code>price</code>, up to 200 results per page. Testnet endpoints
+            are left out.
+          </p>
+          <p>It is paid per call with x402, so there is no key or account: the agent pays and gets the data.</p>
+          {proConfig ? (
+            <div className="overflow-x-auto rounded-lg border border-line">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-line">
+                  {proConfig.rails.map((rail) => (
+                    <tr key={rail.kind}>
+                      <td className="py-2.5 pr-4 pl-4 font-medium whitespace-nowrap">
+                        {{ usdg: "USDG", autonomo: TOKEN.symbol, usdc: "USDC" }[rail.kind]}
+                      </td>
+                      <td className="py-2.5 pr-4 font-mono text-xs whitespace-nowrap">
+                        {rail.kind === "autonomo" ? `${rail.amount} ${TOKEN.symbol.slice(1)}` : `$${rail.priceUsd}`} per call
+                      </td>
+                      <td className="py-2.5 pr-4 text-muted">
+                        {rail.kind === "usdc" ? networkLabel(normalizeNetwork(rail.network) ?? rail.network) : TOKEN.chainName}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-line px-4 py-3 text-muted">
+              <b className="text-ink">Coming soon.</b> The Pro API will accept USDG and {TOKEN.symbol} on{" "}
+              {TOKEN.chainName}. Until it is switched on, it answers <code>503</code>.
+            </p>
+          )}
+          <Code code={PRO_CODE} lang="ts" />
+          <h3 className="pt-2 font-medium">Paying with USDG</h3>
+          <p>
+            USDG (Global Dollar) on {TOKEN.chainName} supports EIP-3009, so each payment is a single signature: no
+            approval step and no gas for the agent. Hold USDG on {TOKEN.chainName} and the x402 client above handles the
+            rest.
+          </p>
+          <h3 className="pt-2 font-medium">Paying with {TOKEN.symbol}</h3>
+          <p>
+            {TOKEN.symbol} payments run on {TOKEN.chainName} through Permit2. Before the first payment, the paying wallet
+            approves the Permit2 contract (<code>{PERMIT2}</code>) to spend its {TOKEN.symbol}, once, which needs a little
+            ETH on {TOKEN.chainName} for gas. After that, each call is a signature and the agent pays no gas.
+          </p>
+        </Section>
+
         <Section id="data" title="Where the data comes from">
           <ul className="list-disc space-y-2 pl-5">
             <li>
@@ -288,7 +360,11 @@ export default async function DocsPage() {
             />
           </div>
           <p>
-            It is also in the bar at the top of every page. Always check the address on autonomo.fun before you buy:
+            {TOKEN.symbol} can be used to pay for the <a href="#pro">Pro API</a>
+            {proConfig?.rails.some((r) => r.kind === "autonomo") ? "" : " once it is switched on"}.
+          </p>
+          <p>
+            The address is also in the bar at the top of every page. Always check it on autonomo.fun before you buy:
             copies posted elsewhere can be fake. Nothing on this site is financial advice.
           </p>
         </Section>

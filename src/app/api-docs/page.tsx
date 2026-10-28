@@ -32,6 +32,21 @@ const ENDPOINTS = [
     params: [],
     example: "/api/v1/stats",
   },
+  {
+    path: "/api/v1/pro/endpoints",
+    paid: true,
+    summary:
+      "Paid per call with x402. Endpoint-level search with URL, method, price, network, asset, payTo, scheme, facilitator and 30-day calls. Testnet endpoints are excluded.",
+    params: [
+      ["q", "Search endpoint URLs and descriptions, and their project's text"],
+      ["network", "e.g. base, solana, polygon"],
+      ["maxPrice", "Only endpoints priced at or below this many USD"],
+      ["sort", "popular (default) · price"],
+      ["page", "1-based page number"],
+      ["limit", "Results per page, max 200 (default 50)"],
+    ],
+    example: "/api/v1/pro/endpoints?q=weather&maxPrice=0.01&sort=price",
+  },
 ];
 
 export default function ApiDocs() {
@@ -50,6 +65,11 @@ export default function ApiDocs() {
           <section key={e.path}>
             <h2 className="font-mono text-sm">
               <span className="text-accent">GET</span> {e.path}
+              {"paid" in e && (
+                <Link href="/docs#pro" className="ml-2 rounded-sm bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-on-brand uppercase">
+                  Paid · x402
+                </Link>
+              )}
             </h2>
             <p className="mt-2 text-muted">{e.summary}</p>
             {e.params.length > 0 && (
