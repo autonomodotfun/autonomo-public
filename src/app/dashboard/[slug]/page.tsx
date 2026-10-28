@@ -15,7 +15,14 @@ export const metadata: Metadata = { title: "API dashboard", robots: { index: fal
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "";
 
-export default async function GatewayDashboard({ params }: { params: Promise<{ slug: string }> }) {
+export default async function GatewayDashboard({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ saved?: string; launched?: string }>;
+}) {
+  const flags = await searchParams;
   const owner = await currentOwner();
   if (!owner) redirect("/dashboard");
   const g = await getOwnedGateway((await params).slug, owner);
@@ -35,6 +42,13 @@ export default async function GatewayDashboard({ params }: { params: Promise<{ s
   return (
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6">
       <Link href="/dashboard" className="text-sm text-muted hover:text-ink">← Your APIs</Link>
+      {(flags.launched === "1" || flags.saved === "1") && (
+        <div role="status" className="mt-4 rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm font-medium text-accent">
+          {flags.launched === "1"
+            ? "🚀 Your API is live. Share the gateway URL below with agents."
+            : "✓ Changes saved. They apply to the very next call."}
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
