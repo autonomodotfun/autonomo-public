@@ -1,0 +1,17 @@
+{
+  "name": "autonomo-agent-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Demo AI agent that pays for an Autonomo x402 gateway call in USDG or $AUTONOMO on Robinhood Chain.",
+  "scripts": {
+    "pay": "node pay.mjs",
+    "pay:autonomo": "node pay.mjs --pay autonomo"
+  },
+  "dependencies": {
+    "@x402/core": "2.28.0",
+    "@x402/evm": "2.28.0",
+    "@x402/fetch": "2.28.0",
+    "viem": "2.57.12"
+  }
+}

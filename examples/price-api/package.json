@@ -1,0 +1,10 @@
+{
+  "name": "autonomo-price-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Example API for the Autonomo launch tutorial: the latest $AUTONOMO price, read from on-chain data.",
+  "dependencies": {
+    "viem": "2.57.12"
+  }
+}
