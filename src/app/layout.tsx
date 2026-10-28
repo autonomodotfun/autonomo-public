@@ -22,6 +22,7 @@ const NAV = [
   { href: "/projects", label: "Explore APIs" },
   { href: "/projects?category=facilitator", label: "Facilitators" },
   { href: "/projects?category=sdk", label: "SDKs" },
+  { href: "/playground", label: "Playground" },
   { href: "/docs", label: "Docs" },
   { href: "/dashboard", label: "Dashboard" },
 ];
