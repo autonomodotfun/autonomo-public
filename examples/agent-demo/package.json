@@ -6,7 +6,9 @@
   "description": "Demo AI agent that pays for an Autonomo x402 gateway call in USDG or $AUTONOMO on Robinhood Chain.",
   "scripts": {
     "pay": "node pay.mjs",
-    "pay:autonomo": "node pay.mjs --pay autonomo"
+    "pay:autonomo": "node pay.mjs --pay autonomo",
+    "pay:json": "node pay.mjs --json",
+    "quote": "node pay.mjs --quote --json"
   },
   "dependencies": {
     "@x402/core": "2.28.0",

@@ -30,6 +30,28 @@ npm run pay:autonomo   # pay in $AUTONOMO (one-time Permit2 approval on the firs
 
 The agent only pays in USDG (max $0.05 per payment) or $AUTONOMO (max 5,000 per payment) on Robinhood Chain.
 
+## For AI agents (Codex)
+
+`AGENTS.md` tells an AI agent how to use this folder: search Autonomo for paid APIs, check a price, pay, and answer with the data and the settlement link. Agents use the JSON modes:
+
+```bash
+npm run quote --silent              # price only, no payment: one JSON object
+npm run pay:json --silent           # pay and return one JSON object
+npm run pay:json --silent -- --pay autonomo --url https://autonomo.fun/x/<slug>/<path>
+```
+
+To demo with Codex:
+
+```bash
+npm i -g @openai/codex
+cd examples/agent-demo
+codex
+```
+
+Then ask: *"What's the current price of $AUTONOMO? Use a paid API if you need to."* Codex reads `AGENTS.md`, checks the price, asks you to approve running the payment, and answers with the price, what it paid, and the tx link.
+
+Codex can read files in this folder, so keep only a few dollars in the agent wallet. `AGENTS.md` tells it never to open `.env`.
+
 ## Recording the agent payment video
 
 ### 1. Fix the gateway (once)
