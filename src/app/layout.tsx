@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { TokenBar } from "@/components/token-bar";
 import "./globals.css";
 
 const barlow = Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-barlow" });
@@ -26,7 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${barlow.variable} ${barlowCondensed.variable} ${geistMono.variable}`}>
       <body className="min-h-dvh font-sans">
-        <header className="border-t-4 border-b border-t-brand border-b-line">
+        <TokenBar />
+        <header className="border-b border-line">
           <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-4 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5" aria-label="Autonomo home">
               <Logo className="h-7 w-auto" />
