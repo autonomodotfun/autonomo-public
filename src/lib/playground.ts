@@ -91,3 +91,30 @@ export async function quote(raw: string): Promise<Quote> {
     return { ok: false, error: e instanceof Error && e.name === "TimeoutError" ? "The API didn't answer in time" : "Couldn't reach the API" };
   }
 }
+
+// How the playground calls each gateway: the path after /x/<slug> that answers a plain question.
+// Gateways not listed here are called at their root.
+export const GATEWAY_PATHS: Record<string, string> = {
+  "token-price": "/price/autonomo",
+};
+
+const usd = (n: number) => (n >= 0.01 ? `$${n.toFixed(4)}` : `$${n.toPrecision(3)}`);
+
+/** A one-paragraph answer from the data an API returned. */
+export function answerFrom(data: unknown): string {
+  if (data && typeof data === "object") {
+    const d = data as Record<string, any>;
+    if (typeof d.priceUsd === "number") {
+      const name = typeof d.token === "string" ? `$${d.token.replace(/^\$/, "")}` : "The token";
+      const trade = d.lastTrade?.side && d.lastTrade?.time
+        ? `, from the last on-chain ${d.lastTrade.side} at ${new Date(d.lastTrade.time).toUTCString().slice(17, 22)} UTC`
+        : "";
+      const eth = typeof d.priceEth === "number" ? ` (${d.priceEth.toPrecision(3)} ETH)` : "";
+      return `${name} is about ${usd(d.priceUsd)}${eth}${trade}.`;
+    }
+    const text = JSON.stringify(data);
+    return text.length > 400 ? `${text.slice(0, 400)}…` : text;
+  }
+  const text = String(data ?? "").trim();
+  return text.length > 400 ? `${text.slice(0, 400)}…` : text || "The API returned an empty answer.";
+}

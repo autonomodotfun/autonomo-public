@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { playgroundPaymentsEnabled } from "@/lib/playground-pay";
 import { Playground } from "./playground";
 
 export const metadata: Metadata = {
@@ -20,8 +21,9 @@ export default function PlaygroundPage() {
       </p>
       <Playground />
       <p className="mt-6 text-sm text-faint">
-        In this preview the search and the price check are real: the agent calls the API and reads its live 402 response.
-        Paying, and with it the answer and receipt, goes live with the agent&apos;s wallet.
+        {playgroundPaymentsEnabled()
+          ? "Every step is real: the agent searches Autonomo, reads the live 402 price and pays from its own wallet on Robinhood Chain. Free to try, a few paid questions per visitor per day."
+          : "In this preview the search and the price check are real: the agent calls the API and reads its live 402 response. Paying, and with it the answer and receipt, goes live with the agent's wallet."}
       </p>
     </div>
   );

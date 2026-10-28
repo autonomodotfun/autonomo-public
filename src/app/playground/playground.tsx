@@ -16,7 +16,7 @@ const STEPS: { key: StepKey; icon: string; title: string }[] = [
   { key: "answer", icon: "💬", title: "Answer with the receipt" },
 ];
 
-const EXAMPLES = ["What's the current price of $AUTONOMO?", "Weather forecast for Tokyo", "Risk check for a Solana meme coin"];
+const EXAMPLES = ["What's the current price of $AUTONOMO?"];
 
 const blank = (): Record<StepKey, Step> => ({
   search: { state: "idle", detail: "" },
@@ -27,12 +27,15 @@ const blank = (): Record<StepKey, Step> => ({
 
 type Api = Extract<PlaygroundEvent, { step: "search"; state: "done" }>["api"];
 type Quote = Extract<PlaygroundEvent, { step: "quote"; state: "done" }>;
+type Paid = Extract<PlaygroundEvent, { step: "pay"; state: "done" }>;
 
 export function Playground() {
   const [question, setQuestion] = useState("");
   const [steps, setSteps] = useState(blank);
   const [api, setApi] = useState<Api | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [paid, setPaid] = useState<Paid | null>(null);
+  const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -43,6 +46,8 @@ export function Playground() {
     setSteps(blank());
     setApi(null);
     setQuote(null);
+    setPaid(null);
+    setAnswer("");
     setError("");
     setBusy(true);
     try {
@@ -79,6 +84,8 @@ export function Playground() {
     setSteps((s) => ({ ...s, [e.step]: { state: e.state, detail: e.detail } }));
     if (e.step === "search" && e.state === "done") setApi(e.api);
     if (e.step === "quote" && e.state === "done") setQuote(e);
+    if (e.step === "pay" && e.state === "done") setPaid(e);
+    if (e.step === "answer" && e.state === "done") setAnswer(e.text);
   }
 
   const started = steps.search.state !== "idle";
@@ -158,6 +165,38 @@ export function Playground() {
                           {o.network && <span className="text-faint"> · {networkLabel(normalizeNetwork(o.network) ?? o.network)}</span>}
                         </span>
                       ))}
+                    </div>
+                  )}
+                  {key === "pay" && paid && (
+                    <p className="mt-2 font-mono text-xs">
+                      Paid {paid.amount} $AUTONOMO
+                      {paid.explorer && (
+                        <>
+                          {" · "}
+                          <a href={paid.explorer} target="_blank" rel="noopener noreferrer" className="text-accent underline">
+                            view tx
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {key === "answer" && answer && (
+                    <div className="mt-2 rounded-md border border-accent p-3">
+                      <p className="font-semibold">{answer}</p>
+                      {paid && (
+                        <p className="mt-2 font-mono text-xs text-muted">
+                          <span className="mr-2 rounded-sm bg-brand px-1.5 py-0.5 text-on-brand">Receipt</span>
+                          Paid {paid.amount} $AUTONOMO · Robinhood Chain
+                          {paid.tx && (
+                            <>
+                              {" · "}
+                              <a href={paid.explorer ?? "#"} target="_blank" rel="noopener noreferrer" className="underline">
+                                tx {paid.tx.slice(0, 6)}…{paid.tx.slice(-4)}
+                              </a>
+                            </>
+                          )}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
