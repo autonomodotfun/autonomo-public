@@ -8,6 +8,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: base, changeFrequency: "daily", priority: 1 },
     { url: `${base}/projects`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${base}/docs`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${base}/api-docs`, changeFrequency: "monthly", priority: 0.6 },
     ...CATEGORIES.map((c) => ({ url: `${base}/projects?category=${c}`, changeFrequency: "daily" as const, priority: 0.8 })),
     ...slugs.map((s) => ({ url: `${base}/projects/${s.slug}`, lastModified: s.updatedAt, priority: 0.6 })),
   ];

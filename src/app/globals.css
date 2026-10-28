@@ -76,4 +76,12 @@ textarea:focus-visible {
   .btn-brand {
     @apply rounded-md bg-brand font-semibold tracking-wide text-on-brand uppercase hover:brightness-95 disabled:opacity-50;
   }
+
+  /* Long-form docs text: underlined links and inline code chips (code blocks style themselves). */
+  .docs-body a:not(.no-underline) {
+    @apply underline decoration-faint underline-offset-2 hover:decoration-ink;
+  }
+  .docs-body :not(pre) > code {
+    @apply rounded-sm bg-surface px-1 py-0.5 font-mono text-[0.85em];
+  }
 }
