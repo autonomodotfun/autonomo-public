@@ -113,8 +113,8 @@ const { data } = await res.json(); // url, method, priceUsd, network, payTo, ...
 const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 // Where Autonomo is. Update `status` as phases ship; "live" items are things anyone can use today.
-// In the phase being built, items with `now: true` are the ones in progress; the rest of that phase is up next.
-type Item = { title: string; note?: string; now?: boolean };
+// In the phase being built, items with `now: true` are in progress, `done: true` are complete, the rest are up next.
+type Item = { title: string; note?: string; now?: boolean; done?: boolean };
 type Phase = { name: string; status: "live" | "building" | "next" | "later"; summary?: string; items: Item[] };
 const ROADMAP: Phase[] = [
   {
@@ -132,9 +132,9 @@ const ROADMAP: Phase[] = [
   {
     name: "Phase 2",
     status: "building",
-    summary: "the Autonomo agent bot for Telegram and more high-quality official APIs",
+    summary: "the Autonomo agent bot for Telegram is complete, and more high-quality official APIs are in progress",
     items: [
-      { title: "Autonomo agent bot for Telegram", note: "The playground in DMs and groups, with free daily answers", now: true },
+      { title: "Autonomo agent bot for Telegram", note: "Live at t.me/autonomoagentbot: ask in a DM or a group, with free daily answers", done: true },
       { title: "More high-quality official APIs", note: "Ideas: wallet portfolio, transaction explainer, page to clean text", now: true },
       { title: "Autonomo MCP server", note: "Claude, Codex and other agents find and pay APIs natively" },
       { title: "Agent SDK and CLI", note: "With spend limits built in" },
@@ -440,7 +440,7 @@ export default async function DocsPage() {
           <div className="rounded-lg border border-accent bg-surface p-4">
             <p className="font-mono text-xs tracking-wide text-accent uppercase">Live status</p>
             <p className="mt-2 text-ink">
-              Phase 1 is live.{current ? <> We&apos;re building <b>{current.name}</b>: {current.summary ?? current.items.filter((i) => i.now).map((i) => i.title).join(" and ")}.</> : null}
+              Phase 1 is live.{current ? <> In <b>{current.name}</b>, {current.summary ?? current.items.filter((i) => i.now).map((i) => i.title).join(" and ")}.</> : null}
             </p>
             {liveApis.length > 0 && (
               <p className="mt-2 text-sm text-muted">
@@ -466,8 +466,9 @@ export default async function DocsPage() {
                 </div>
                 <ul className="mt-3 space-y-2">
                   {phase.items.map((item) => {
+                    const done = phase.status === "building" && item.done;
                     const active = phase.status === "building" && item.now;
-                    const upNext = phase.status === "building" && !item.now;
+                    const upNext = phase.status === "building" && !item.now && !item.done;
                     return (
                       <li
                         key={item.title}
@@ -475,11 +476,12 @@ export default async function DocsPage() {
                       >
                         <span
                           className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${
-                            phase.status === "live" || active ? "bg-brand" : "bg-faint"
+                            phase.status === "live" || active || done ? "bg-brand" : "bg-faint"
                           }`}
                         />
                         <span className="min-w-0 flex-1">
                           <span className={upNext ? "text-muted" : "text-ink"}>{item.title}</span>
+                          {done && <span className="ml-2 rounded-sm bg-brand px-1.5 py-0.5 font-mono text-[10px] tracking-wide text-on-brand uppercase">✓ Complete</span>}
                           {active && <span className="ml-2 font-mono text-[10px] tracking-wide text-accent uppercase">In progress</span>}
                           {upNext && <span className="ml-2 font-mono text-[10px] tracking-wide text-faint uppercase">Up next</span>}
                           {item.note && <span className="block text-sm text-muted">{item.note}</span>}
