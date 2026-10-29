@@ -1,9 +1,13 @@
-# Autonomo tools API (official Autonomo APIs)
+# Autonomo tools API (all official Autonomo APIs)
 
-Four small APIs agents can pay for in $AUTONOMO, each behind its own Autonomo gateway.
+Every official Autonomo API in one Vercel project (tools.autonomo.fun), each behind its own Autonomo gateway.
+All gateways use the same upstream base, `https://tools.autonomo.fun/v1`, and the same key.
 
 | Gateway slug | Upstream path | What it returns |
 | --- | --- | --- |
+| `token-price` | `/v1/price/autonomo` | The live $AUTONOMO price (same as token-lookup for $AUTONOMO) |
+| `new-launches` | `/v1/launches?limit=10` | The newest Robinhood Chain launchpad tokens: age, buys, sells, market cap, curve progress |
+| `token-risk` | `/v1/risk/<token>` | Rug-risk score: holder concentration, creator, launch-block buyers, bot volume |
 | `token-lookup` | `/v1/price/<token>` | Live price and market cap of any Robinhood Chain launchpad token, from its bonding curve (USDG and WETH too) |
 | `tx-explainer` | `/v1/tx/<hash>` | A Robinhood Chain transaction in plain English: launches, curve buys and sells (router and bundled buys grouped), transfers, fee |
 | `wallet-portfolio` | `/v1/portfolio/<wallet>?days=2` | ETH, USDG, WETH and $AUTONOMO, plus tokens received in the last 1–7 days, valued in USD; copies of known symbols are flagged as likely impostors |
@@ -21,6 +25,6 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
 
 ## Deploy
 
-A plain Vercel project, like `examples/risk-api`. Point each gateway's upstream at the matching base, for example
-`https://tools.autonomo.fun/v1/price` for `token-lookup`, with auth header `x-api-key`. The slugs above are the ones
-the Agent Playground and the Telegram bot know how to call.
+A plain Vercel project. Every gateway's upstream is `https://tools.autonomo.fun/v1` with auth header `x-api-key` and
+the `TOOLS_API_KEY` value; the Agent Playground and the Telegram bot add the right path for each slug above.
+`examples/price-api`, `launches-api` and `risk-api` are the earlier single-API versions, kept until their gateways move here.
