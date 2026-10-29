@@ -113,18 +113,20 @@ const { data } = await res.json(); // url, method, priceUsd, network, payTo, ...
 const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 // Where Autonomo is. Update `status` as phases ship; "live" items are things anyone can use today.
-type Phase = { name: string; status: "live" | "building" | "next" | "later"; summary?: string; items: [string, string?][] };
+// In the phase being built, items with `now: true` are the ones in progress; the rest of that phase is up next.
+type Item = { title: string; note?: string; now?: boolean };
+type Phase = { name: string; status: "live" | "building" | "next" | "later"; summary?: string; items: Item[] };
 const ROADMAP: Phase[] = [
   {
     name: "Phase 1",
     status: "live",
     items: [
-      ["Hosted x402 gateways for any API", "Launch from the dashboard, get paid per call"],
-      ["Pay per call in USDG or $AUTONOMO", "On Robinhood Chain, settled by Autonomo's own facilitator"],
-      ["Owner dashboard and on-chain receipts", "Paid calls, earnings and tx links"],
-      ["AI agents paying live", "Codex demo and the agent payment example"],
-      ["Agent Playground", "Ask a question, watch an agent pay in $AUTONOMO"],
-      ["Official Autonomo APIs", "$AUTONOMO price, New Launches and Risk Checker"],
+      { title: "Hosted x402 gateways for any API", note: "Launch from the dashboard, get paid per call" },
+      { title: "Pay per call in USDG or $AUTONOMO", note: "On Robinhood Chain, settled by Autonomo's own facilitator" },
+      { title: "Owner dashboard and on-chain receipts", note: "Paid calls, earnings and tx links" },
+      { title: "AI agents paying live", note: "Codex demo and the agent payment example" },
+      { title: "Agent Playground", note: "Ask a question, watch an agent pay in $AUTONOMO" },
+      { title: "Official Autonomo APIs", note: "$AUTONOMO price, New Launches and Risk Checker" },
     ],
   },
   {
@@ -132,23 +134,17 @@ const ROADMAP: Phase[] = [
     status: "building",
     summary: "the Autonomo agent bot for Telegram and more high-quality official APIs",
     items: [
-      ["Autonomo agent bot for Telegram", "The playground in DMs and groups, with free daily answers"],
-      ["More high-quality official APIs", "Ideas: wallet portfolio, transaction explainer, page to clean text"],
-    ],
-  },
-  {
-    name: "Phase 3",
-    status: "next",
-    items: [
-      ["Autonomo MCP server", "Claude, Codex and other agents find and pay APIs natively"],
-      ["Agent SDK and CLI", "With spend limits built in"],
-      ["Webhooks and payout analytics", "For API owners"],
+      { title: "Autonomo agent bot for Telegram", note: "The playground in DMs and groups, with free daily answers", now: true },
+      { title: "More high-quality official APIs", note: "Ideas: wallet portfolio, transaction explainer, page to clean text", now: true },
+      { title: "Autonomo MCP server", note: "Claude, Codex and other agents find and pay APIs natively" },
+      { title: "Agent SDK and CLI", note: "With spend limits built in" },
+      { title: "Webhooks and payout analytics", note: "For API owners" },
     ],
   },
   {
     name: "Later",
     status: "later",
-    items: [["More chains and stablecoins"], ["Verified API listings and reputation"]],
+    items: [{ title: "More chains and stablecoins" }, { title: "Verified API listings and reputation" }],
   },
 ];
 
@@ -440,7 +436,7 @@ export default async function DocsPage() {
           <div className="rounded-lg border border-accent bg-surface p-4">
             <p className="font-mono text-xs tracking-wide text-accent uppercase">Live status</p>
             <p className="mt-2 text-ink">
-              Phase 1 is live.{current ? <> We&apos;re building <b>{current.name}</b>: {current.summary ?? current.items.map(([t]) => t).join(" and ")}.</> : null}
+              Phase 1 is live.{current ? <> We&apos;re building <b>{current.name}</b>: {current.summary ?? current.items.filter((i) => i.now).map((i) => i.title).join(" and ")}.</> : null}
             </p>
             {liveApis.length > 0 && (
               <p className="mt-2 text-sm text-muted">
@@ -465,15 +461,28 @@ export default async function DocsPage() {
                   </span>
                 </div>
                 <ul className="mt-3 space-y-2">
-                  {phase.items.map(([title, note]) => (
-                    <li key={title} className="flex gap-2.5">
-                      <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${phase.status === "live" ? "bg-brand" : phase.status === "building" ? "bg-accent" : "bg-faint"}`} />
-                      <span>
-                        <span className="text-ink">{title}</span>
-                        {note && <span className="block text-sm text-muted">{note}</span>}
-                      </span>
-                    </li>
-                  ))}
+                  {phase.items.map((item) => {
+                    const active = phase.status === "building" && item.now;
+                    const upNext = phase.status === "building" && !item.now;
+                    return (
+                      <li
+                        key={item.title}
+                        className={`flex gap-2.5 ${active ? "-mx-2 rounded-md border border-accent bg-accent-soft px-2 py-1.5" : ""}`}
+                      >
+                        <span
+                          className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${
+                            phase.status === "live" || active ? "bg-brand" : "bg-faint"
+                          }`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className={upNext ? "text-muted" : "text-ink"}>{item.title}</span>
+                          {active && <span className="ml-2 font-mono text-[10px] tracking-wide text-accent uppercase">In progress</span>}
+                          {upNext && <span className="ml-2 font-mono text-[10px] tracking-wide text-faint uppercase">Up next</span>}
+                          {item.note && <span className="block text-sm text-muted">{item.note}</span>}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </li>
             ))}
