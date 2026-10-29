@@ -191,3 +191,16 @@ export type GatewayCall = typeof gatewayCalls.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type Endpoint = typeof endpoints.$inferSelect;
 export type Submission = typeof submissions.$inferSelect;
+
+// One row per paid answer the Telegram agent bot gave, for each user's free daily allowance.
+export const telegramQuestions = pgTable(
+  "telegram_questions",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    chatId: text("chat_id").notNull(),
+    tx: text("tx"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("telegram_questions_user_created_idx").on(t.userId, t.createdAt)],
+);

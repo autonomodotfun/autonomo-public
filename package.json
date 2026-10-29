@@ -13,7 +13,8 @@
     "db:seed": "tsx scripts/seed-curated.ts",
     "db:import": "tsx scripts/import-bazaar.ts",
     "db:setup": "npm run db:migrate && npm run db:seed && npm run db:import",
-    "db:remove": "tsx scripts/remove-project.ts"
+    "db:remove": "tsx scripts/remove-project.ts",
+    "telegram:setup": "tsx scripts/telegram-setup.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",
