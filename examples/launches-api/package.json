@@ -1,0 +1,10 @@
+{
+  "name": "autonomo-launches-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Official Autonomo API: the newest token launches on the Robinhood Chain launchpad, read from on-chain data.",
+  "dependencies": {
+    "viem": "2.57.12"
+  }
+}
