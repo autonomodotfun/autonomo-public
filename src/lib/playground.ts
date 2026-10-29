@@ -94,13 +94,48 @@ export async function quote(raw: string): Promise<Quote> {
 
 // How the playground calls each gateway: the path after /x/<slug> that answers a plain question.
 // Gateways not listed here are called at their root. A null path means the question lacks a needed input.
+const TX_HASH = /0x[0-9a-fA-F]{64}(?![0-9a-fA-F])/;
+const ADDRESS = /0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/;
+const HTTPS_URL = /https:\/\/[^\s<>"']+/i;
+
+/** A contract or wallet address in the question (not part of a tx hash), or $AUTONOMO's when it's named. */
+function addressIn(q: string, allowAutonomo = true) {
+  const cleaned = q.replace(TX_HASH, " ").replace(HTTPS_URL, " ");
+  return cleaned.match(ADDRESS)?.[0]?.toLowerCase() ?? (allowAutonomo && /\$?autonomo\b/i.test(cleaned) ? TOKEN.address : null);
+}
+
 const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
   "token-price": () => "/price/autonomo",
   "new-launches": () => "/launches?limit=10",
   "token-risk": (q) => {
-    const address = q.match(/0x[0-9a-fA-F]{40}/)?.[0] ?? (/\$?autonomo\b/i.test(q) ? TOKEN.address : null);
-    return address ? `/risk/${address.toLowerCase()}` : null;
+    const address = addressIn(q);
+    return address ? `/risk/${address}` : null;
   },
+  "token-lookup": (q) => {
+    const address = addressIn(q);
+    return address ? `/price/${address}` : null;
+  },
+  "tx-explainer": (q) => {
+    const hash = q.match(TX_HASH)?.[0];
+    return hash ? `/tx/${hash.toLowerCase()}` : null;
+  },
+  "wallet-portfolio": (q) => {
+    const address = addressIn(q, false);
+    return address ? `/portfolio/${address}` : null;
+  },
+  "page-reader": (q) => {
+    const url = q.match(HTTPS_URL)?.[0]?.replace(/[).,!?]+$/, "");
+    return url ? `/page?url=${encodeURIComponent(url)}` : null;
+  },
+};
+
+// What each gateway needs when the question doesn't include it.
+export const MISSING_INPUT: Record<string, string> = {
+  "token-risk": "a token contract address",
+  "token-lookup": "a token contract address",
+  "tx-explainer": "a transaction hash",
+  "wallet-portfolio": "a wallet address",
+  "page-reader": "an https:// link",
 };
 
 // A question that shows off each known gateway; others get a generic one built from their name.
@@ -108,6 +143,10 @@ const EXAMPLE_QUESTIONS: Record<string, string> = {
   "token-price": "What's the current price of $AUTONOMO?",
   "new-launches": "What are the newest token launches?",
   "token-risk": "Is $AUTONOMO safe? Run a rug-risk check",
+  "token-lookup": `Price of token ${TOKEN.address}`,
+  "tx-explainer": "Explain transaction 0x7bd85b4da40a3cf8f5445faa3affac958661f33e4f3790abe288161af6615f07",
+  "wallet-portfolio": "What does wallet 0xde87838695ba7151ae93ca24c96b2f5334f4988b hold?",
+  "page-reader": "Read this page: https://autonomo.fun/docs",
 };
 
 export function exampleQuestion(slug: string, name: string) {
@@ -122,14 +161,19 @@ export function gatewayPath(slug: string, question: string) {
 /** Keywords for gateways that need an input the plain keyword search wouldn't see. */
 export function intentKeywords(question: string) {
   const extra: string[] = [];
-  if (/0x[0-9a-fA-F]{40}/.test(question) || /\b(safe|rug|risk|scam|legit|holders?)\b/i.test(question)) extra.push("risk", "rug");
+  const hasAddress = ADDRESS.test(question.replace(TX_HASH, " "));
+  if (TX_HASH.test(question)) extra.push("transaction", "explain", "explainer");
+  if (HTTPS_URL.test(question)) extra.push("page", "read", "reader", "text");
+  if (/\b(safe|rug|risk|scam|legit)\b/i.test(question)) extra.push("risk", "rug");
+  else if (hasAddress && /\b(wallet|portfolio|holdings?|holds?|balances?|owns?)\b/i.test(question)) extra.push("wallet", "portfolio");
+  else if (hasAddress) extra.push("token", "price", "lookup");
   return extra;
 }
 
 const usd = (n: number) => (n >= 0.01 ? `$${n.toFixed(4)}` : `$${n.toPrecision(3)}`);
 
 const compactUsd = (n: number) =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${n.toFixed(0)}`;
+  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : n >= 10 ? `$${n.toFixed(0)}` : `$${n.toFixed(2)}`;
 
 /** A short answer from the data an API returned: a list for launch feeds, a sentence for prices. */
 export function answerFrom(data: unknown): string {
@@ -157,8 +201,33 @@ export function answerFrom(data: unknown): string {
       });
       return [`The ${lines.length} newest launches on ${d.chain ?? "Robinhood Chain"}:`, ...lines].join("\n");
     }
+    // Transaction explainer: its own plain-English summary.
+    if (typeof d.summary === "string" && typeof d.hash === "string") {
+      const fee = typeof d.feeUsd === "number" ? ` Fee: $${d.feeUsd < 0.01 ? d.feeUsd.toPrecision(2) : d.feeUsd.toFixed(2)}.` : "";
+      return `${d.summary}${fee}`;
+    }
+    // Wallet portfolio: total, then the biggest holdings.
+    if (typeof d.totalUsd === "number" && Array.isArray(d.tokens)) {
+      const rows = [
+        d.eth?.amount > 0 ? `• ETH: ${Number(d.eth.amount).toPrecision(3)} (${compactUsd(d.eth.valueUsd ?? 0)})` : "",
+        ...d.tokens.slice(0, 8).map((t: Record<string, any>) => {
+          const amount = Number(t.amount).toLocaleString("en-US", { maximumFractionDigits: 2 });
+          const value = typeof t.valueUsd === "number" ? ` (${compactUsd(t.valueUsd)})` : " (no price)";
+          return `• ${t.symbol ? `$${t.symbol}` : String(t.token).slice(0, 8)}: ${amount}${value}${t.warning ? " ⚠ likely impostor" : ""}`;
+        }),
+      ].filter(Boolean);
+      return [`This wallet holds about ${compactUsd(d.totalUsd)} on ${d.chain ?? "Robinhood Chain"}:`, ...rows].join("\n");
+    }
+    // Page reader: title and the start of the text.
+    if (typeof d.text === "string" && typeof d.url === "string") {
+      const excerpt = d.text.replace(/\s+/g, " ").slice(0, 320);
+      return [`${d.title ?? d.url}${typeof d.words === "number" ? ` (${d.words.toLocaleString("en-US")} words)` : ""}`, d.description ?? "", `${excerpt}${d.text.length > 320 ? "…" : ""}`]
+        .filter(Boolean)
+        .join("\n");
+    }
     if (typeof d.priceUsd === "number") {
-      const name = typeof d.token === "string" ? `$${d.token.replace(/^\$/, "")}` : "The token";
+      const label = typeof d.symbol === "string" ? d.symbol : typeof d.token === "string" && !d.token.startsWith("0x") ? d.token : null;
+      const name = label ? `$${label.replace(/^\$/, "")}` : "The token";
       const trade = d.lastTrade?.side && d.lastTrade?.time
         ? `, from the last on-chain ${d.lastTrade.side} at ${new Date(d.lastTrade.time).toUTCString().slice(17, 22)} UTC`
         : "";

@@ -1,0 +1,10 @@
+{
+  "functions": { "api/*.js": { "maxDuration": 30 } },
+  "rewrites": [
+    { "source": "/v1/price/:token", "destination": "/api/price?token=:token" },
+    { "source": "/v1/tx/:hash", "destination": "/api/tx?hash=:hash" },
+    { "source": "/v1/portfolio/:wallet", "destination": "/api/portfolio?wallet=:wallet" },
+    { "source": "/v1/page", "destination": "/api/page" },
+    { "source": "/v1/health", "destination": "/api/health" }
+  ]
+}

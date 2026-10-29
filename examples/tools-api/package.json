@@ -1,0 +1,10 @@
+{
+  "name": "autonomo-tools-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Official Autonomo APIs: token price by contract, transaction explainer, wallet portfolio and page to clean text.",
+  "dependencies": {
+    "viem": "2.57.12"
+  }
+}

@@ -1,5 +1,5 @@
 import "server-only";
-import { answerFrom, gatewayPath, intentKeywords, keywordsFrom, quote } from "@/lib/playground";
+import { answerFrom, gatewayPath, intentKeywords, keywordsFrom, MISSING_INPUT, quote } from "@/lib/playground";
 import type { PlaygroundEvent } from "@/lib/playground-events";
 import { payAndCall, playgroundPaymentsEnabled } from "@/lib/playground-pay";
 import { findAutonomoGateways } from "@/lib/queries";
@@ -27,16 +27,19 @@ export async function runAgent(question: string, send: (e: PlaygroundEvent) => v
 
     // Take the first gateway that answers with a readable 402 that includes $AUTONOMO.
     let picked: { g: (typeof candidates)[number]; url: string; offers: { token: string; amount: string; network: string }[] } | null = null;
-    for (const [i, g] of candidates.entries()) {
+    let missing: string | null = null; // the best match needed an input the question didn't include
+    let tried = 0;
+    for (const g of candidates) {
       const path = gatewayPath(g.slug, question);
       if (path === null) {
-        send({ step: "search", state: "fail", detail: `${g.name} needs a token contract address. Ask again with the 0x… address.` });
-        return;
+        missing ??= `${g.name} needs ${MISSING_INPUT[g.slug] ?? "more detail"}. Ask again and include it.`;
+        continue;
       }
       const url = `${site}/x/${g.slug}${path}`;
       const api = { name: g.name, slug: g.projectSlug, url, description: g.description || null, autonomo: true };
-      send({ step: "search", state: "done", detail: i === 0 ? `Found ${g.name}` : `Trying ${g.name} instead`, api });
-      if (i === 0) send({ step: "quote", state: "running", detail: "Calling it without paying to read the price…" });
+      send({ step: "search", state: "done", detail: tried === 0 ? `Found ${g.name}` : `Trying ${g.name} instead`, api });
+      if (tried === 0) send({ step: "quote", state: "running", detail: "Calling it without paying to read the price…" });
+      tried++;
       const q = await quote(url);
       if (q.ok && q.offers.some((o) => o.token === "$AUTONOMO")) {
         picked = { g, url, offers: q.offers.map(({ token, amount, network }) => ({ token, amount, network })) };
@@ -44,7 +47,8 @@ export async function runAgent(question: string, send: (e: PlaygroundEvent) => v
       }
     }
     if (!picked) {
-      send({ step: "quote", state: "fail", detail: "None of the matching APIs returned a $AUTONOMO price right now." });
+      if (tried === 0 && missing) send({ step: "search", state: "fail", detail: missing });
+      else send({ step: "quote", state: "fail", detail: "None of the matching APIs returned a $AUTONOMO price right now." });
       return;
     }
     send({ step: "quote", state: "done", detail: "402 Payment Required", offers: picked.offers, acceptsAutonomo: true });
