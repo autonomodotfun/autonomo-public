@@ -103,6 +103,17 @@ const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
   },
 };
 
+// A question that shows off each known gateway; others get a generic one built from their name.
+const EXAMPLE_QUESTIONS: Record<string, string> = {
+  "token-price": "What's the current price of $AUTONOMO?",
+  "new-launches": "What are the newest token launches?",
+  "token-risk": "Is $AUTONOMO safe? Run a rug-risk check",
+};
+
+export function exampleQuestion(slug: string, name: string) {
+  return EXAMPLE_QUESTIONS[slug] ?? `Use ${name}`;
+}
+
 export function gatewayPath(slug: string, question: string) {
   const path = GATEWAY_PATHS[slug];
   return path ? path(question) : "";
