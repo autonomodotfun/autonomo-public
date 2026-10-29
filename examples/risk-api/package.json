@@ -1,0 +1,10 @@
+{
+  "name": "autonomo-risk-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Official Autonomo API: a rug-risk check for Robinhood Chain launchpad tokens, read from on-chain data.",
+  "dependencies": {
+    "viem": "2.57.12"
+  }
+}
