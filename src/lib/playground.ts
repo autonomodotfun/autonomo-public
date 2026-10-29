@@ -96,14 +96,29 @@ export async function quote(raw: string): Promise<Quote> {
 // Gateways not listed here are called at their root.
 export const GATEWAY_PATHS: Record<string, string> = {
   "token-price": "/price/autonomo",
+  "new-launches": "/launches?limit=10",
 };
 
 const usd = (n: number) => (n >= 0.01 ? `$${n.toFixed(4)}` : `$${n.toPrecision(3)}`);
 
-/** A one-paragraph answer from the data an API returned. */
+const compactUsd = (n: number) =>
+  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${n.toFixed(0)}`;
+
+/** A short answer from the data an API returned: a list for launch feeds, a sentence for prices. */
 export function answerFrom(data: unknown): string {
   if (data && typeof data === "object") {
     const d = data as Record<string, any>;
+    if (Array.isArray(d.launches)) {
+      if (!d.launches.length) return "No new launches found right now.";
+      const lines = d.launches.slice(0, 10).map((l: Record<string, any>, i: number) => {
+        const name = l.symbol ? `$${l.symbol}` : `${String(l.token).slice(0, 8)}…`;
+        const age = typeof l.ageMinutes === "number" ? (l.ageMinutes < 60 ? `${l.ageMinutes} min ago` : `${Math.round(l.ageMinutes / 60)} h ago`) : "";
+        const buys = l.trades ? `${l.trades.buys} buys` : "";
+        const mcap = typeof l.marketCapUsd === "number" ? `${compactUsd(l.marketCapUsd)} mcap` : "";
+        return `${i + 1}. ${name}${l.name && l.name !== l.symbol ? ` (${l.name})` : ""} · ${[age, buys, mcap].filter(Boolean).join(" · ")}`;
+      });
+      return [`The ${lines.length} newest launches on ${d.chain ?? "Robinhood Chain"}:`, ...lines].join("\n");
+    }
     if (typeof d.priceUsd === "number") {
       const name = typeof d.token === "string" ? `$${d.token.replace(/^\$/, "")}` : "The token";
       const trade = d.lastTrade?.side && d.lastTrade?.time

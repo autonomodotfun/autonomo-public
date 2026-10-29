@@ -16,7 +16,7 @@ const STEPS: { key: StepKey; icon: string; title: string }[] = [
   { key: "answer", icon: "💬", title: "Answer with the receipt" },
 ];
 
-const EXAMPLES = ["What's the current price of $AUTONOMO?"];
+const EXAMPLES = ["What's the current price of $AUTONOMO?", "What are the newest token launches?"];
 
 const blank = (): Record<StepKey, Step> => ({
   search: { state: "idle", detail: "" },
@@ -182,7 +182,7 @@ export function Playground() {
                   )}
                   {key === "answer" && answer && (
                     <div className="mt-2 rounded-md border border-accent p-3">
-                      <p className="font-semibold">{answer}</p>
+                      <p className="font-semibold whitespace-pre-line">{answer}</p>
                       {paid && (
                         <p className="mt-2 font-mono text-xs text-muted">
                           <span className="mr-2 rounded-sm bg-brand px-1.5 py-0.5 text-on-brand">Receipt</span>
