@@ -95,26 +95,27 @@ export async function findLaunch(token, latest) {
   return hit;
 }
 
-/** Price in ETH from the latest buy or sell on a curve, looking back in growing windows. */
+/** Price in ETH from the latest buy or sell on a curve since `fromBlock`.
+ * Buys and sells are queried separately: the RPC caps "buy or sell" queries at 100,000 blocks, but allows far
+ * larger ranges for a single event type on one contract. */
 export async function curvePrice(curve, latest, fromBlock = 0n) {
-  for (const span of [100_000n, 1_000_000n, 9_000_000n]) {
-    const from = latest - span > fromBlock ? latest - span : fromBlock;
-    const logs = await logsBetween({ address: curve, topics: [[BUY, SELL]] }, from, latest);
-    const last = logs.at(-1);
-    if (last) {
-      const w = words(last.data);
-      const [eth, tokens] = last.topics[0] === BUY ? [w[0], w[1]] : [w[1], w[0]];
-      const block = await rh.getBlock({ blockNumber: BigInt(last.blockNumber) });
-      return {
-        priceEth: tokens > 0n ? Number(eth) / Number(tokens) : null,
-        side: last.topics[0] === BUY ? "buy" : "sell",
-        time: new Date(Number(block.timestamp) * 1000).toISOString(),
-        tx: last.transactionHash,
-      };
-    }
-    if (from === fromBlock) break;
-  }
-  return null;
+  const from = fromBlock > 0n ? fromBlock : latest > LOOKBACK ? latest - LOOKBACK : 0n;
+  const [buys, sells] = await Promise.all([
+    logsBetween({ address: curve, topics: [BUY] }, from, latest),
+    logsBetween({ address: curve, topics: [SELL] }, from, latest),
+  ]);
+  const order = (l) => BigInt(l.blockNumber) * 100_000n + BigInt(l.logIndex);
+  const last = [buys.at(-1), sells.at(-1)].filter(Boolean).sort((a, b) => (order(a) > order(b) ? -1 : 1))[0];
+  if (!last) return null;
+  const w = words(last.data);
+  const [eth, tokens] = last.topics[0] === BUY ? [w[0], w[1]] : [w[1], w[0]];
+  const block = await rh.getBlock({ blockNumber: BigInt(last.blockNumber) });
+  return {
+    priceEth: tokens > 0n ? Number(eth) / Number(tokens) : null,
+    side: last.topics[0] === BUY ? "buy" : "sell",
+    time: new Date(Number(block.timestamp) * 1000).toISOString(),
+    tx: last.transactionHash,
+  };
 }
 
 export function sendJson(res, status, body) {

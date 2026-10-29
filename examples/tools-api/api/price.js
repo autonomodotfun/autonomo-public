@@ -3,13 +3,15 @@
 // USDG is always $1 and WETH tracks ETH; other tokens must come from the launchpad.
 
 import { isAddress } from "viem";
-import { authorized, curvePrice, erc20, ethUsd, EXPLORER, findLaunch, rh, sendJson, tokenMeta, USDG, WETH } from "./_lib.js";
+import { AUTONOMO, authorized, curvePrice, erc20, ethUsd, EXPLORER, findLaunch, rh, sendJson, tokenMeta, USDG, WETH } from "./_lib.js";
 
 const cache = new Map();
 
 export default async function handler(req, res) {
   if (!authorized(req)) return sendJson(res, 401, { error: "unauthorized" });
-  const token = String(req.query.token ?? "").trim().toLowerCase();
+  // "autonomo" is accepted as a name, so the original /v1/price/autonomo path keeps working.
+  const raw = String(req.query.token ?? "").trim().toLowerCase();
+  const token = raw === "autonomo" || raw === "$autonomo" ? AUTONOMO : raw;
   if (!isAddress(token)) return sendJson(res, 400, { error: "bad_token", message: "Pass a token contract address: /v1/price/0x…" });
 
   const hit = cache.get(token);
