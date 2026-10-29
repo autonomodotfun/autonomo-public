@@ -93,11 +93,27 @@ export async function quote(raw: string): Promise<Quote> {
 }
 
 // How the playground calls each gateway: the path after /x/<slug> that answers a plain question.
-// Gateways not listed here are called at their root.
-export const GATEWAY_PATHS: Record<string, string> = {
-  "token-price": "/price/autonomo",
-  "new-launches": "/launches?limit=10",
+// Gateways not listed here are called at their root. A null path means the question lacks a needed input.
+const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
+  "token-price": () => "/price/autonomo",
+  "new-launches": () => "/launches?limit=10",
+  "token-risk": (q) => {
+    const address = q.match(/0x[0-9a-fA-F]{40}/)?.[0] ?? (/\$?autonomo\b/i.test(q) ? TOKEN.address : null);
+    return address ? `/risk/${address.toLowerCase()}` : null;
+  },
 };
+
+export function gatewayPath(slug: string, question: string) {
+  const path = GATEWAY_PATHS[slug];
+  return path ? path(question) : "";
+}
+
+/** Keywords for gateways that need an input the plain keyword search wouldn't see. */
+export function intentKeywords(question: string) {
+  const extra: string[] = [];
+  if (/0x[0-9a-fA-F]{40}/.test(question) || /\b(safe|rug|risk|scam|legit|holders?)\b/i.test(question)) extra.push("risk", "rug");
+  return extra;
+}
 
 const usd = (n: number) => (n >= 0.01 ? `$${n.toFixed(4)}` : `$${n.toPrecision(3)}`);
 
@@ -108,6 +124,17 @@ const compactUsd = (n: number) =>
 export function answerFrom(data: unknown): string {
   if (data && typeof data === "object") {
     const d = data as Record<string, any>;
+    if (d.risk && typeof d.risk.level === "string") {
+      const name = d.symbol ? `$${d.symbol}` : "This token";
+      const flags = Array.isArray(d.risk.flags) ? d.risk.flags.slice(0, 4).map((f: Record<string, any>) => `• ${f.text}`) : [];
+      const facts = [
+        typeof d.holders?.count === "number" ? `${d.holders.count} holders` : "",
+        typeof d.holders?.top10Percent === "number" ? `top 10 hold ${d.holders.top10Percent.toFixed(1)}%` : "",
+        typeof d.market?.marketCapUsd === "number" ? `${compactUsd(d.market.marketCapUsd)} mcap` : "",
+      ].filter(Boolean).join(" · ");
+      return [`${name} rug risk: ${d.risk.level.toUpperCase()} (score ${d.risk.score})`, ...flags, facts, "Heuristic from on-chain data, not financial advice."]
+        .filter(Boolean).join("\n");
+    }
     if (Array.isArray(d.launches)) {
       if (!d.launches.length) return "No new launches found right now.";
       const lines = d.launches.slice(0, 10).map((l: Record<string, any>, i: number) => {

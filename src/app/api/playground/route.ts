@@ -1,4 +1,4 @@
-import { answerFrom, GATEWAY_PATHS, keywordsFrom, quote } from "@/lib/playground";
+import { answerFrom, gatewayPath, intentKeywords, keywordsFrom, quote } from "@/lib/playground";
 import type { PlaygroundEvent } from "@/lib/playground-events";
 import { payAndCall, playgroundPaymentsEnabled } from "@/lib/playground-pay";
 import { findAutonomoGateways } from "@/lib/queries";
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       const send = (e: PlaygroundEvent) => controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
       try {
         send({ step: "search", state: "running", detail: "Searching Autonomo for an API that takes $AUTONOMO…" });
-        const candidates = await findAutonomoGateways(keywordsFrom(question), 3);
+        const candidates = await findAutonomoGateways([...keywordsFrom(question), ...intentKeywords(question)], 3);
         if (!candidates.length) {
           send({ step: "search", state: "fail", detail: "No API on Autonomo answers that yet. Try asking for the $AUTONOMO price." });
           return;
@@ -48,7 +48,12 @@ export async function POST(request: Request) {
         // Take the first gateway that answers with a readable 402 that includes $AUTONOMO.
         let picked: { g: (typeof candidates)[number]; url: string; offers: { token: string; amount: string; network: string }[] } | null = null;
         for (const [i, g] of candidates.entries()) {
-          const url = `${site}/x/${g.slug}${GATEWAY_PATHS[g.slug] ?? ""}`;
+          const path = gatewayPath(g.slug, question);
+          if (path === null) {
+            send({ step: "search", state: "fail", detail: `${g.name} needs a token contract address. Ask again with the 0x… address.` });
+            return;
+          }
+          const url = `${site}/x/${g.slug}${path}`;
           const api = { name: g.name, slug: g.projectSlug, url, description: g.description || null, autonomo: true };
           send({ step: "search", state: "done", detail: i === 0 ? `Found ${g.name}` : `Trying ${g.name} instead`, api });
           if (i === 0) send({ step: "quote", state: "running", detail: "Calling it without paying to read the price…" });

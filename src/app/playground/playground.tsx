@@ -16,7 +16,7 @@ const STEPS: { key: StepKey; icon: string; title: string }[] = [
   { key: "answer", icon: "💬", title: "Answer with the receipt" },
 ];
 
-const EXAMPLES = ["What's the current price of $AUTONOMO?", "What are the newest token launches?"];
+const EXAMPLES = ["What's the current price of $AUTONOMO?", "What are the newest token launches?", "Is $AUTONOMO safe? Run a rug-risk check"];
 
 const blank = (): Record<StepKey, Step> => ({
   search: { state: "idle", detail: "" },
