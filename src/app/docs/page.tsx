@@ -144,7 +144,11 @@ const ROADMAP: Phase[] = [
   {
     name: "Later",
     status: "later",
-    items: [{ title: "More chains and stablecoins" }, { title: "Verified API listings and reputation" }],
+    items: [
+      { title: "Base and Solana support", note: "Launch and pay for APIs on more chains, beyond Robinhood Chain" },
+      { title: "APIs from other platforms", note: "The agent uses and pays x402 APIs from platforms like PayAI and Coinbase" },
+      { title: "Verified API listings and reputation" },
+    ],
   },
 ];
 
