@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TOKEN } from "@/lib/constants";
-import { getStats } from "@/lib/queries";
+import { getStats, listAutonomoGateways } from "@/lib/queries";
 import { compact } from "@/components/project-row";
 import { CopyButton } from "@/components/copy-button";
 import { networkLabel, normalizeNetwork } from "@/lib/networks";
@@ -23,6 +23,7 @@ const SECTIONS = [
   { id: "pro", label: "Pro API" },
   { id: "data", label: "Where the data comes from" },
   { id: "token", label: `${TOKEN.symbol} token` },
+  { id: "roadmap", label: "Roadmap & status" },
   { id: "faq", label: "FAQ" },
 ];
 
@@ -111,6 +112,53 @@ const { data } = await res.json(); // url, method, priceUsd, network, payTo, ...
 
 const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
+// Where Autonomo is. Update `status` as phases ship; "live" items are things anyone can use today.
+type Phase = { name: string; status: "live" | "building" | "next" | "later"; summary?: string; items: [string, string?][] };
+const ROADMAP: Phase[] = [
+  {
+    name: "Phase 1",
+    status: "live",
+    items: [
+      ["Hosted x402 gateways for any API", "Launch from the dashboard, get paid per call"],
+      ["Pay per call in USDG or $AUTONOMO", "On Robinhood Chain, settled by Autonomo's own facilitator"],
+      ["Owner dashboard and on-chain receipts", "Paid calls, earnings and tx links"],
+      ["AI agents paying live", "Codex demo and the agent payment example"],
+      ["Agent Playground", "Ask a question, watch an agent pay in $AUTONOMO"],
+      ["Official Autonomo APIs", "$AUTONOMO price, New Launches and Risk Checker"],
+    ],
+  },
+  {
+    name: "Phase 2",
+    status: "building",
+    summary: "the Autonomo agent bot for Telegram and more high-quality official APIs",
+    items: [
+      ["Autonomo agent bot for Telegram", "The playground in DMs and groups, with free daily answers"],
+      ["More high-quality official APIs", "Ideas: wallet portfolio, transaction explainer, page to clean text"],
+    ],
+  },
+  {
+    name: "Phase 3",
+    status: "next",
+    items: [
+      ["Autonomo MCP server", "Claude, Codex and other agents find and pay APIs natively"],
+      ["Agent SDK and CLI", "With spend limits built in"],
+      ["Webhooks and payout analytics", "For API owners"],
+    ],
+  },
+  {
+    name: "Later",
+    status: "later",
+    items: [["More chains and stablecoins"], ["Verified API listings and reputation"]],
+  },
+];
+
+const PHASE_STYLE: Record<Phase["status"], { label: string; className: string }> = {
+  live: { label: "Live", className: "bg-brand text-on-brand" },
+  building: { label: "Building now", className: "border border-accent text-accent" },
+  next: { label: "Next", className: "border border-line text-muted" },
+  later: { label: "Later", className: "border border-line text-faint" },
+};
+
 const ENDPOINTS: [string, string][] = [
   ["GET /api/v1/projects", "Search and filter projects: q, category, network, sort, page, limit"],
   ["GET /api/v1/projects/{slug}", "One project with up to 500 paid endpoints, prices, networks and 30-day calls"],
@@ -146,7 +194,8 @@ const FAQ: [string, React.ReactNode][] = [
 ];
 
 export default async function DocsPage() {
-  const stats = await getStats();
+  const [stats, liveApis] = await Promise.all([getStats(), listAutonomoGateways()]);
+  const current = ROADMAP.find((p) => p.status === "building");
 
   return (
     <div className="mx-auto grid max-w-6xl gap-10 px-4 pt-10 sm:px-6 lg:grid-cols-[13rem_1fr]">
@@ -384,6 +433,54 @@ export default async function DocsPage() {
           <p>
             The address is also in the bar at the top of every page. Always check it on autonomo.fun before you buy:
             copies posted elsewhere can be fake. Nothing on this site is financial advice.
+          </p>
+        </Section>
+
+        <Section id="roadmap" title="Roadmap & status">
+          <div className="rounded-lg border border-accent bg-surface p-4">
+            <p className="font-mono text-xs tracking-wide text-accent uppercase">Live status</p>
+            <p className="mt-2 text-ink">
+              Phase 1 is live.{current ? <> We&apos;re building <b>{current.name}</b>: {current.summary ?? current.items.map(([t]) => t).join(" and ")}.</> : null}
+            </p>
+            {liveApis.length > 0 && (
+              <p className="mt-2 text-sm text-muted">
+                {liveApis.length} official {liveApis.length === 1 ? "API is" : "APIs are"} live and payable in {TOKEN.symbol}:{" "}
+                {liveApis.map((g, i) => (
+                  <span key={g.slug}>
+                    {i > 0 && ", "}
+                    <Link href={`/projects/${g.projectSlug}`}>{g.name}</Link>
+                  </span>
+                ))}
+                . Try them in the <Link href="/playground">Agent Playground</Link>.
+              </p>
+            )}
+          </div>
+          <ol className="space-y-3">
+            {ROADMAP.map((phase) => (
+              <li key={phase.name} className="rounded-lg border border-line p-4">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-medium text-ink">{phase.name}</h3>
+                  <span className={`rounded-md px-2 py-0.5 font-mono text-[11px] tracking-wide uppercase ${PHASE_STYLE[phase.status].className}`}>
+                    {PHASE_STYLE[phase.status].label}
+                  </span>
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {phase.items.map(([title, note]) => (
+                    <li key={title} className="flex gap-2.5">
+                      <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${phase.status === "live" ? "bg-brand" : phase.status === "building" ? "bg-accent" : "bg-faint"}`} />
+                      <span>
+                        <span className="text-ink">{title}</span>
+                        {note && <span className="block text-sm text-muted">{note}</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+          <p className="text-sm text-muted">
+            Plans can change as we learn what agents and builders need. Follow along on{" "}
+            <a href="https://x.com/useautonomo">X</a> and <a href="https://t.me/autonomodotfun">Telegram</a>.
           </p>
         </Section>
 
