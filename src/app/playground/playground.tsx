@@ -16,7 +16,16 @@ const STEPS: { key: StepKey; icon: string; title: string }[] = [
   { key: "answer", icon: "💬", title: "Answer with the receipt" },
 ];
 
-const EXAMPLES = ["What's the current price of $AUTONOMO?", "What are the newest token launches?", "Is $AUTONOMO safe? Run a rug-risk check"];
+/** A listed Autonomo gateway the agent can pay in $AUTONOMO, with a question that uses it. */
+export type AvailableApi = {
+  slug: string;
+  projectSlug: string;
+  name: string;
+  description: string;
+  autonomo: string;
+  usdg: string | null;
+  question: string;
+};
 
 const blank = (): Record<StepKey, Step> => ({
   search: { state: "idle", detail: "" },
@@ -29,7 +38,7 @@ type Api = Extract<PlaygroundEvent, { step: "search"; state: "done" }>["api"];
 type Quote = Extract<PlaygroundEvent, { step: "quote"; state: "done" }>;
 type Paid = Extract<PlaygroundEvent, { step: "pay"; state: "done" }>;
 
-export function Playground() {
+export function Playground({ apis }: { apis: AvailableApi[] }) {
   const [question, setQuestion] = useState("");
   const [steps, setSteps] = useState(blank);
   const [api, setApi] = useState<Api | null>(null);
@@ -91,6 +100,7 @@ export function Playground() {
   const started = steps.search.state !== "idle";
 
   return (
+    <>
     <div className="mt-8 rounded-lg border border-line bg-surface">
       <form
         className="flex flex-col gap-2 border-b border-line p-4 sm:flex-row"
@@ -113,17 +123,17 @@ export function Playground() {
         </button>
       </form>
 
-      {!started && !error && (
+      {!started && !error && apis.length > 0 && (
         <div className="flex flex-wrap gap-2 p-4">
           <span className="w-full text-sm text-muted">Try one:</span>
-          {EXAMPLES.map((ex) => (
+          {apis.map((a) => (
             <button
-              key={ex}
+              key={a.slug}
               type="button"
-              onClick={() => ask(ex)}
+              onClick={() => ask(a.question)}
               className="rounded-md border border-line px-3 py-1.5 text-left text-sm hover:border-accent hover:text-accent"
             >
-              {ex}
+              {a.question}
             </button>
           ))}
         </div>
@@ -215,8 +225,51 @@ export function Playground() {
         </div>
       )}
     </div>
+
+    {apis.length > 0 && (
+      <section className="mt-12">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="heading text-2xl">APIs the agent can use right now</h2>
+          <span className="font-mono text-xs text-muted uppercase">{apis.length} live · paid in $AUTONOMO</span>
+        </div>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {apis.map((a) => (
+            <li key={a.slug} className="flex flex-col rounded-lg border border-line bg-surface p-4">
+              <div className="flex items-start justify-between gap-3">
+                <Link href={`/projects/${a.projectSlug}`} className="font-semibold hover:text-accent">
+                  {a.name}
+                </Link>
+                <span className="font-mono text-[11px] tracking-wider text-accent uppercase">Live</span>
+              </div>
+              {a.description && <p className="mt-1 line-clamp-3 text-sm text-muted">{a.description}</p>}
+              <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs">
+                <span className="rounded-md border border-accent px-2 py-0.5 text-accent">{a.autonomo} $AUTONOMO</span>
+                {a.usdg && <span className="rounded-md border border-line px-2 py-0.5">{a.usdg} USDG</span>}
+                <span className="truncate rounded-md border border-line px-2 py-0.5 text-faint">/x/{a.slug}</span>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  ask(a.question);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="mt-4 self-start rounded-md border border-line px-3 py-1.5 text-left text-sm hover:border-accent hover:text-accent disabled:opacity-50"
+              >
+                Ask: “{a.question}”
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 text-sm text-muted">
+          Built an API? <Link href="/dashboard" className="text-accent underline">Launch it on Autonomo</Link>, accept $AUTONOMO and the agent can pick it too.
+        </p>
+      </section>
+    )}
+    </>
   );
 }
+
 
 function StateBadge({ state }: { state: StepState }) {
   if (state === "idle") return null;

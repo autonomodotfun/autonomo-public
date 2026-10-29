@@ -224,6 +224,34 @@ export async function findAutonomoGateways(keywords: string[], limit = 3) {
     .limit(limit);
 }
 
+// Playground: every listed, active Autonomo gateway the agent can pay in $AUTONOMO right now.
+export async function listAutonomoGateways() {
+  await connection();
+  const db = await getDb();
+  const { gateways } = schema;
+  return db
+    .select({
+      slug: gateways.slug,
+      name: gateways.name,
+      description: gateways.description,
+      autonomoAmount: gateways.autonomoAmount,
+      priceUsd: gateways.priceUsd,
+      acceptUsdg: gateways.acceptUsdg,
+      projectSlug: projects.slug,
+    })
+    .from(gateways)
+    .innerJoin(projects, eq(gateways.projectId, projects.id))
+    .where(
+      and(
+        eq(gateways.listing, "listed"),
+        eq(gateways.status, "active"),
+        eq(projects.status, "approved"),
+        sql`${gateways.autonomoAmount} is not null`,
+      ),
+    )
+    .orderBy(asc(gateways.createdAt));
+}
+
 function escapeLike(s: string) {
   return s.replace(/[\\%_]/g, (c) => `\\${c}`);
 }

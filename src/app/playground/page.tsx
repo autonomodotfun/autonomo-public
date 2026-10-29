@@ -1,13 +1,24 @@
 import type { Metadata } from "next";
+import { exampleQuestion } from "@/lib/playground";
 import { playgroundPaymentsEnabled } from "@/lib/playground-pay";
-import { Playground } from "./playground";
+import { listAutonomoGateways } from "@/lib/queries";
+import { Playground, type AvailableApi } from "./playground";
 
 export const metadata: Metadata = {
   title: "Agent Playground",
   description: "Ask a question and watch an AI agent find a paid x402 API on Autonomo, check its price and pay for it in $AUTONOMO.",
 };
 
-export default function PlaygroundPage() {
+export default async function PlaygroundPage() {
+  const apis: AvailableApi[] = (await listAutonomoGateways()).map((g) => ({
+    slug: g.slug,
+    projectSlug: g.projectSlug,
+    name: g.name,
+    description: g.description,
+    autonomo: Number(g.autonomoAmount).toLocaleString("en-US"),
+    usdg: g.acceptUsdg ? String(Number(g.priceUsd)) : null,
+    question: exampleQuestion(g.slug, g.name),
+  }));
   return (
     <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6">
       <span className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 font-mono text-xs tracking-widest text-accent uppercase">
@@ -19,7 +30,7 @@ export default function PlaygroundPage() {
         Ask a question and watch an AI agent find a paid API on Autonomo, check its price and pay for it in $AUTONOMO.
         No wallet, no signup.
       </p>
-      <Playground />
+      <Playground apis={apis} />
       <p className="mt-6 text-sm text-faint">
         {playgroundPaymentsEnabled()
           ? "Every step is real: the agent searches Autonomo, reads the live 402 price and pays from its own wallet on Robinhood Chain. Free to try, a few paid questions per visitor per day."
