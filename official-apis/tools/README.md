@@ -27,4 +27,4 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
 
 A plain Vercel project. Every gateway's upstream is `https://tools.autonomo.fun/v1` with auth header `x-api-key` and
 the `TOOLS_API_KEY` value; the Agent Playground and the Telegram bot add the right path for each slug above.
-`examples/price-api`, `launches-api` and `risk-api` are the earlier single-API versions, kept until their gateways move here.
+Deploy from this folder: `npx vercel deploy --prod`.

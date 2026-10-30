@@ -13,3 +13,6 @@ next-env.d.ts
 
 # Marketing posts, images and videos stay local
 brand/launch/
+
+# Private team and project notes stay local
+brand/notes/

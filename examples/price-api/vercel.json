@@ -1,6 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/v1/price/:token", "destination": "/api/price?token=:token" },
-    { "source": "/v1/health", "destination": "/api/health" }
-  ]
-}
