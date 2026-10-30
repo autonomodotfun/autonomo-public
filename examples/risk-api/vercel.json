@@ -1,7 +1,0 @@
-{
-  "functions": { "api/risk.js": { "maxDuration": 30 } },
-  "rewrites": [
-    { "source": "/v1/risk/:token", "destination": "/api/risk?token=:token" },
-    { "source": "/v1/health", "destination": "/api/health" }
-  ]
-}
