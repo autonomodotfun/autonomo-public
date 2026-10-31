@@ -38,6 +38,7 @@
   "exclude": [
     "examples",
     "official-apis",
+    "mcp",
     "node_modules"
   ]
 }
