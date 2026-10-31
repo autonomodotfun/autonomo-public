@@ -9,6 +9,7 @@ import { TOKEN } from "@/lib/constants";
 import { gatewayOffers } from "@/lib/gateway";
 import { USDG } from "@/lib/pro";
 import { slugify } from "@/lib/slug";
+import { revalidateCatalog } from "@/lib/queries";
 
 // Server actions can be invoked from any route, so each one re-checks auth rather than trusting the proxy.
 async function requireAdmin() {
@@ -47,6 +48,7 @@ export async function approveSubmission(form: FormData) {
     .set({ status: "approved", projectId: project.id, reviewedAt: new Date() })
     .where(eq(schema.submissions.id, id));
   revalidatePath("/admin");
+  revalidateCatalog();
 }
 
 export async function rejectSubmission(form: FormData) {
@@ -57,6 +59,7 @@ export async function rejectSubmission(form: FormData) {
     .set({ status: "rejected", reviewedAt: new Date(), reviewNote: String(form.get("note") ?? "") || null })
     .where(eq(schema.submissions.id, Number(form.get("id"))));
   revalidatePath("/admin");
+  revalidateCatalog();
 }
 
 export async function setProjectFlags(form: FormData) {
@@ -74,6 +77,7 @@ export async function setProjectFlags(form: FormData) {
     })
     .where(eq(schema.projects.slug, slug));
   revalidatePath("/admin");
+  revalidateCatalog();
 }
 
 // Publishes a hosted gateway in the catalog as a paid service with one endpoint (the gateway URL).
@@ -128,6 +132,7 @@ export async function approveGateway(form: FormData) {
   }
   await db.update(schema.gateways).set({ listing: "listed", projectId }).where(eq(schema.gateways.id, g.id));
   revalidatePath("/admin");
+  revalidateCatalog();
 }
 
 export async function rejectGateway(form: FormData) {
@@ -135,4 +140,5 @@ export async function rejectGateway(form: FormData) {
   const db = await getDb();
   await db.update(schema.gateways).set({ listing: "rejected" }).where(eq(schema.gateways.id, Number(form.get("id"))));
   revalidatePath("/admin");
+  revalidateCatalog();
 }

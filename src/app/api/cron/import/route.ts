@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { importBazaar } from "@/lib/bazaar-import";
+import { revalidateCatalog } from "@/lib/queries";
 
 // Daily directory refresh (scheduled in vercel.json): re-imports the Coinbase CDP and PayAI discovery catalogs so
 // project counts, prices and 30-day call numbers stay current. Vercel calls it with `Authorization: Bearer
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
   const lines: string[] = [];
   try {
     const summary = await importBazaar({ log: (l) => lines.push(l) });
+    revalidateCatalog();
     console.log("directory import", { ...summary, seconds: Math.round((Date.now() - started) / 1000) });
     return Response.json({ ok: true, ...summary, seconds: Math.round((Date.now() - started) / 1000) });
   } catch (e) {

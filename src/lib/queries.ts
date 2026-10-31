@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { connection } from "next/server";
 import { cache } from "react";
 import { getDb, schema } from "@/db";
@@ -60,8 +61,7 @@ export function parseProjectQuery(params: Record<string, string | string[] | und
   };
 }
 
-export async function searchProjects(query: ProjectQuery) {
-  await connection();
+async function searchProjectsFresh(query: ProjectQuery) {
   const db = await getDb();
   const { q, category, network, page = 1, limit = 30 } = query;
   const sort: Sort = query.sort ?? (q ? "relevance" : "popular");
@@ -131,8 +131,7 @@ export function parseEndpointQuery(params: URLSearchParams): EndpointQuery {
 }
 
 // Endpoint-level search across the whole catalog (paid tier): callable URLs with price and payment details.
-export async function searchEndpoints(query: EndpointQuery) {
-  await connection();
+async function searchEndpointsFresh(query: EndpointQuery) {
   const db = await getDb();
   const { q, network, maxPriceUsd, sort, page, limit } = query;
 
@@ -194,8 +193,7 @@ export async function searchEndpoints(query: EndpointQuery) {
 }
 
 // Playground: listed, active Autonomo gateways that accept $AUTONOMO, best match first.
-export async function findAutonomoGateways(keywords: string[], limit = 3) {
-  await connection();
+async function findAutonomoGatewaysFresh(keywords: string[], limit = 3) {
   const db = await getDb();
   if (!keywords.length) return [];
   const { gateways } = schema;
@@ -225,8 +223,7 @@ export async function findAutonomoGateways(keywords: string[], limit = 3) {
 }
 
 // Playground: every listed, active Autonomo gateway the agent can pay in $AUTONOMO right now.
-export async function listAutonomoGateways() {
-  await connection();
+async function listAutonomoGatewaysFresh() {
   const db = await getDb();
   const { gateways } = schema;
   return db
@@ -256,8 +253,7 @@ function escapeLike(s: string) {
   return s.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
-export const getProject = cache(async (slug: string) => {
-  await connection();
+async function getProjectFresh(slug: string) {
   const db = await getDb();
   const [project] = await db
     .select()
@@ -287,10 +283,9 @@ export const getProject = cache(async (slug: string) => {
     .orderBy(desc(endpoints.calls30d), asc(endpoints.url))
     .limit(500);
   return { project, endpoints: eps };
-});
+}
 
-export async function getStats() {
-  await connection();
+async function getStatsFresh() {
   const db = await getDb();
   const [[totals], categories, networks] = await Promise.all([
     db
@@ -322,8 +317,7 @@ export async function getStats() {
   };
 }
 
-export async function getFeatured(category?: Category, limit = 8) {
-  await connection();
+async function getFeaturedFresh(category?: Category, limit = 8) {
   const db = await getDb();
   const where = [eq(projects.status, "approved")];
   if (category) where.push(eq(projects.category, category));
@@ -335,8 +329,7 @@ export async function getFeatured(category?: Category, limit = 8) {
     .limit(limit)) as ProjectListItem[];
 }
 
-export async function getAllSlugs() {
-  await connection();
+async function getAllSlugsFresh() {
   const db = await getDb();
   return db
     .select({ slug: projects.slug, updatedAt: projects.updatedAt })
@@ -344,4 +337,36 @@ export async function getAllSlugs() {
     .where(eq(projects.status, "approved"))
     .orderBy(desc(projects.calls30d))
     .limit(10000);
+}
+
+// ---------- cached reads ----------
+// Every page view and API call used to query the database, which kept it awake around the clock. These reads are
+// cached (shared across server instances), so most requests never reach it. Admin changes and the daily directory
+// refresh clear the tags (see revalidateCatalog), so directory reads can live a day; gateway lists refresh sooner.
+
+const DAY = 24 * 3600;
+
+export const CATALOG_TAGS = { directory: "directory", gateways: "gateways" } as const;
+
+function cachedRead<A extends unknown[], R>(fn: (...args: A) => Promise<R>, key: string, seconds: number, tag: string) {
+  const read = unstable_cache(fn, [key], { revalidate: seconds, tags: [tag] });
+  return async (...args: A) => {
+    await connection();
+    return read(...args);
+  };
+}
+
+export const searchProjects = cachedRead(searchProjectsFresh, "search-projects", DAY, CATALOG_TAGS.directory);
+export const searchEndpoints = cachedRead(searchEndpointsFresh, "search-endpoints", DAY, CATALOG_TAGS.directory);
+export const getStats = cachedRead(getStatsFresh, "stats", DAY, CATALOG_TAGS.directory);
+export const getFeatured = cachedRead(getFeaturedFresh, "featured", DAY, CATALOG_TAGS.directory);
+export const getAllSlugs = cachedRead(getAllSlugsFresh, "all-slugs", DAY, CATALOG_TAGS.directory);
+export const getProject = cache(cachedRead(getProjectFresh, "project", DAY, CATALOG_TAGS.directory));
+export const listAutonomoGateways = cachedRead(listAutonomoGatewaysFresh, "autonomo-gateways", 300, CATALOG_TAGS.gateways);
+export const findAutonomoGateways = cachedRead(findAutonomoGatewaysFresh, "find-autonomo-gateways", 300, CATALOG_TAGS.gateways);
+
+/** Drop cached catalog reads now (after admin changes, gateway edits and the daily refresh). */
+export function revalidateCatalog() {
+  revalidateTag(CATALOG_TAGS.directory, { expire: 0 });
+  revalidateTag(CATALOG_TAGS.gateways, { expire: 0 });
 }
