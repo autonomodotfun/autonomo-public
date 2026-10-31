@@ -1,0 +1,36 @@
+{
+  "name": "autonomo-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Autonomo: AI agents find x402 APIs, check prices and pay per call in USDG or $AUTONOMO on Robinhood Chain.",
+  "type": "module",
+  "bin": {
+    "autonomo-mcp": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "inspect": "npx @modelcontextprotocol/inspector node index.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "x402",
+    "autonomo",
+    "robinhood-chain",
+    "ai-agents"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@x402/core": "2.28.0",
+    "@x402/evm": "2.28.0",
+    "@x402/fetch": "2.28.0",
+    "viem": "2.57.12",
+    "zod": "4.6.5"
+  }
+}
