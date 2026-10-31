@@ -83,8 +83,11 @@ function recordSpend(pay, amount) {
 
 // ---------- Gateways ----------
 
+const UPDATING = "Autonomo is being updated right now. Please check back later.";
+
 async function getJson(url) {
   const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  if (res.status === 503) fail(UPDATING);
   if (!res.ok) fail(`${new URL(url).pathname} answered ${res.status}.`);
   return res.json();
 }
@@ -114,6 +117,7 @@ async function quote(url) {
   } else {
     await res.body?.cancel();
   }
+  if (res.status === 503 && res.headers.get("retry-after")) fail(UPDATING);
   if (res.status !== 402 || !Array.isArray(required?.accepts)) fail(`Expected a 402 price list, got ${res.status}.`);
   return required;
 }

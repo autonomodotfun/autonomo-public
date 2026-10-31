@@ -1,8 +1,8 @@
-import { json, options } from "@/lib/api";
+import { json, options, withUpdating } from "@/lib/api";
 import { getStats } from "@/lib/queries";
 
 export { options as OPTIONS };
 
-export async function GET() {
+export const GET = withUpdating(async () => {
   return json({ data: await getStats() });
-}
+});
