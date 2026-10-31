@@ -1,6 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
+import { updating } from "@/lib/api";
 import { forward, gatewayOffers, getGateway, recordCall } from "@/lib/gateway";
 import { acceptsFor, railForAsset, x402Server } from "@/lib/pro";
 
@@ -62,7 +63,14 @@ function paidHandler(g: Gateway) {
 
 async function handle(request: NextRequest, ctx: { params: Promise<{ slug: string; path?: string[] }> }) {
   const { slug } = await ctx.params;
-  const g = await getGateway(slug);
+  let g: Awaited<ReturnType<typeof getGateway>>;
+  try {
+    g = await getGateway(slug);
+  } catch (e) {
+    // Database briefly unavailable: a clear, retryable 503 for agents instead of a 500. Nobody is charged.
+    console.error(e);
+    return withHeaders(updating(), slug);
+  }
   if (!g) return withHeaders(Response.json({ error: "not_found" }, { status: 404 }));
   if (g.status !== "active") {
     return withHeaders(Response.json({ error: "gateway_paused", message: "This API is paused by its owner." }, { status: 503 }), slug);
