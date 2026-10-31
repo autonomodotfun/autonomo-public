@@ -132,11 +132,16 @@ const ROADMAP: Phase[] = [
   {
     name: "Phase 2",
     status: "building",
-    summary: "the Autonomo agent bot for Telegram is complete, and more high-quality official APIs are in progress",
+    summary:
+      "the Autonomo agent bot for Telegram is complete, and the Autonomo MCP server and more high-quality official APIs are in progress",
     items: [
       { title: "Autonomo agent bot for Telegram", note: "Live at t.me/autonomoagentbot: ask in a DM or a group, with free daily answers", done: true },
       { title: "More high-quality official APIs", note: "Ideas: wallet portfolio, transaction explainer, page to clean text", now: true },
-      { title: "Autonomo MCP server", note: "Claude, Codex and other agents find and pay APIs natively" },
+      {
+        title: "Autonomo MCP server",
+        note: "First version on npm as autonomo-mcp: Claude, Cursor, Codex and other agents find and pay APIs natively",
+        now: true,
+      },
       { title: "Agent SDK and CLI", note: "With spend limits built in" },
       { title: "Webhooks and payout analytics", note: "For API owners" },
     ],
