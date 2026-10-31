@@ -118,6 +118,62 @@ export async function curvePrice(curve, latest, fromBlock = 0n) {
   };
 }
 
+// Graduated tokens leave their curve for a Uniswap v4 ETH pool whose hook was made by the launchpad factory.
+const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
+const V4_INITIALIZE = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438"; // topics: id, currency0, currency1
+const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"; // data: amount0, amount1, sqrtPriceX96, …
+// The hook the factory graduates tokens into (it's baked into the factory's bytecode). Anyone can deploy a hook
+// whose factory() returns the launchpad, so only this exact address counts.
+const LAUNCHPAD_HOOK = 0xe5e702641ea86f4ae6cc3cdaed2b886f976be044n;
+const signed = (w) => (w >= 2n ** 255n ? w - 2n ** 256n : w);
+
+const poolCache = new Map();
+/** The launchpad's ETH/token v4 pool for a graduated token, or null while it's still on its curve.
+ * Look-alike pools for the same token (other hooks, no hook) are ignored, so they can't set the price. */
+export async function findPool(token, latest, fromBlock) {
+  const key = token.toLowerCase();
+  const hit = poolCache.get(key);
+  if (hit && (hit.pool || Date.now() - hit.at < 60_000)) return hit.pool;
+  const inits = await logsBetween({ address: POOL_MANAGER, topics: [V4_INITIALIZE, null, pad("0x00"), pad(key)] }, fromBlock, latest);
+  const init = inits.find((l) => words(l.data)[2] === LAUNCHPAD_HOOK); // data: fee, tickSpacing, hooks, …
+  const pool = init ? { id: init.topics[1], block: BigInt(init.blockNumber) } : null;
+  poolCache.set(key, { at: Date.now(), pool });
+  return pool;
+}
+
+/** Price in ETH from the latest swap in a v4 ETH/token pool, searching back from the newest blocks. */
+export async function poolPrice(pool, latest) {
+  for (let span = 100_000n; ; span *= 4n) {
+    const from = latest - span > pool.block ? latest - span : pool.block;
+    const swaps = await logsBetween({ address: POOL_MANAGER, topics: [V4_SWAP, pool.id] }, from, latest);
+    const last = swaps.at(-1);
+    if (last) {
+      const [amount0, , sqrtPriceX96] = words(last.data);
+      const sqrt = Number(sqrtPriceX96) / 2 ** 96;
+      const block = await rh.getBlock({ blockNumber: BigInt(last.blockNumber) });
+      return {
+        priceEth: 1 / (sqrt * sqrt), // currency0 is ETH, so the pool price is tokens per ETH
+        side: signed(amount0) < 0n ? "buy" : "sell", // the swapper paid ETH in
+        time: new Date(Number(block.timestamp) * 1000).toISOString(),
+        tx: last.transactionHash,
+        venue: "uniswap-v4",
+      };
+    }
+    if (from === pool.block) return null;
+  }
+}
+
+/** Price in ETH of a launchpad token: its v4 pool once it has graduated, otherwise its curve. */
+export async function launchPrice(token, launch, latest) {
+  const pool = await findPool(token, latest, launch.block);
+  if (pool) {
+    const last = await poolPrice(pool, latest);
+    if (last) return last;
+  }
+  const last = await curvePrice(launch.curve, latest, launch.block);
+  return last && { ...last, venue: "curve" };
+}
+
 export function sendJson(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
   return res.status(status).json(body);
