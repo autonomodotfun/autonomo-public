@@ -22,6 +22,9 @@ const CHAINLINK_ETH_USD_BASE = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70";
 const EXPLORER = "https://robinhoodchain.blockscout.com";
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEAD = "0x000000000000000000000000000000000000dead";
+// Graduated tokens move their liquidity from the curve into Uniswap v4, where the singleton PoolManager holds it.
+// Like the curve, that's pool liquidity rather than a holder, so it's kept out of holder concentration.
+const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
 
 // Log queries filtered by contract may span millions of blocks; the RPC caps results, so big ranges split in half.
 const LOOKBACK = 9_000_000n; // about 13 days of launch history (~0.125 s blocks)
@@ -134,9 +137,10 @@ async function check(token) {
   }
   const inCurve = balances.get(curve) ?? 0n;
   const burned = (balances.get(DEAD) ?? 0n) + (balances.get(ZERO) ?? 0n);
-  const circulating = supply - inCurve - burned;
+  const inPool = balances.get(POOL_MANAGER) ?? 0n;
+  const circulating = supply - inCurve - inPool - burned;
   const holders = [...balances.entries()]
-    .filter(([a, b]) => b > 0n && a !== curve && a !== DEAD && a !== ZERO)
+    .filter(([a, b]) => b > 0n && a !== curve && a !== POOL_MANAGER && a !== DEAD && a !== ZERO)
     .sort((x, y) => (y[1] > x[1] ? 1 : y[1] < x[1] ? -1 : 0));
   const top10 = holders.slice(0, 10).reduce((s, [, b]) => s + b, 0n);
   const creatorHolds = balances.get(creator) ?? 0n;
@@ -175,7 +179,7 @@ async function check(token) {
   const priceUsd = priceEth === null ? null : priceEth * ethPrice;
   const netEth = Number(ethIn - ethOut) / 1e18;
 
-  // Plain-English flags and a simple score. Shares are of circulating supply (outside the curve and burns).
+  // Plain-English flags and a simple score. Shares are of circulating supply (outside the curve, the v4 pool and burns).
   const flags = [];
   let score = 0;
   const flag = (points, text) => { score += points; flags.push({ severity: points >= 3 ? "high" : points >= 2 ? "medium" : "low", text }); };
@@ -225,6 +229,7 @@ async function check(token) {
       supply: {
         total: Number(supply) / unit,
         inCurvePercent: pct(inCurve, supply),
+        inPoolPercent: pct(inPool, supply),
         burnedPercent: pct(burned, supply),
         creatorPercent: creatorShare,
         launchBlockBuyers: launchBlockBuyers.size,
