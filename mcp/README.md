@@ -28,6 +28,12 @@ Without a key, `find_apis` and `get_price` still work.
 claude mcp add autonomo -e AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY -- npx -y autonomo-mcp
 ```
 
+On Windows, start `npx` through `cmd /c`. In PowerShell, quote the `--`:
+
+```powershell
+claude mcp add autonomo -e AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY '--' cmd /c npx -y autonomo-mcp
+```
+
 ### Claude Desktop, Cursor and others
 
 Add this to the client's MCP config (`claude_desktop_config.json`, `.cursor/mcp.json`, …):
@@ -43,6 +49,8 @@ Add this to the client's MCP config (`claude_desktop_config.json`, `.cursor/mcp.
   }
 }
 ```
+
+If the client can't find `npx` on Windows, use `"command": "cmd"` and `"args": ["/c", "npx", "-y", "autonomo-mcp"]`.
 
 ### Codex
 
@@ -73,7 +81,7 @@ env = { AUTONOMO_WALLET_KEY = "0xYOUR_AGENT_WALLET_KEY" }
 - Your MCP client asks before each tool call, so you approve every payment unless you choose to allow it always.
 - Use a dedicated wallet with a small balance, never your main wallet.
 
-## Run from this folder
+## Develop
 
 ```bash
 npm install
