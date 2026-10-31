@@ -3,8 +3,9 @@
 // GET /v1/risk/<token address>   (header: x-api-key: <TOOLS_API_KEY>)
 //
 // Finds the token's launch event on the launchpad factory (creator, bonding curve, launch block), replays every
-// transfer since launch to get current balances, and reads every curve trade. From that it reports holder
-// concentration, what the creator and the launch-block buyers still hold, trading activity and curve progress,
+// transfer since launch to get current balances, and reads every curve trade plus, once the token has graduated,
+// every swap in its Uniswap v4 pool. From that it reports holder concentration, what the creator and the
+// launch-block buyers still hold, trading activity, price and curve progress,
 // then turns those into plain-English flags and a low / medium / high score. Everything is read from the chain.
 //
 // This is a heuristic, not advice: a low score doesn't make a token safe.
@@ -12,6 +13,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { createPublicClient, defineChain, http, isAddress, pad, parseAbi, toHex } from "viem";
 import { base } from "viem/chains";
+import { findPool } from "./_lib.js";
 
 const FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
 const LAUNCHED = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607"; // topics: token, curve, creator
@@ -25,6 +27,8 @@ const DEAD = "0x000000000000000000000000000000000000dead";
 // Graduated tokens move their liquidity from the curve into Uniswap v4, where the singleton PoolManager holds it.
 // Like the curve, that's pool liquidity rather than a holder, so it's kept out of holder concentration.
 const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
+const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"; // data: amount0, amount1, sqrtPriceX96, …
+const signed = (w) => (w >= 2n ** 255n ? w - 2n ** 256n : w);
 
 // Log queries filtered by contract may span millions of blocks; the RPC caps results, so big ranges split in half.
 const LOOKBACK = 9_000_000n; // about 13 days of launch history (~0.125 s blocks)
@@ -119,7 +123,9 @@ async function check(token) {
   const launchBlock = BigInt(launch.blockNumber);
   const graduationEth = Number(words(launch.data)[2] ?? 0n) / 1e18;
 
-  const [name, symbol, decimals, supply, launchedBlock, transfers, trades, ethPrice] = await Promise.all([
+  // After graduation, trading moves to the launchpad's Uniswap v4 pool, so its swaps count as well.
+  const pool = await findPool(token, latest, launchBlock);
+  const [name, symbol, decimals, supply, launchedBlock, transfers, trades, swaps, ethPrice] = await Promise.all([
     rh.readContract({ address: token, abi: erc20, functionName: "name" }).catch(() => null),
     rh.readContract({ address: token, abi: erc20, functionName: "symbol" }).catch(() => null),
     rh.readContract({ address: token, abi: erc20, functionName: "decimals" }).catch(() => 18),
@@ -127,6 +133,7 @@ async function check(token) {
     rh.getBlock({ blockNumber: launchBlock }),
     logsBetween({ address: token, topics: [TRANSFER] }, launchBlock, latest),
     curveTrades(curve, launchBlock, latest),
+    pool ? logsBetween({ address: POOL_MANAGER, topics: [V4_SWAP, pool.id] }, pool.block, latest) : [],
     ethUsd(),
   ]);
 
@@ -144,8 +151,9 @@ async function check(token) {
     if (from !== ZERO) balances.set(from, (balances.get(from) ?? 0n) - value);
     balances.set(to, (balances.get(to) ?? 0n) + value);
     const recent = BigInt(t.blockNumber) >= dayAgo;
-    if (from === curveAddr && to !== ZERO) { buys++; buyers.add(to); if (recent) buys24h++; }
+    if (from === curveAddr && to !== ZERO && to !== POOL_MANAGER) { buys++; buyers.add(to); if (recent) buys24h++; }
     else if (to === curveAddr && from !== ZERO) { sells++; if (recent) sells24h++; }
+    else if (from === POOL_MANAGER && to !== ZERO) buyers.add(to); // bought in the v4 pool
   }
   const inCurve = balances.get(curve) ?? 0n;
   const burned = (balances.get(DEAD) ?? 0n) + (balances.get(ZERO) ?? 0n);
@@ -178,11 +186,29 @@ async function check(token) {
   }
   sells = Math.max(sells, sellEvents);
   sells24h = Math.max(sells24h, sellEvents24h);
+
+  // Uniswap v4 swaps (amounts are from the swapper's side: negative ETH means they paid ETH in, i.e. a buy).
+  let poolBuys = 0, poolSells = 0, poolBuys24h = 0, poolSells24h = 0, poolEth = 0n;
+  for (const sw of swaps) {
+    const eth = signed(words(sw.data)[0]);
+    const recent = BigInt(sw.blockNumber) >= dayAgo;
+    if (eth < 0n) { poolBuys++; if (recent) poolBuys24h++; } else { poolSells++; if (recent) poolSells24h++; }
+    poolEth += eth < 0n ? -eth : eth;
+  }
+  const curveStats = { buys, sells, volumeEth: Number(ethIn + ethOut) / 1e18 };
+  buys += poolBuys;
+  sells += poolSells;
+  buys24h += poolBuys24h;
+  sells24h += poolSells24h;
   const bundleHolds = [...launchBlockBuyers].reduce((s, a) => s + (a === curve ? 0n : balances.get(a) ?? 0n), 0n);
 
   let priceEth = null;
   const last = trades.at(-1);
-  if (last) {
+  const lastSwap = swaps.at(-1);
+  if (lastSwap) {
+    const sqrt = Number(words(lastSwap.data)[2]) / 2 ** 96;
+    priceEth = 1 / (sqrt * sqrt); // currency0 is ETH, so the pool price is tokens per ETH
+  } else if (last) {
     const w = words(last.data);
     const [eth, tokens] = last.topics[0] === BUY ? [w[0], w[1]] : [w[1], w[0]];
     if (tokens > 0n) priceEth = (Number(eth) / Number(tokens)) * 10 ** (Number(decimals) - 18);
@@ -247,10 +273,22 @@ async function check(token) {
         launchBlockBuyers: launchBlockBuyers.size,
         launchBlockBuyersPercent: bundleShare,
       },
-      trading: { buys, sells, buys24h, sells24h, uniqueBuyers: buyers.size, stillHolding: holders.length, volumeEth: Number(ethIn + ethOut) / 1e18 },
+      trading: {
+        buys,
+        sells,
+        buys24h,
+        sells24h,
+        uniqueBuyers: buyers.size,
+        stillHolding: holders.length,
+        volumeEth: Number(ethIn + ethOut + poolEth) / 1e18,
+        curve: curveStats,
+        pool: pool ? { buys: poolBuys, sells: poolSells, volumeEth: Number(poolEth) / 1e18 } : null,
+      },
       market: {
         priceEth,
         priceUsd,
+        priceSource: lastSwap ? "uniswap-v4" : last ? "curve" : null,
+        graduated: Boolean(pool),
         marketCapUsd: priceUsd === null ? null : (priceUsd * Number(supply)) / unit,
         curveProgress: graduationEth > 0 ? { netEth, targetEth: graduationEth, percent: Math.max(0, Math.min(100, (netEth / graduationEth) * 100)) } : null,
       },
