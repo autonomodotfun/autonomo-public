@@ -74,6 +74,18 @@ async function logsBetween(filter, from, to) {
   }
 }
 
+/** Every buy and sell on the curve, oldest first. Queried as two single-event queries: the RPC caps "buy or sell"
+ * queries at 100,000 blocks (dozens of split requests for a token a few days old, enough to time out), but allows
+ * far larger ranges for one event type on one contract. */
+async function curveTrades(curve, from, to) {
+  const [buys, sells] = await Promise.all([
+    logsBetween({ address: curve, topics: [BUY] }, from, to),
+    logsBetween({ address: curve, topics: [SELL] }, from, to),
+  ]);
+  const order = (l) => BigInt(l.blockNumber) * 100_000n + BigInt(l.logIndex);
+  return [...buys, ...sells].sort((a, b) => (order(a) < order(b) ? -1 : order(a) > order(b) ? 1 : 0));
+}
+
 /** The factory's launch event for this token within the lookback window. */
 async function findLaunch(token, latest) {
   if (launchCache.has(token)) return launchCache.get(token);
@@ -114,7 +126,7 @@ async function check(token) {
     rh.readContract({ address: token, abi: erc20, functionName: "totalSupply" }),
     rh.getBlock({ blockNumber: launchBlock }),
     logsBetween({ address: token, topics: [TRANSFER] }, launchBlock, latest),
-    logsBetween({ address: curve, topics: [[BUY, SELL]] }, launchBlock, latest),
+    curveTrades(curve, launchBlock, latest),
     ethUsd(),
   ]);
 
