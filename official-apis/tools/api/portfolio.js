@@ -7,7 +7,7 @@
 // checked directly, so long-held core balances never go missing.
 
 import { isAddress, pad, toHex } from "viem";
-import { AUTONOMO, authorized, BLOCKS_PER_DAY, curvePrice, erc20, ethUsd, EXPLORER, findLaunch, getLogs, rh, sendJson, tokenMeta, TRANSFER, USDG, WETH } from "./_lib.js";
+import { AUTONOMO, authorized, BLOCKS_PER_DAY, erc20, ethUsd, EXPLORER, findLaunch, getLogs, launchPrice, rh, sendJson, tokenMeta, TRANSFER, USDG, WETH } from "./_lib.js";
 
 const SPAN = 29_000n; // log queries without an address filter may span 30,000 blocks
 const PARALLEL = 24;
@@ -82,10 +82,12 @@ async function portfolio(wallet, days) {
         // Each lookup gets at most 6 s, so one slow token can't hold up the whole answer.
         const lookup = (async () => {
           const launch = await findLaunch(token, latest).catch(() => null);
-          return launch ? await curvePrice(launch.curve, latest, launch.block).catch(() => null) : null;
+          return launch ? await launchPrice(token, launch, latest).catch(() => null) : null;
         })();
         const last = await Promise.race([lookup, new Promise((r) => setTimeout(() => r(null), 6_000))]);
-        if (last?.priceEth != null) [priceUsd, source] = [last.priceEth * 10 ** (meta.decimals - 18) * eth, "launchpad curve"];
+        if (last?.priceEth != null) {
+          [priceUsd, source] = [last.priceEth * 10 ** (meta.decimals - 18) * eth, last.venue === "curve" ? "launchpad curve" : "launchpad Uniswap v4 pool"];
+        }
       }
       const copies = Object.entries(GENUINE).find(([s, a]) => meta.symbol?.toUpperCase().replace(/^\$/, "") === s && a !== token);
       const warning = copies ? `Not the real ${copies[0]}: likely an impostor or scam airdrop. Don't interact with it.` : null;

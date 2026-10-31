@@ -3,7 +3,7 @@
 // USDG is always $1 and WETH tracks ETH; other tokens must come from the launchpad.
 
 import { isAddress } from "viem";
-import { AUTONOMO, authorized, curvePrice, erc20, ethUsd, EXPLORER, findLaunch, rh, sendJson, tokenMeta, USDG, WETH } from "./_lib.js";
+import { AUTONOMO, authorized, erc20, ethUsd, EXPLORER, findLaunch, launchPrice, rh, sendJson, tokenMeta, USDG, WETH } from "./_lib.js";
 
 const cache = new Map();
 
@@ -38,7 +38,7 @@ async function price(token) {
     return { status: 404, body: { error: "not_found", message: "This token wasn't launched on the Robinhood Chain launchpad in the last ~13 days, so there's no curve price." } };
   }
   const [last, supply] = await Promise.all([
-    curvePrice(launch.curve, latest, launch.block),
+    launchPrice(token, launch, latest),
     rh.readContract({ address: token, abi: erc20, functionName: "totalSupply" }),
   ]);
   if (!last || last.priceEth === null) return { status: 404, body: { error: "no_trades", message: "No trades on this token's curve yet." } };
@@ -57,7 +57,11 @@ async function price(token) {
       ethUsd: eth,
       lastTrade: { side: last.side, time: last.time, tx: last.tx },
       explorer: `${EXPLORER}/token/${token}`,
-      source: "Latest trade on the token's launchpad bonding curve (Robinhood Chain); ETH/USD from Chainlink on Base.",
+      venue: last.venue,
+      source:
+        last.venue === "curve"
+          ? "Latest trade on the token's launchpad bonding curve (Robinhood Chain); ETH/USD from Chainlink on Base."
+          : "Latest swap in the token's launchpad Uniswap v4 pool, after graduating from its curve (Robinhood Chain); ETH/USD from Chainlink on Base.",
       updatedAt: new Date().toISOString(),
     },
   };
