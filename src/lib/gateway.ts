@@ -174,9 +174,19 @@ export function gatewayOffers(g: Pick<Gateway, "priceUsd" | "acceptUsdg" | "auto
   return offers({ priceUsd: String(Number(g.priceUsd)), acceptUsdg: g.acceptUsdg, autonomoAmount: g.autonomoAmount });
 }
 
+// Every gateway call (paid or not) looks its gateway up, so rows are kept in memory for a short while. Kept per
+// server instance rather than in the shared data cache, because rows hold the encrypted upstream secret.
+// Owner edits (price, pause) take effect within GATEWAY_TTL_MS.
+const GATEWAY_TTL_MS = 30_000;
+const gatewayRows = new Map<string, { row: Gateway | null; until: number }>();
+
 export async function getGateway(slug: string) {
+  const hit = gatewayRows.get(slug);
+  if (hit && hit.until > Date.now()) return hit.row;
   const db = await getDb();
   const [g] = await db.select().from(gateways).where(eq(gateways.slug, slug)).limit(1);
+  if (gatewayRows.size > 500) gatewayRows.clear();
+  gatewayRows.set(slug, { row: g ?? null, until: Date.now() + GATEWAY_TTL_MS });
   return g ?? null;
 }
 

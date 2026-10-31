@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
 import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled } from "@/lib/gateway";
 import { currentOwner } from "@/lib/session";
+import { revalidateCatalog } from "@/lib/queries";
 
 const { gateways } = schema;
 
@@ -109,6 +110,7 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
     await db.insert(gateways).values({ ...fields, owner });
   }
   revalidatePath("/dashboard");
+  revalidateCatalog();
   // The query flag drives the "saved" / "live" confirmation on the gateway page.
   redirect(`/dashboard/${values.slug}?${existing ? "saved" : "launched"}=1`);
 }
@@ -132,6 +134,7 @@ export async function setGatewayStatus(form: FormData) {
     .set({ status: g.status === "active" ? "paused" : "active", updatedAt: new Date() })
     .where(eq(gateways.id, g.id));
   revalidatePath(`/dashboard/${g.slug}`);
+  revalidateCatalog();
 }
 
 export async function requestListing(form: FormData) {
@@ -140,6 +143,7 @@ export async function requestListing(form: FormData) {
     await db.update(gateways).set({ listing: "pending" }).where(eq(gateways.id, g.id));
   }
   revalidatePath(`/dashboard/${g.slug}`);
+  revalidateCatalog();
 }
 
 export async function deleteGateway(form: FormData) {
@@ -148,5 +152,6 @@ export async function deleteGateway(form: FormData) {
   if (g.projectId) await db.update(schema.projects).set({ status: "hidden" }).where(eq(schema.projects.id, g.projectId));
   await db.delete(gateways).where(eq(gateways.id, g.id));
   revalidatePath("/dashboard");
+  revalidateCatalog();
   redirect("/dashboard");
 }
