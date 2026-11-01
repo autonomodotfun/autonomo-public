@@ -1,17 +1,22 @@
 import "server-only";
+import { eq } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { createPublicClient, defineChain, erc20Abi, formatUnits, http, parseAbi, toHex, type Hex } from "viem";
 import { base } from "viem/chains";
+import { getDb, schema } from "@/db";
 import { TOKEN } from "@/lib/constants";
 
 // Launching an API is free. A wallet holding about a set dollar value of $AUTONOMO shows as Verified on its APIs;
 // the tokens stay in the wallet, and the badge goes away if the balance drops below the requirement. Balances are read
-// live from the chain, so nothing is stored. Verified says the provider holds the token, not that the API was reviewed.
+// live from the chain. Verified says the provider holds the token, not that the API was reviewed.
 //
 // The requirement in tokens is set once a week from the previous full week's average pool price, so badges don't
 // flicker with the market and one trade in a thin pool can't move it.
 //
 // The amount is rounded to a round number of tokens, so it can come to slightly more or less than the dollar value.
+//
+// A wallet that qualifies keeps that amount: it never has to hold more, and it moves down if the weekly amount falls
+// below it. A wallet found below its amount loses the lock and qualifies again at the current weekly amount.
 //
 // Env: VERIFIED_USD   Dollar value to aim for (default 27). 0 turns Verified off.
 
@@ -156,11 +161,37 @@ function readBalance(owner: string) {
 
 const meets = (balance: bigint, tokens: number) => balance >= BigInt(tokens) * 10n ** BigInt(TOKEN.decimals);
 
-/** Whether a wallet holds the requirement. Throws if it can't be read, so callers never cache a wrong "no". */
+/**
+ * Applies the lock rules for a wallet and saves any change. Needs a real balance and weekly amount. If the database
+ * can't be reached the wallet is judged on the weekly amount, and the lock is saved on a later check.
+ */
+async function standing(owner: string, balance: bigint, weekly: number) {
+  const key = owner.toLowerCase();
+  const { verifiedWallets } = schema;
+  try {
+    const db = await getDb();
+    const [lock] = await db.select().from(verifiedWallets).where(eq(verifiedWallets.owner, key)).limit(1);
+    const tokens = lock ? Math.min(lock.tokens, weekly) : weekly;
+    const verified = meets(balance, tokens);
+    if (lock && !verified) {
+      await db.delete(verifiedWallets).where(eq(verifiedWallets.owner, key));
+    } else if (lock && tokens < lock.tokens) {
+      await db.update(verifiedWallets).set({ tokens, updatedAt: new Date() }).where(eq(verifiedWallets.owner, key));
+    } else if (!lock && verified) {
+      await db.insert(verifiedWallets).values({ owner: key, tokens }).onConflictDoNothing();
+    }
+    return { tokens: verified ? tokens : weekly, verified, locked: verified };
+  } catch (e) {
+    console.error("verified lock failed", e);
+    return { tokens: weekly, verified: meets(balance, weekly), locked: false };
+  }
+}
+
+/** Whether a wallet holds its requirement. Throws if it can't be read, so callers never cache a wrong "no". */
 export async function holdsMinimum(owner: string) {
   if (!verifiedEnabled()) return false;
-  const [balance, tokens] = await Promise.all([readBalance(owner), verifiedTokens()]);
-  return meets(balance, tokens);
+  const [balance, weekly] = await Promise.all([readBalance(owner), verifiedTokens()]);
+  return (await standing(owner, balance, weekly)).verified;
 }
 
 const whole = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
@@ -170,10 +201,15 @@ export async function verifiedStatus(owner: string) {
   const [balance, tokens] = await Promise.allSettled([readBalance(owner), verifiedTokens()]);
   for (const r of [balance, tokens]) if (r.status === "rejected") console.error("verified check failed", r.reason);
   const held = balance.status === "fulfilled" ? balance.value : null;
-  const required = tokens.status === "fulfilled" ? tokens.value : null;
+  const weekly = tokens.status === "fulfilled" ? tokens.value : null;
+  const state =
+    verifiedEnabled() && held !== null && weekly !== null
+      ? await standing(owner, held, weekly)
+      : { tokens: weekly, verified: false, locked: false };
   return {
     balance: held === null ? null : whole(Number(formatUnits(held, TOKEN.decimals))),
-    required: required === null ? null : whole(required),
-    verified: verifiedEnabled() && held !== null && required !== null && meets(held, required),
+    required: state.tokens === null ? null : whole(state.tokens),
+    verified: state.verified,
+    locked: state.locked,
   };
 }
