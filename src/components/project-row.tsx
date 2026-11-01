@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { formatUsd, isTestnet, networkLabel } from "@/lib/networks";
-import type { ProjectListItem } from "@/lib/queries";
+import { getVerifiedGateways, type ProjectListItem } from "@/lib/queries";
+import { VerifiedBadge } from "@/components/verified";
 
 export function compact(n: number): string {
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -23,7 +24,7 @@ export function NetworkChips({ networks, max = 3 }: { networks: string[]; max?: 
   );
 }
 
-export function ProjectRow({ p }: { p: ProjectListItem }) {
+export function ProjectRow({ p, verified = false }: { p: ProjectListItem; verified?: boolean }) {
   const isService = p.category === "service" || p.endpointCount > 0;
   return (
     <li>
@@ -34,6 +35,7 @@ export function ProjectRow({ p }: { p: ProjectListItem }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{p.name}</span>
+            {verified && <VerifiedBadge />}
             {p.featured && (
               <span className="rounded bg-accent-soft px-1.5 py-px text-[11px] font-medium text-accent">Featured</span>
             )}
@@ -68,11 +70,12 @@ export function ProjectRow({ p }: { p: ProjectListItem }) {
   );
 }
 
-export function ProjectList({ rows }: { rows: ProjectListItem[] }) {
+export async function ProjectList({ rows }: { rows: ProjectListItem[] }) {
+  const { projectSlugs } = await getVerifiedGateways();
   return (
     <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-bg">
       {rows.map((p) => (
-        <ProjectRow key={p.id} p={p} />
+        <ProjectRow key={p.id} p={p} verified={projectSlugs.includes(p.slug)} />
       ))}
     </ul>
   );

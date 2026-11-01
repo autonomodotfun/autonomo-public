@@ -6,6 +6,7 @@ import { cache } from "react";
 import { getDb, schema } from "@/db";
 import { CATEGORIES, type Category } from "@/db/schema";
 import { TESTNET_PATTERN } from "@/lib/networks";
+import { holdsMinimum } from "@/lib/verified";
 
 const { projects, endpoints } = schema;
 
@@ -249,6 +250,21 @@ async function listAutonomoGatewaysFresh() {
     .orderBy(asc(gateways.createdAt));
 }
 
+// Listed, active gateways whose owner holds the Verified minimum. A failed balance read throws, so it isn't cached.
+async function verifiedGatewaysFresh() {
+  const db = await getDb();
+  const { gateways } = schema;
+  const rows = await db
+    .select({ slug: gateways.slug, owner: gateways.owner, projectSlug: projects.slug })
+    .from(gateways)
+    .innerJoin(projects, eq(gateways.projectId, projects.id))
+    .where(and(eq(gateways.listing, "listed"), eq(gateways.status, "active"), eq(projects.status, "approved")));
+  const owners = [...new Set(rows.map((r) => r.owner))];
+  const holds = new Map(await Promise.all(owners.map(async (o) => [o, await holdsMinimum(o)] as const)));
+  const verified = rows.filter((r) => holds.get(r.owner));
+  return { slugs: verified.map((r) => r.slug), projectSlugs: verified.map((r) => r.projectSlug) };
+}
+
 function escapeLike(s: string) {
   return s.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
@@ -363,6 +379,17 @@ export const getFeatured = cachedRead(getFeaturedFresh, "featured", DAY, CATALOG
 export const getAllSlugs = cachedRead(getAllSlugsFresh, "all-slugs", DAY, CATALOG_TAGS.directory);
 export const getProject = cache(cachedRead(getProjectFresh, "project", DAY, CATALOG_TAGS.directory));
 export const listAutonomoGateways = cachedRead(listAutonomoGatewaysFresh, "autonomo-gateways", 300, CATALOG_TAGS.gateways);
+const verifiedGatewaysCached = cachedRead(verifiedGatewaysFresh, "verified-gateways", 300, CATALOG_TAGS.gateways);
+
+/** Slugs of Verified gateways and their projects; empty while balances can't be read, so a badge never blocks a page. */
+export const getVerifiedGateways = cache(async () => {
+  try {
+    return await verifiedGatewaysCached();
+  } catch (e) {
+    console.error("verified gateways failed", e);
+    return { slugs: [] as string[], projectSlugs: [] as string[] };
+  }
+});
 export const findAutonomoGateways = cachedRead(findAutonomoGatewaysFresh, "find-autonomo-gateways", 300, CATALOG_TAGS.gateways);
 
 /** Drop cached catalog reads now (after admin changes, gateway edits and the directory refresh). */

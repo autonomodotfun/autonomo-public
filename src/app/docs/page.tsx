@@ -5,6 +5,7 @@ import { getStats, listAutonomoGateways } from "@/lib/queries";
 import { compact } from "@/components/project-row";
 import { CopyButton } from "@/components/copy-button";
 import { privyEnabled } from "@/lib/privy";
+import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
 import { proConfig } from "@/lib/pro";
 
 export const metadata: Metadata = {
@@ -330,6 +331,9 @@ export default async function DocsPage() {
             </p>
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
               <li>Your API must be public and use https. Gateways don&apos;t follow redirects.</li>
+              {verifiedEnabled() && (
+                <li>Launching is free. Hold at least {verifiedAmount()} {TOKEN.symbol} in your wallet and your listed APIs show as Verified. The tokens stay yours, and the badge goes away if your balance drops below that. Verified shows the provider holds the token; it isn&apos;t a review of the API.</li>
+              )}
               <li>If your API needs a key, add it as an auth header; it&apos;s encrypted and added to every forwarded call.</li>
               <li>Requests up to 1 MB and responses up to 5 MB, with a 25-second timeout.</li>
               <li>A payment only settles when your API answers successfully (status below 400).</li>

@@ -224,7 +224,8 @@ server.registerTool(
     title: "Find Autonomo APIs",
     description:
       "Search the paid APIs on Autonomo (token prices, new launches, rug-risk checks, wallet portfolios, transaction explainers, " +
-      "page reader and more on Robinhood Chain). Returns each API's slug, price and the path to call. Free. " +
+      "page reader and more on Robinhood Chain). Returns each API's slug, price and the path to call. verified means the provider holds the Verified minimum of " +
+      "$AUTONOMO; it isn't a review of the API. Free. " +
       "Set include_directory to also search Autonomo's directory of 3.7K x402 projects on other networks (listed for reference; " +
       "call_api only pays Autonomo gateways).",
     inputSchema: {
@@ -239,7 +240,7 @@ server.registerTool(
     const score = (g) => words.filter((w) => `${g.slug} ${g.name} ${g.description}`.toLowerCase().includes(w)).length;
     const apis = words.length ? data.map((g) => [score(g), g]).filter(([s]) => s > 0).sort((a, b) => b[0] - a[0]).map(([, g]) => g) : data;
     const result = {
-      apis: (apis.length ? apis : data).map(({ slug, name, description, usage, price }) => ({ slug, name, description, path: usage, price })),
+      apis: (apis.length ? apis : data).map(({ slug, name, description, usage, price, verified }) => ({ slug, name, description, path: usage, price, verified })),
       note: !data.length
         ? "No Autonomo APIs are listed right now."
         : apis.length || !words.length

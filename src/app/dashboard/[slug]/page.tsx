@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { VerifiedBadge } from "@/components/verified";
+import { verifiedStatus } from "@/lib/verified";
 import { notFound, redirect } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { TOKEN } from "@/lib/constants";
@@ -27,7 +29,7 @@ export default async function GatewayDashboard({
   if (!owner) redirect("/dashboard");
   const g = await getOwnedGateway((await params).slug, owner);
   if (!g) notFound();
-  const stats = await gatewayStats(g.id);
+  const [stats, { verified }] = await Promise.all([gatewayStats(g.id), verifiedStatus(owner)]);
   const live = gatewayOffers(g);
   const url = `${SITE}/x/${g.slug}`;
 
@@ -53,6 +55,7 @@ export default async function GatewayDashboard({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="heading text-4xl">{g.name}</h1>
+            {verified && <VerifiedBadge />}
             <Badge tone={g.status === "active" ? "ok" : "muted"}>{g.status}</Badge>
             {g.listing !== "unlisted" && <Badge tone={g.listing === "listed" ? "ok" : g.listing === "rejected" ? "warn" : "muted"}>{g.listing}</Badge>}
           </div>
