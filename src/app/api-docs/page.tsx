@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "API",
-  description: "Free JSON API for agents to discover x402 APIs launched on Autonomo.",
+  description: "Free JSON API for agents to discover x402 APIs and Autonomo gateways.",
 };
 
 const ENDPOINTS = [
@@ -33,10 +33,17 @@ const ENDPOINTS = [
     example: "/api/v1/stats",
   },
   {
+    path: "/api/v1/gateways",
+    summary:
+      "Every live Autonomo gateway, including the official APIs: name, description, the URL to call, the path to append, accepted tokens and its project page. Used by the Autonomo MCP server.",
+    params: [],
+    example: "/api/v1/gateways",
+  },
+  {
     path: "/api/v1/pro/endpoints",
     paid: true,
     summary:
-      "Paid per call with x402. Endpoint-level search with URL, method, price, network, asset, payTo, scheme, facilitator and 30-day calls. Testnet endpoints are excluded.",
+      "Paid per call with x402, in USDG or $AUTONOMO on Robinhood Chain. Answers 503 until it is switched on. Endpoint-level search with URL, method, price, network, asset, payTo, scheme, facilitator and 30-day calls. Testnet endpoints are excluded.",
     params: [
       ["q", "Search endpoint URLs and descriptions, and their project's text"],
       ["network", "e.g. base, solana, polygon"],
@@ -55,7 +62,13 @@ export default function ApiDocs() {
       <h1 className="heading text-4xl">API</h1>
       <p className="mt-3 text-muted">
         Point your agent here to find APIs it can pay for. Read-only JSON, free while in beta. No key needed, CORS is
-        open, and responses are cached for 5 minutes. A paid tier using x402 itself is planned for higher volume.
+        open, and responses are cached for 5 minutes. The <Link href="/docs#pro" className="underline hover:text-ink">Pro API</Link>{" "}
+        adds endpoint-level search, paid per call with x402.
+      </p>
+      <p className="mt-3 text-sm text-muted">
+        To call and pay the APIs you find, use the{" "}
+        <Link href="/docs#mcp" className="underline hover:text-ink">MCP server</Link> or an{" "}
+        <Link href="/docs#agents" className="underline hover:text-ink">x402 client in your own code</Link>.
       </p>
       <p className="mt-3 text-sm text-muted">
         New to Autonomo? Start with the <Link href="/docs" className="underline hover:text-ink">docs</Link>.

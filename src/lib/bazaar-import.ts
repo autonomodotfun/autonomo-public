@@ -4,7 +4,7 @@ import { isTestnet, normalizeNetwork, priceUsd } from "./networks";
 import { displayHost, slugify } from "./slug";
 
 // Imports x402 resources from facilitator discovery ("Bazaar") endpoints and groups them into projects by host.
-// Used by `npm run db:import` and by the daily cron at /api/cron/import. Existing projects keep their curated
+// Used by `npm run db:import` and by the cron (every 3 days) at /api/cron/import. Existing projects keep their curated
 // name, category and status; stats, prices and imported descriptions are refreshed.
 
 const SOURCES = [
