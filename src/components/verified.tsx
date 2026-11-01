@@ -16,7 +16,7 @@ export function VerifiedBadge() {
 /** On the dashboard: whether this wallet's APIs show as Verified, and how to get there. */
 export async function VerifiedPanel({ owner, className = "" }: { owner: string; className?: string }) {
   if (!verifiedEnabled()) return null;
-  const { balance, required, verified } = await verifiedStatus(owner);
+  const { balance, required, verified, locked } = await verifiedStatus(owner);
   return (
     <div className={`rounded-lg border border-line p-4 text-sm ${className}`}>
       <p className="font-medium">
@@ -29,7 +29,11 @@ export async function VerifiedPanel({ owner, className = "" }: { owner: string; 
         )}
       </p>
       <p className="mt-1 text-muted">
-        {required === null ? "We couldn't read this week's amount just now." : `This week that's ${required} ${TOKEN.symbol}.`}{" "}
+        {required === null
+          ? "We couldn't read this week's amount just now."
+          : locked
+            ? `Your amount is locked at ${required} ${TOKEN.symbol}.`
+            : `This week that's ${required} ${TOKEN.symbol}.`}{" "}
         {balance === null ? "We couldn't read your balance just now." : `Your wallet holds ${balance}.`} The tokens stay yours.{" "}
         {!verified && (
           <a

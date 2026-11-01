@@ -204,3 +204,13 @@ export const telegramQuestions = pgTable(
   },
   (t) => [index("telegram_questions_user_created_idx").on(t.userId, t.createdAt)],
 );
+
+// The $AUTONOMO amount a wallet is held to for Verified, saved when it first qualifies. See src/lib/verified.ts.
+export const verifiedWallets = pgTable("verified_wallets", {
+  // Lowercased wallet address.
+  owner: text("owner").primaryKey(),
+  // Whole tokens.
+  tokens: integer("tokens").notNull(),
+  lockedAt: timestamp("locked_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
