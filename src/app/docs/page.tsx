@@ -332,7 +332,7 @@ export default async function DocsPage() {
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
               <li>Your API must be public and use https. Gateways don&apos;t follow redirects.</li>
               {verifiedEnabled() && (
-                <li>Launching is free. Hold about {verifiedAmount()} of {TOKEN.symbol} in your wallet and your APIs show as Verified. The amount in tokens is set each week from the previous week&apos;s average price, rounded to the nearest 100,000. The tokens stay yours, and the badge goes away if your balance drops below that week&apos;s amount. Verified shows the provider holds the token; it isn&apos;t a review of the API.</li>
+                <li>Launching is free. Hold about {verifiedAmount()} of {TOKEN.symbol} in your wallet and your APIs show as Verified. The amount in tokens is set each week from the previous week&apos;s average price, rounded to the nearest 100,000. Once you qualify, your amount is locked: it won&apos;t go up, and it moves down if the weekly amount falls below it. The tokens stay yours. If your balance drops below your amount, you lose the badge and the lock, and qualify again at the current weekly amount. Verified shows the provider holds the token; it isn&apos;t a review of the API.</li>
               )}
               <li>If your API needs a key, add it as an auth header; it&apos;s encrypted and added to every forwarded call.</li>
               <li>Requests up to 1 MB and responses up to 5 MB, with a 25-second timeout.</li>
