@@ -250,7 +250,7 @@ async function listAutonomoGatewaysFresh() {
     .orderBy(asc(gateways.createdAt));
 }
 
-// Listed, active gateways whose owner holds the Verified minimum. A failed balance read throws, so it isn't cached.
+// Listed, active gateways whose owner holds the Verified amount. A failed read throws, so it isn't cached.
 async function verifiedGatewaysFresh() {
   const db = await getDb();
   const { gateways } = schema;
