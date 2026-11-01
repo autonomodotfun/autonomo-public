@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { cache } from "react";
 import { getDb, schema } from "@/db";
 import { CATEGORIES, type Category } from "@/db/schema";
+import { TOKEN } from "@/lib/constants";
 import { TESTNET_PATTERN } from "@/lib/networks";
 import { holdsMinimum } from "@/lib/verified";
 
@@ -321,15 +322,17 @@ async function getStatsFresh() {
       select n as network, count(*)::int as count
       from ${projects}, unnest(${projects.networks}) as n
       where ${projects.status} = 'approved'
-      group by n order by count desc limit 12`),
+      group by n order by count desc`),
   ]);
   const networkRows = "rows" in networks ? networks.rows : (networks as unknown as { network: string; count: number }[]);
+  // The 12 most common, plus Autonomo's own chain wherever it ranks.
+  const topNetworks = networkRows.filter((n, i) => i < 12 || n.network === TOKEN.network);
   return {
     projects: totals.projects,
     endpoints: totals.endpoints,
     calls30d: Number(totals.calls30d),
     categories: Object.fromEntries(categories.map((c) => [c.category, c.count])) as Partial<Record<Category, number>>,
-    networks: networkRows,
+    networks: topNetworks,
   };
 }
 
