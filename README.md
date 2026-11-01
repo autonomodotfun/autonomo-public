@@ -75,5 +75,5 @@ Both use the same agent (`src/lib/agent.ts`, `src/lib/playground.ts`): it picks 
 The live roadmap is in the "Roadmap & status" section of `/docs` (`src/app/docs/page.tsx`).
 
 - **Phase 1 (live):** hosted gateways, USDG and $AUTONOMO payments on Robinhood Chain, owner dashboard, Agent Playground, official APIs.
-- **Phase 2 (building):** Telegram bot, more official APIs, MCP server and Verified (done), agent SDK and CLI, webhooks and payout analytics.
+- **Phase 2 (building):** Telegram bot, MCP server and Verified (done), more official APIs (in progress), agent SDK and CLI, webhooks and payout analytics.
 - **Later:** Base and Solana support, paying x402 APIs from other platforms, API reputation.
