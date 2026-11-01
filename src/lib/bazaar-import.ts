@@ -68,7 +68,12 @@ async function* pages(base: string, max: number, log: (s: string) => void) {
   log(`  ${Math.min(offset, total)}/${total === Infinity ? "?" : total} fetched`);
 }
 
-type EndpointRow = Omit<typeof schema.endpoints.$inferInsert, "projectId"> & { host: string; serviceName: string | null };
+// `network` is the first payment option, which the price and payment details come from. `networks` is every option.
+type EndpointRow = Omit<typeof schema.endpoints.$inferInsert, "projectId"> & {
+  host: string;
+  serviceName: string | null;
+  networks: string[];
+};
 
 // Postgres text/jsonb reject NUL characters, which a few listings contain.
 function clean<T>(value: T): T {
@@ -104,6 +109,7 @@ function toRow(raw: Item, facilitator: string): EndpointRow | null {
     type: item.type ?? "http",
     description: (item.description ?? item.metadata?.description ?? accept?.description ?? "").trim().slice(0, 1000),
     network: normalizeNetwork(accept?.network),
+    networks: [...new Set((item.accepts ?? []).map((a) => normalizeNetwork(a.network)).filter((n): n is string => !!n))],
     asset: accept?.asset ?? null,
     amount,
     priceUsd: usd === null ? null : String(usd),
@@ -157,8 +163,10 @@ export async function importBazaar({ dryRun = false, max = Infinity, log = conso
           if (!row) continue;
           const key = `${row.method} ${row.url}`;
           const prev = byKey.get(key);
-          // Same resource listed by several facilitators: keep the one with more usage data.
-          if (!prev || (row.calls30d ?? 0) > (prev.calls30d ?? 0)) byKey.set(key, row);
+          // Same resource listed by several facilitators: keep the one with more usage data, and every network from both.
+          const networks = [...new Set([...(prev?.networks ?? []), ...row.networks])];
+          if (!prev || (row.calls30d ?? 0) > (prev.calls30d ?? 0)) byKey.set(key, { ...row, networks });
+          else prev.networks = networks;
         }
       }
     } catch (err) {
@@ -179,7 +187,7 @@ export async function importBazaar({ dryRun = false, max = Infinity, log = conso
 
   const projectRows = [...groups.values()].map(({ host, rows }) => {
     rows.sort((a, b) => (b.calls30d ?? 0) - (a.calls30d ?? 0));
-    const networks = [...new Set(rows.map((r) => r.network).filter((n): n is string => !!n))];
+    const networks = [...new Set(rows.flatMap((r) => r.networks))];
     const tagCounts = mostCommonTags(rows.flatMap((r) => r.tags ?? []));
     const prices = rows.map((r) => (r.priceUsd ? Number(r.priceUsd) : null)).filter((p): p is number => p !== null);
     const name = mostCommon(rows.map((r) => r.serviceName)) ?? displayHost(host);
@@ -272,7 +280,7 @@ export async function importBazaar({ dryRun = false, max = Infinity, log = conso
 
     const idByHost = new Map(inserted.map((r) => [r.host!, r.id]));
     const endpointValues = batch.flatMap((p) =>
-      p.rows.map(({ host, serviceName: _s, ...r }) => ({ ...r, projectId: idByHost.get(host)!, updatedAt: now })),
+      p.rows.map(({ host, serviceName: _s, networks: _n, ...r }) => ({ ...r, projectId: idByHost.get(host)!, updatedAt: now })),
     );
     for (const epBatch of chunks(endpointValues, 400)) {
       await db
