@@ -19,7 +19,7 @@ import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { z } from "zod";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 const BASE = (process.env.AUTONOMO_BASE_URL || "https://autonomo.fun").replace(/\/+$/, "");
 const NETWORK = "eip155:4663";
 const RPC = "https://rpc.mainnet.chain.robinhood.com";

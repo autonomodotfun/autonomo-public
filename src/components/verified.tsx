@@ -5,7 +5,7 @@ import { verifiedAmount, verifiedEnabled, verifiedStatus } from "@/lib/verified"
 export function VerifiedBadge() {
   return (
     <span
-      title={`The wallet behind this API holds at least ${verifiedAmount()} ${TOKEN.symbol}. This isn't a review of the API.`}
+      title={`The wallet behind this API holds about ${verifiedAmount()} or more of ${TOKEN.symbol}. This isn't a review of the API.`}
       className="shrink-0 rounded bg-accent-soft px-1.5 py-px text-[11px] font-medium text-accent"
     >
       ✓ Verified
@@ -16,7 +16,7 @@ export function VerifiedBadge() {
 /** On the dashboard: whether this wallet's APIs show as Verified, and how to get there. */
 export async function VerifiedPanel({ owner, className = "" }: { owner: string; className?: string }) {
   if (!verifiedEnabled()) return null;
-  const { balance, verified } = await verifiedStatus(owner);
+  const { balance, required, verified } = await verifiedStatus(owner);
   return (
     <div className={`rounded-lg border border-line p-4 text-sm ${className}`}>
       <p className="font-medium">
@@ -25,12 +25,12 @@ export async function VerifiedPanel({ owner, className = "" }: { owner: string; 
             Your APIs show as <VerifiedBadge />
           </>
         ) : (
-          `Launching is free. Hold ${verifiedAmount()} ${TOKEN.symbol} to show as Verified`
+          `Launching is free. Hold about ${verifiedAmount()} of ${TOKEN.symbol} to show as Verified`
         )}
       </p>
       <p className="mt-1 text-muted">
-        {balance === null ? "We couldn't read your balance just now." : `Your wallet holds ${balance}.`} The tokens stay yours
-        {verified ? `, and the badge stays while you hold at least ${verifiedAmount()}.` : "."}{" "}
+        {required === null ? "We couldn't read this week's amount just now." : `This week that's ${required} ${TOKEN.symbol}.`}{" "}
+        {balance === null ? "We couldn't read your balance just now." : `Your wallet holds ${balance}.`} The tokens stay yours.{" "}
         {!verified && (
           <a
             href={`https://dexscreener.com/robinhood/${TOKEN.address}`}
