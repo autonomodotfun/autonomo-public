@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { VerifiedBadge } from "@/components/verified";
+import { verifiedStatus } from "@/lib/verified";
 import { listOwnerGateways } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 import { platform } from "@/lib/pro";
@@ -54,7 +56,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const rows = await listOwnerGateways(owner);
+  const [rows, { verified }] = await Promise.all([listOwnerGateways(owner), verifiedStatus(owner)]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6">
@@ -91,6 +93,7 @@ export default async function DashboardPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{g.name}</span>
+                    {verified && <VerifiedBadge />}
                     <Badge tone={g.status === "active" ? "ok" : "muted"}>{g.status}</Badge>
                     {g.listing !== "unlisted" && <Badge tone={g.listing === "listed" ? "ok" : "muted"}>{g.listing}</Badge>}
                   </div>
