@@ -166,16 +166,17 @@ const ROADMAP: Phase[] = [
     name: "Phase 2",
     status: "building",
     summary:
-      "the Telegram bot and four more official APIs are complete, and the Autonomo MCP server is in progress",
+      "the Telegram bot, four more official APIs, the Autonomo MCP server and Verified are complete, and the Agent SDK and CLI are up next",
     items: [
       { title: "Autonomo agent bot for Telegram", note: "Live at t.me/autonomoagentbot: ask in a DM or a group, with free daily answers", done: true },
       { title: "More official APIs", note: "Token Lookup, Tx Explainer, Wallet Portfolio and Page Reader", done: true },
       { title: "Automatic directory refresh", note: "The x402 catalog is re-imported every 3 days", done: true },
       {
         title: "Autonomo MCP server",
-        note: "First version on npm as autonomo-mcp: Claude, Cursor, Codex and other agents find and pay APIs natively",
-        now: true,
+        note: "On npm as autonomo-mcp: Claude, Cursor, Codex and other agents find and pay APIs natively",
+        done: true,
       },
+      { title: "Verified for API providers", note: "Launching stays free. Hold $AUTONOMO and your APIs show as Verified", done: true },
       { title: "Agent SDK and CLI", note: "With spend limits built in" },
       { title: "Webhooks and payout analytics", note: "For API owners" },
     ],
@@ -186,7 +187,7 @@ const ROADMAP: Phase[] = [
     items: [
       { title: "Base and Solana support", note: "Launch and pay for APIs on more chains, beyond Robinhood Chain" },
       { title: "APIs from other platforms", note: "The agent uses and pays x402 APIs from platforms like PayAI and Coinbase" },
-      { title: "Verified API listings and reputation" },
+      { title: "API reputation" },
     ],
   },
 ];
