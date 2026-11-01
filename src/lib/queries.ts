@@ -341,8 +341,8 @@ async function getAllSlugsFresh() {
 
 // ---------- cached reads ----------
 // Every page view and API call used to query the database, which kept it awake around the clock. These reads are
-// cached (shared across server instances), so most requests never reach it. Admin changes and the daily directory
-// refresh clear the tags (see revalidateCatalog), so directory reads can live a day; gateway lists refresh sooner.
+// cached (shared across server instances), so most requests never reach it. Admin changes and the directory refresh
+// (every 3 days) clear the tags (see revalidateCatalog), so directory reads can live a day; gateway lists refresh sooner.
 
 const DAY = 24 * 3600;
 
@@ -365,7 +365,7 @@ export const getProject = cache(cachedRead(getProjectFresh, "project", DAY, CATA
 export const listAutonomoGateways = cachedRead(listAutonomoGatewaysFresh, "autonomo-gateways", 300, CATALOG_TAGS.gateways);
 export const findAutonomoGateways = cachedRead(findAutonomoGatewaysFresh, "find-autonomo-gateways", 300, CATALOG_TAGS.gateways);
 
-/** Drop cached catalog reads now (after admin changes, gateway edits and the daily refresh). */
+/** Drop cached catalog reads now (after admin changes, gateway edits and the directory refresh). */
 export function revalidateCatalog() {
   revalidateTag(CATALOG_TAGS.directory, { expire: 0 });
   revalidateTag(CATALOG_TAGS.gateways, { expire: 0 });

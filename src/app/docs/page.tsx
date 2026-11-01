@@ -4,21 +4,23 @@ import { TOKEN } from "@/lib/constants";
 import { getStats, listAutonomoGateways } from "@/lib/queries";
 import { compact } from "@/components/project-row";
 import { CopyButton } from "@/components/copy-button";
-import { networkLabel, normalizeNetwork } from "@/lib/networks";
 import { privyEnabled } from "@/lib/privy";
 import { proConfig } from "@/lib/pro";
 
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "How Autonomo works: launch an x402 API that AI agents pay per call, connect your agent to the free discovery API, and find your way around the catalog.",
+    "How Autonomo works: launch an x402 API that AI agents pay per call, use the official Autonomo APIs from the MCP server, the Telegram bot or your own code, and find your way around the catalog.",
 };
 
 const SECTIONS = [
   { id: "overview", label: "Overview" },
   { id: "how-x402-works", label: "How x402 works" },
   { id: "launch", label: "Launch your API" },
-  { id: "agents", label: "Connect your agent" },
+  { id: "official-apis", label: "Official APIs" },
+  { id: "mcp", label: "MCP server" },
+  { id: "agents", label: "Pay from your own code" },
+  { id: "telegram", label: "Telegram bot & Playground" },
   { id: "api", label: "API reference" },
   { id: "pro", label: "Pro API" },
   { id: "data", label: "Where the data comes from" },
@@ -82,7 +84,8 @@ import { x402Client } from "@x402/core/client";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { privateKeyToAccount } from "viem/accounts";
 
-// A dedicated agent wallet holding a small USDC balance.
+// A dedicated agent wallet with a small balance: USDG or $AUTONOMO on Robinhood Chain
+// for Autonomo gateways, or USDC for most other x402 APIs (often on Base).
 const signer = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as \`0x\${string}\`);
 
 const client = new x402Client();
@@ -91,7 +94,7 @@ client.register("eip155:*", new ExactEvmScheme(signer));
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 
 // Pays automatically when the API answers 402, then retries.
-const res = await fetchWithPayment("https://api.example.com/weather");
+const res = await fetchWithPayment("${SITE}/x/token-price/price/autonomo");
 console.log(await res.json());`;
 
 const PRO_CODE = `import { wrapFetchWithPayment } from "@x402/fetch";
@@ -110,6 +113,35 @@ const res = await fetchWithPayment(
 );
 const { data } = await res.json(); // url, method, priceUsd, network, payTo, ...`;
 
+const MCP_CLAUDE_CODE = "claude mcp add autonomo -e AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY -- npx -y autonomo-mcp";
+
+const MCP_JSON = `{
+  "mcpServers": {
+    "autonomo": {
+      "command": "npx",
+      "args": ["-y", "autonomo-mcp"],
+      "env": { "AUTONOMO_WALLET_KEY": "0xYOUR_AGENT_WALLET_KEY" }
+    }
+  }
+}`;
+
+const MCP_TOOLS: [string, string][] = [
+  ["find_apis", "Search Autonomo's official APIs, and optionally the whole x402 directory. Free."],
+  ["get_price", "Call an API without paying and show what it asks for. Free."],
+  ["call_api", "Pay for one call and return the answer, with the payment link on Blockscout."],
+];
+
+// The APIs Autonomo runs itself (official-apis/tools). Each sits behind its own gateway at /x/<slug>.
+const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }[] = [
+  { name: "Token Price", slug: "token-price", path: "/price/autonomo", about: `The live ${TOKEN.symbol} price` },
+  { name: "Token Lookup", slug: "token-lookup", path: "/price/<token>", about: "Price and market cap of any Robinhood Chain launchpad token, from its bonding curve or, after graduation, its Uniswap v4 pool" },
+  { name: "New Launches", slug: "new-launches", path: "/launches?limit=10", about: "The newest launchpad tokens: age, buys, sells, market cap and curve progress" },
+  { name: "Risk Checker", slug: "token-risk", path: "/risk/<token>", about: "A rug-risk score from holder concentration, the creator, launch-block buyers and bot volume" },
+  { name: "Tx Explainer", slug: "tx-explainer", path: "/tx/<hash>", about: "A Robinhood Chain transaction in plain English: launches, buys, sells, transfers and fee" },
+  { name: "Wallet Portfolio", slug: "wallet-portfolio", path: "/portfolio/<wallet>", about: "ETH, USDG, WETH, $AUTONOMO and recently received tokens, valued in USD, with impostor tokens flagged" },
+  { name: "Page Reader", slug: "page-reader", path: "/page?url=<https link>", about: "Title, description and readable text of a public web page" },
+];
+
 const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 // Where Autonomo is. Update `status` as phases ship; "live" items are things anyone can use today.
@@ -126,17 +158,18 @@ const ROADMAP: Phase[] = [
       { title: "Owner dashboard and on-chain receipts", note: "Paid calls, earnings and tx links" },
       { title: "AI agents paying live", note: "Codex demo and the agent payment example" },
       { title: "Agent Playground", note: "Ask a question, watch an agent pay in $AUTONOMO" },
-      { title: "Official Autonomo APIs", note: "$AUTONOMO price, New Launches and Risk Checker" },
+      { title: "Official Autonomo APIs", note: "Token Price, New Launches and Risk Checker" },
     ],
   },
   {
     name: "Phase 2",
     status: "building",
     summary:
-      "the Autonomo agent bot for Telegram is complete, and the Autonomo MCP server and more high-quality official APIs are in progress",
+      "the Telegram bot and four more official APIs are complete, and the Autonomo MCP server is in progress",
     items: [
       { title: "Autonomo agent bot for Telegram", note: "Live at t.me/autonomoagentbot: ask in a DM or a group, with free daily answers", done: true },
-      { title: "More high-quality official APIs", note: "Ideas: wallet portfolio, transaction explainer, page to clean text", now: true },
+      { title: "More official APIs", note: "Token Lookup, Tx Explainer, Wallet Portfolio and Page Reader", done: true },
+      { title: "Automatic directory refresh", note: "The x402 catalog is re-imported every 3 days", done: true },
       {
         title: "Autonomo MCP server",
         note: "First version on npm as autonomo-mcp: Claude, Cursor, Codex and other agents find and pay APIs natively",
@@ -168,25 +201,30 @@ const ENDPOINTS: [string, string][] = [
   ["GET /api/v1/projects", "Search and filter projects: q, category, network, sort, page, limit"],
   ["GET /api/v1/projects/{slug}", "One project with up to 500 paid endpoints, prices, networks and 30-day calls"],
   ["GET /api/v1/stats", "Totals, counts per category and the most common networks"],
+  ["GET /api/v1/gateways", "Every live Autonomo gateway, with the URL and path to call (used by the MCP server)"],
   ["GET /api/v1/pro/endpoints", "Paid: endpoint-level search with payment details (see Pro API)"],
 ];
 
 const FAQ: [string, React.ReactNode][] = [
   [
     "Does Autonomo take a cut of payments?",
-    <>No. Agents pay your <code>payTo</code> wallet directly through the facilitator; Autonomo never holds or routes payments for listed APIs. The only payments Autonomo receives are for its own <a href="#pro">Pro API</a>.</>,
+    <>No. Payments go straight from the agent&apos;s wallet to your <code>payTo</code> wallet. For hosted gateways, Autonomo&apos;s facilitator settles the payment on-chain and pays the gas, but never holds the money. Autonomo is only paid for its own <a href="#official-apis">official APIs</a> and the <a href="#pro">Pro API</a>.</>,
   ],
   [
     "Does Autonomo host my API?",
-    <>No. Your API runs wherever it runs today. Autonomo lists it so agents can find it, with its price, network and usage.</>,
+    <>No. Your API runs wherever it runs today. A <a href="#launch">hosted gateway</a> sits in front of it, takes the payment and forwards the request; or you run x402 yourself and Autonomo just lists it.</>,
   ],
   [
     "How much does it cost to launch?",
-    <>Nothing. Listing is free, whether your API is picked up from a facilitator catalog or launched through the form.</>,
+    <>Nothing. Launching a gateway and getting listed are free, whether your API comes from a facilitator catalog, the dashboard or the launch form.</>,
   ],
   [
     "Is the discovery API free?",
     <>Yes, with no key. The <a href="#pro">Pro API</a> adds paid, endpoint-level search, paid per call with x402.</>,
+  ],
+  [
+    "Is it safe to give the MCP server a private key?",
+    <>Use a new wallet just for your agent with a small balance, never your main wallet. The key stays on your computer and is only used to sign payments, the server only pays Autonomo gateways, and it stops at a per-call cap and a daily budget.</>,
   ],
   [
     "My listing is wrong or out of date. How do I fix it?",
@@ -194,7 +232,7 @@ const FAQ: [string, React.ReactNode][] = [
   ],
   [
     "Which networks are supported?",
-    <>Whatever your facilitator supports. Most listed endpoints settle on Base, followed by Solana, Polygon, Arbitrum and others. Testnet-only services are hidden.</>,
+    <>Hosted gateways and the official APIs take USDG or {TOKEN.symbol} on {TOKEN.chainName}. Self-hosted APIs use whatever their facilitator supports: most listed endpoints settle on Base, followed by Solana, Polygon, Arbitrum and others. Testnet-only services are hidden. Base and Solana for gateways are on the <a href="#roadmap">roadmap</a>.</>,
   ],
 ];
 
@@ -223,17 +261,35 @@ export default async function DocsPage() {
 
         <Section id="overview" title="Overview">
           <p>
-            Autonomo is the agentic x402 launchpad for APIs. You put a price on an endpoint with x402, launch it here,
-            and AI agents can find it and pay for each call in stablecoins. Agents need no API keys, accounts or
-            invoices.
+            Autonomo is the agentic x402 launchpad for APIs. You put a price on an endpoint, launch it here, and AI
+            agents can find it and pay for each call. Agents need no API keys, accounts or invoices: just a wallet.
           </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <b>Hosted gateways</b> put any existing API behind x402 in a few clicks, paid in USDG or {TOKEN.symbol} on{" "}
+              {TOKEN.chainName}.
+            </li>
+            <li>
+              <b>Official APIs</b> run by Autonomo cover token prices, new launches, rug risk, transactions, wallets and
+              web pages.
+            </li>
+            <li>
+              <b>Agents</b> use them through the <a href="#mcp">MCP server</a>, the{" "}
+              <a href="#telegram">Telegram bot</a>, the <Link href="/playground">Agent Playground</Link> or{" "}
+              <a href="#agents">their own code</a>.
+            </li>
+            <li>
+              <b>The directory</b> tracks the wider x402 ecosystem: paid services, facilitators, SDKs and explorers.
+            </li>
+          </ul>
           <p>
             Autonomo currently lists {compact(stats.projects)} projects and {compact(stats.endpoints)} paid endpoints,
             which handled {compact(stats.calls30d)} paid calls in the last 30 days.
           </p>
-          <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2">
+          <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
             <Card title="I have an API" href="#launch" body="Charge agents per call and get discovered." />
-            <Card title="I'm building an agent" href="#agents" body="Find paid APIs and pay for them automatically." />
+            <Card title="I use Claude, Cursor or Codex" href="#mcp" body="Add the MCP server and let your agent pay." />
+            <Card title="I'm building an agent" href="#agents" body="Find paid APIs and pay for them in code." />
           </div>
         </Section>
 
@@ -277,6 +333,8 @@ export default async function DocsPage() {
               <li>If your API needs a key, add it as an auth header; it&apos;s encrypted and added to every forwarded call.</li>
               <li>Requests up to 1 MB and responses up to 5 MB, with a 25-second timeout.</li>
               <li>A payment only settles when your API answers successfully (status below 400).</li>
+              <li>Autonomo settles payments on {TOKEN.chainName} itself and pays the gas. Paying in {TOKEN.symbol} needs a one-time Permit2 approval from the agent.</li>
+              <li>Once it&apos;s live, request a listing from the dashboard so it shows up in the directory and in agent searches.</li>
             </ul>
           </div>
           <p>Or run x402 on your own server:</p>
@@ -310,11 +368,91 @@ export default async function DocsPage() {
           </Step>
         </Section>
 
-        <Section id="agents" title="Connect your agent">
+        <Section id="official-apis" title="Official APIs">
+          <p>
+            Autonomo runs its own APIs for {TOKEN.chainName}, each behind a gateway and payable per call in USDG or{" "}
+            {TOKEN.symbol}. Call them at <code>{SITE.replace(/^https?:\/\//, "")}/x/&lt;slug&gt;&lt;path&gt;</code>.
+          </p>
+          <div className="overflow-x-auto rounded-lg border border-line">
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-line">
+                {OFFICIAL_APIS.map((a) => (
+                  <tr key={a.slug}>
+                    <td className="py-2.5 pr-4 pl-4 align-top">
+                      <span className="font-medium whitespace-nowrap text-ink">{a.name}</span>
+                      <span className="block font-mono text-xs whitespace-nowrap text-faint">
+                        /x/{a.slug}
+                        {a.path}
+                      </span>
+                    </td>
+                    <td className="py-2.5 pr-4 align-top text-muted">{a.about}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Everything is read from public chains. Try any of them without a wallet in the{" "}
+            <Link href="/playground">Agent Playground</Link>.
+          </p>
+        </Section>
+
+        <Section id="mcp" title="MCP server">
+          <p>
+            <code>autonomo-mcp</code> gives Claude, Cursor, Codex and any other MCP client access to Autonomo&apos;s
+            APIs. The agent finds an API, checks the price and pays per call in USDG or {TOKEN.symbol} on{" "}
+            {TOKEN.chainName}. It runs on your own computer, so your wallet key stays there.
+          </p>
+          <div className="overflow-x-auto rounded-lg border border-line">
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-line">
+                {MCP_TOOLS.map(([tool, desc]) => (
+                  <tr key={tool}>
+                    <td className="py-2.5 pr-4 pl-4 align-top font-mono text-xs whitespace-nowrap">{tool}</td>
+                    <td className="py-2.5 pr-4 text-muted">{desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Step n={1} title="Fund a wallet for your agent">
+            <p>
+              Make a new wallet just for your agent and send it a little USDG or {TOKEN.symbol} on {TOKEN.chainName}.
+              Paying in {TOKEN.symbol} also needs a little ETH once, for the Permit2 approval.
+            </p>
+          </Step>
+          <Step n={2} title="Add the server to your client">
+            <p>Claude Code:</p>
+            <Code code={MCP_CLAUDE_CODE} lang="bash" />
+            <p>
+              Claude Desktop, Cursor and others (<code>claude_desktop_config.json</code>, <code>.cursor/mcp.json</code>,
+              …):
+            </p>
+            <Code code={MCP_JSON} lang="json" />
+            <p className="text-sm text-muted">
+              Without a key, <code>find_apis</code> and <code>get_price</code> still work. Windows, Codex and all
+              settings are covered on the{" "}
+              <a href="https://www.npmjs.com/package/autonomo-mcp">autonomo-mcp package page</a>.
+            </p>
+          </Step>
+          <Step n={3} title="Ask">
+            <p>
+              For example: <i>&ldquo;Is token 0x… safe? Use Autonomo.&rdquo;</i> Your client asks before each tool call,
+              so you approve every payment unless you choose to allow it always.
+            </p>
+          </Step>
+          <p className="text-sm text-muted">
+            The server only pays Autonomo gateways, caps each call, and stops at a daily budget (set with{" "}
+            <code>AUTONOMO_DAILY_USDG</code> and <code>AUTONOMO_DAILY_AUTONOMO</code>).
+          </p>
+        </Section>
+
+        <Section id="agents" title="Pay from your own code">
           <Step n={1} title="Find APIs to pay for">
             <p>
               Search the catalog through the free discovery API. No key is needed and CORS is open, so it works from
-              servers, browsers and agent tools.
+              servers, browsers and agent tools. <code>GET /api/v1/gateways</code> lists Autonomo&apos;s own gateways
+              with the path to call.
             </p>
             <Code code={DISCOVER_CODE} lang="ts" />
           </Step>
@@ -329,6 +467,19 @@ export default async function DocsPage() {
               Use a dedicated wallet for your agent and keep only a small balance in it. Never commit private keys.
             </p>
           </Step>
+        </Section>
+
+        <Section id="telegram" title="Telegram bot & Playground">
+          <p>
+            <b>The Autonomo agent bot</b> answers questions in Telegram using the official APIs and pays for them
+            itself. Message <a href="https://t.me/autonomoagentbot">@autonomoagentbot</a> directly or mention it in a
+            group. Each user gets a few free paid answers a day.
+          </p>
+          <p>
+            <b>The <Link href="/playground">Agent Playground</Link></b> shows the same agent at work in the browser: ask a
+            question and watch it find an API, read the live <code>402</code> price, pay in {TOKEN.symbol} and answer
+            with an on-chain receipt. No wallet or signup needed.
+          </p>
         </Section>
 
         <Section id="api" title="API reference">
@@ -358,35 +509,15 @@ export default async function DocsPage() {
             (USD), sort by <code>popular</code> or <code>price</code>, up to 200 results per page. Testnet endpoints
             are left out.
           </p>
-          <p>It is paid per call with x402, so there is no key or account: the agent pays and gets the data.</p>
-          {proConfig ? (
-            <div className="overflow-x-auto rounded-lg border border-line">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-line">
-                  {proConfig.rails.map((rail) => (
-                    <tr key={rail.kind}>
-                      <td className="py-2.5 pr-4 pl-4 font-medium whitespace-nowrap">
-                        {{ usdg: "USDG", autonomo: TOKEN.symbol, usdc: "USDC" }[rail.kind]}
-                      </td>
-                      <td className="py-2.5 pr-4 font-mono text-xs whitespace-nowrap">
-                        {rail.kind === "autonomo" ? `${rail.amount} ${TOKEN.symbol.slice(1)}` : `$${rail.priceUsd}`} per call
-                      </td>
-                      <td className="py-2.5 pr-4 text-muted">
-                        {rail.kind === "usdc" ? networkLabel(normalizeNetwork(rail.network) ?? rail.network) : TOKEN.chainName}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
+          <p>It is paid per call with x402 in USDG or {TOKEN.symbol}, so there is no key or account: the agent pays and gets the data.</p>
+          {!proConfig && (
             <p className="rounded-lg border border-dashed border-line px-4 py-3 text-muted">
-              <b className="text-ink">Coming soon.</b> The Pro API will accept USDG and {TOKEN.symbol} on{" "}
-              {TOKEN.chainName}. Until it is switched on, it answers <code>503</code>.
+              <b className="text-ink">Coming soon.</b> Until it is switched on, it answers <code>503</code>.
             </p>
           )}
           <Code code={PRO_CODE} lang="ts" />
           <h3 className="pt-2 font-medium">Paying with USDG</h3>
+          <p className="text-sm text-muted">These notes apply to every Autonomo gateway too, not only the Pro API.</p>
           <p>
             USDG (Global Dollar) on {TOKEN.chainName} supports EIP-3009, so each payment is a single signature: no
             approval step and no gas for the agent. Hold USDG on {TOKEN.chainName} and the x402 client above handles the
@@ -407,11 +538,14 @@ export default async function DocsPage() {
               into one project per host, with price, network, facilitator and 30-day usage for each.
             </li>
             <li>
+              <b>Autonomo gateways</b> appear once their owner requests a listing and it is approved.
+            </li>
+            <li>
               <b>Ecosystem projects</b> such as facilitators, SDKs, extensions and explorers are checked by hand.
             </li>
             <li>
-              <b>Testnet-only</b> services are hidden. The catalog is re-imported periodically, so new endpoints can take
-              a while to appear.
+              <b>Testnet-only</b> services are hidden. The catalog is re-imported every 3 days, so new endpoints can take
+              a few days to appear.
             </li>
             <li>
               <b>Usage numbers</b> are paid calls reported by facilitators over the last 30 days.
@@ -432,8 +566,11 @@ export default async function DocsPage() {
             />
           </div>
           <p>
-            {TOKEN.symbol} can be used to pay for the <a href="#pro">Pro API</a>
-            {proConfig?.rails.some((r) => r.kind === "autonomo") ? "" : " once it is switched on"}.
+            {TOKEN.symbol} runs on {TOKEN.chainName}. Agents can use it to pay for the{" "}
+            <a href="#official-apis">official APIs</a>, any hosted gateway whose owner accepts it, and the{" "}
+            <a href="#pro">Pro API</a>
+            {proConfig?.rails.some((r) => r.kind === "autonomo") ? "" : " once it is switched on"}. The Agent Playground
+            and the Telegram bot pay in {TOKEN.symbol}.
           </p>
           <p>
             The address is also in the bar at the top of every page. Always check it on autonomo.fun before you buy:
