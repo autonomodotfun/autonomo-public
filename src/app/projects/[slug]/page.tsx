@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { formatUsd, networkLabel } from "@/lib/networks";
-import { getProject } from "@/lib/queries";
+import { getProject, getVerifiedGateways } from "@/lib/queries";
+import { VerifiedBadge } from "@/components/verified";
 import { compact, NetworkChips } from "@/components/project-row";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -25,6 +26,7 @@ export default async function ProjectPage({ params }: Props) {
   const data = await getProject((await params).slug);
   if (!data) notFound();
   const { project: p, endpoints } = data;
+  const { projectSlugs } = await getVerifiedGateways();
 
   const links = [
     { label: "Website", url: p.website },
@@ -46,6 +48,11 @@ export default async function ProjectPage({ params }: Props) {
       <header className="mt-6 grid gap-8 border-b border-line pb-8 lg:grid-cols-[1fr_auto]">
         <div className="min-w-0">
           <h1 className="heading text-4xl normal-case sm:text-5xl">{p.name}</h1>
+          {projectSlugs.includes(p.slug) && (
+            <p className="mt-2">
+              <VerifiedBadge />
+            </p>
+          )}
           {p.host && <p className="mt-1 font-mono text-sm text-faint">{p.host}</p>}
           {p.description && <p className="mt-4 max-w-2xl text-lg text-muted">{p.description}</p>}
           <div className="mt-5 flex flex-wrap gap-2">
