@@ -22,6 +22,12 @@ const NETWORKS: Record<string, NetworkInfo> = {
   "eip155:4663": { key: "eip155:4663", label: "Robinhood Chain", testnet: false },
   "eip155:2741": { key: "abstract", label: "Abstract", testnet: false },
   "eip155:3338": { key: "peaq", label: "peaq", testnet: false },
+  "eip155:56": { key: "bnb", label: "BNB Chain", testnet: false },
+  "eip155:143": { key: "monad", label: "Monad", testnet: false },
+  "eip155:480": { key: "worldchain", label: "World Chain", testnet: false },
+  "eip155:999": { key: "hyperevm", label: "HyperEVM", testnet: false },
+  "algorand:wGHE2Pwdvd7S12BL5FaOP20EGYesN73k": { key: "algorand", label: "Algorand", testnet: false },
+  "xrpl:0": { key: "xrpl", label: "XRP Ledger", testnet: false },
   "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp": { key: "solana", label: "Solana", testnet: false },
   "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1": { key: "solana-devnet", label: "Solana Devnet", testnet: true },
 };
