@@ -27,6 +27,10 @@ const DEAD = "0x000000000000000000000000000000000000dead";
 // Graduated tokens move their liquidity from the curve into Uniswap v4, where the singleton PoolManager holds it.
 // Like the curve, that's pool liquidity rather than a holder, so it's kept out of holder concentration.
 const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
+// PonsV2LaunchLocker: at graduation the launchpad sends it the Uniswap v4 position and a fixed share of supply
+// (4/49, about 8.16%). It has no withdraw function, so those tokens can never be sold: they're reported as locked
+// and kept out of holder concentration and circulating supply, like burns.
+const LOCKER = "0x267444d099b10fb5ed7c3cc7b7c767adca574952";
 const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"; // data: amount0, amount1, sqrtPriceX96, …
 const signed = (w) => (w >= 2n ** 255n ? w - 2n ** 256n : w);
 
@@ -151,16 +155,17 @@ async function check(token) {
     if (from !== ZERO) balances.set(from, (balances.get(from) ?? 0n) - value);
     balances.set(to, (balances.get(to) ?? 0n) + value);
     const recent = BigInt(t.blockNumber) >= dayAgo;
-    if (from === curveAddr && to !== ZERO && to !== POOL_MANAGER) { buys++; buyers.add(to); if (recent) buys24h++; }
+    if (from === curveAddr && to !== ZERO && to !== POOL_MANAGER && to !== LOCKER) { buys++; buyers.add(to); if (recent) buys24h++; }
     else if (to === curveAddr && from !== ZERO) { sells++; if (recent) sells24h++; }
-    else if (from === POOL_MANAGER && to !== ZERO) buyers.add(to); // bought in the v4 pool
+    else if (from === POOL_MANAGER && to !== ZERO && to !== LOCKER) buyers.add(to); // bought in the v4 pool
   }
   const inCurve = balances.get(curve) ?? 0n;
   const burned = (balances.get(DEAD) ?? 0n) + (balances.get(ZERO) ?? 0n);
   const inPool = balances.get(POOL_MANAGER) ?? 0n;
-  const circulating = supply - inCurve - inPool - burned;
+  const locked = balances.get(LOCKER) ?? 0n;
+  const circulating = supply - inCurve - inPool - burned - locked;
   const holders = [...balances.entries()]
-    .filter(([a, b]) => b > 0n && a !== curve && a !== POOL_MANAGER && a !== DEAD && a !== ZERO)
+    .filter(([a, b]) => b > 0n && a !== curve && a !== POOL_MANAGER && a !== LOCKER && a !== DEAD && a !== ZERO)
     .sort((x, y) => (y[1] > x[1] ? 1 : y[1] < x[1] ? -1 : 0));
   const top10 = holders.slice(0, 10).reduce((s, [, b]) => s + b, 0n);
   const creatorHolds = balances.get(creator) ?? 0n;
@@ -217,7 +222,7 @@ async function check(token) {
   const priceUsd = priceEth === null ? null : priceEth * ethPrice;
   const netEth = Number(ethIn - ethOut) / 1e18;
 
-  // Plain-English flags and a simple score. Shares are of circulating supply (outside the curve, the v4 pool and burns).
+  // Plain-English flags and a simple score. Shares are of circulating supply (outside the curve, the v4 pool, the locker and burns).
   const flags = [];
   let score = 0;
   const flag = (points, text) => { score += points; flags.push({ severity: points >= 3 ? "high" : points >= 2 ? "medium" : "low", text }); };
@@ -269,6 +274,7 @@ async function check(token) {
         inCurvePercent: pct(inCurve, supply),
         inPoolPercent: pct(inPool, supply),
         burnedPercent: pct(burned, supply),
+        lockedPercent: pct(locked, supply),
         creatorPercent: creatorShare,
         launchBlockBuyers: launchBlockBuyers.size,
         launchBlockBuyersPercent: bundleShare,
