@@ -44,9 +44,15 @@ function applyEvent(turn: Turn, e: AgentEvent): Turn {
   if (e.type === "text") return { ...turn, text: turn.text + e.delta };
   if (e.type === "retract") return { ...turn, text: "" };
   if (e.type === "answer") return { ...turn, text: e.text, receipts: e.receipts, state: "answer" };
-  if (e.type === "fail") return { ...turn, text: "", receipts: e.receipts, state: "fail", failure: e.detail };
+  if (e.type === "fail") return { ...stopCalls(turn), text: "", receipts: e.receipts, state: "fail", failure: e.detail };
   return turn;
 }
+
+/** Calls still running when a turn ends won't report back, so they show as stopped rather than disappearing. */
+const stopCalls = (turn: Turn): Turn => ({
+  ...turn,
+  calls: turn.calls.map((c) => (c.state === "quoting" || c.state === "paying" ? { ...c, state: "fail", detail: "Stopped before it finished" } : c)),
+});
 
 const amountOf = (r: AgentReceipt) => Number(r.amount.replace(/,/g, ""));
 const paidIn = (t: Turn) => (t.state === "working" ? t.calls.flatMap((c) => (c.receipt ? [c.receipt] : [])) : t.receipts);
@@ -66,7 +72,7 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
   }, [turns.length]);
 
   const updateLast = (change: (t: Turn) => Turn) => setTurns((all) => [...all.slice(0, -1), change(all[all.length - 1])]);
-  const stop = (failure: string) => updateLast((t) => (t.state === "working" ? { ...t, state: "fail", failure } : t));
+  const stop = (failure: string) => updateLast((t) => (t.state === "working" ? { ...stopCalls(t), state: "fail", failure } : t));
 
   async function ask(q: string) {
     const question = q.trim();
@@ -74,6 +80,7 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
     setDraft("");
     setTurns((all) => [...all, blankTurn(question)]);
     setBusy(true);
+    let connected = false;
     try {
       const res = await fetch("/api/playground", {
         method: "POST",
@@ -85,6 +92,7 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
         stop(body?.error ?? "Something went wrong. Try again.");
         return;
       }
+      connected = true;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -107,7 +115,7 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
       }
       stop("The connection dropped before the agent finished. Any payment it made is still on-chain.");
     } catch {
-      stop("Couldn't reach the agent. Try again.");
+      stop(connected ? "The connection dropped before the agent finished. Any payment it made is still on-chain." : "Couldn't reach the agent. Try again.");
     } finally {
       setBusy(false);
     }

@@ -85,6 +85,8 @@ export async function payAndCall(rawUrl: string, amountWhole: string): Promise<P
     return { ok: false, resting: true, error: "The agent spent today's budget. It's resting until tomorrow." };
   }
 
+  const started = Date.now();
+  const logStep = (step: string) => console.log(`agent pay: ${step} at ${Date.now() - started} ms`);
   const pub = createPublicClient({ chain: robinhood, transport: http(TOKEN.rpcUrl) });
   const balance = await pub.readContract({ address: TOKEN.address as Hex, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
   if (balance < amount) return { ok: false, resting: true, error: "The agent's wallet is out of $AUTONOMO for now." };
@@ -106,10 +108,20 @@ export async function payAndCall(rawUrl: string, amountWhole: string): Promise<P
     paymentRequirementsSelector: (_v, reqs) => reqs.find((r) => r.asset.toLowerCase() === TOKEN.address.toLowerCase()) ?? reqs[0],
   });
 
-  const res = await wrapFetchWithPayment(fetch, client)(url, { signal: AbortSignal.timeout(45_000) });
+  logStep("wallet checks done");
+  const timedFetch: typeof fetch = async (input, init) => {
+    const paying = input instanceof Request && input.headers.has("payment-signature");
+    logStep(paying ? "sending the paid request" : "asking for the price");
+    const answer = await fetch(input, init);
+    logStep(`${paying ? "paid request" : "price request"} answered ${answer.status}`);
+    return answer;
+  };
+  const res = await wrapFetchWithPayment(timedFetch, client)(url, { signal: AbortSignal.timeout(45_000) });
+  logStep(`finished with ${res.status}`);
   const settlement = decode(res.headers.get("payment-response"));
   if (res.status !== 200) {
-    await res.body?.cancel();
+    // Not awaited: cancelling can wait on a copy of the body that nobody reads, which froze failed payments.
+    void res.body?.cancel().catch(() => {});
     return { ok: false, error: `The API answered ${res.status}, so no payment was taken.` };
   }
   const text = (await res.text()).slice(0, 50_000);

@@ -13,6 +13,8 @@ export type AgentLookup = { tool: string; input: Record<string, unknown> };
 export type AgentTurn = { question: string; answer: string; lookups: AgentLookup[] };
 
 export type AgentEvent =
+  /** Sent during long waits so nothing along the way closes a quiet connection. Carries no information. */
+  | { type: "ping" }
   /** The conversation this question belongs to. Send the id back with a follow-up question. */
   | { type: "conversation"; id: string; freeLeft: number }
   /** One API call moving through checking the price, paying and finishing. `id` ties its updates together. */
