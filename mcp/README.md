@@ -9,7 +9,7 @@ The server runs on your own computer. Your wallet key stays there and is only us
 
 | Tool | What it does | Costs |
 | --- | --- | --- |
-| `find_apis` | Search Autonomo's APIs (token prices, launches, rug risk, wallets, transactions, page reader). Optionally also the directory of 3.7K x402 projects. | Free |
+| `find_apis` | Search Autonomo's APIs (token prices, launches, rug risk, wallets, transactions, page reader). Optionally also the directory of 4K+ x402 projects. | Free |
 | `get_price` | Call an API without paying and show its price. | Free |
 | `call_api` | Pay for one call and return the answer, with the payment link on Blockscout. | Usually 0.01 USDG or 100 $AUTONOMO |
 

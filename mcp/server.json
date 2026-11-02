@@ -1,0 +1,49 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.autonomodotfun/autonomo",
+  "title": "Autonomo",
+  "description": "Let AI agents find x402 APIs and pay per call in USDG or $AUTONOMO on Robinhood Chain.",
+  "websiteUrl": "https://autonomo.fun",
+  "version": "0.1.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "autonomo-mcp",
+      "version": "0.1.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "AUTONOMO_WALLET_KEY",
+          "description": "Private key of a new wallet just for your agent, with a small balance. Only needed for paid calls.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "AUTONOMO_PAY_WITH",
+          "description": "Token used when the agent doesn't say: usdg or autonomo.",
+          "isRequired": false,
+          "format": "string",
+          "default": "usdg",
+          "choices": ["usdg", "autonomo"]
+        },
+        {
+          "name": "AUTONOMO_DAILY_USDG",
+          "description": "Most USDG the server will spend per UTC day.",
+          "isRequired": false,
+          "format": "string",
+          "default": "1"
+        },
+        {
+          "name": "AUTONOMO_DAILY_AUTONOMO",
+          "description": "Most $AUTONOMO the server will spend per UTC day.",
+          "isRequired": false,
+          "format": "string",
+          "default": "10000"
+        }
+      ]
+    }
+  ]
+}
