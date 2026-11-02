@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   customType,
+  date,
   index,
   integer,
   jsonb,
@@ -226,3 +227,50 @@ export const verifiedWallets = pgTable("verified_wallets", {
   lockedAt: timestamp("locked_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// One row per question the AI agent took, for costs and to see who comes back. Questions themselves aren't stored.
+export const agentQuestions = pgTable(
+  "agent_questions",
+  {
+    id: serial("id").primaryKey(),
+    // "web" or "telegram".
+    surface: text("surface").notNull(),
+    // Keyed hash of the visitor's IP or Telegram id, never the id itself. See src/lib/agent-limits.ts.
+    subject: text("subject").notNull(),
+    // "answer" or "fail".
+    outcome: text("outcome").notNull(),
+    // Null when the keyword agent answered, which uses no model.
+    model: text("model"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    cachedTokens: integer("cached_tokens").notNull().default(0),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    // What it paid for: [{ api, amount, tx }].
+    receipts: jsonb("receipts").$type<{ api: string; amount: string; tx: string | null }[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("agent_questions_subject_created_idx").on(t.subject, t.createdAt), index("agent_questions_created_idx").on(t.createdAt)],
+);
+
+// Daily question counters. A counter row is updated in one statement, so simultaneous requests can't get past a limit.
+export const agentLimits = pgTable("agent_limits", {
+  // "<surface>:<subject>:<day>" for a visitor, "site:<day>" for everyone.
+  key: text("key").primaryKey(),
+  day: date("day", { mode: "string" }).notNull(),
+  count: integer("count").notNull().default(0),
+});
+
+// The agent's recent conversations, so follow-up questions have context. See src/lib/agent-conversations.ts.
+export const agentConversations = pgTable(
+  "agent_conversations",
+  {
+    // Random and unguessable: whoever holds it can continue the conversation.
+    id: text("id").primaryKey(),
+    surface: text("surface").notNull(),
+    // Each turn: { question, answer, lookups }.
+    turns: jsonb("turns").$type<{ question: string; answer: string; lookups: { tool: string; input: Record<string, unknown> }[] }[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("agent_conversations_updated_idx").on(t.updatedAt)],
+);
