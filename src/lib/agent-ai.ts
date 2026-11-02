@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { BetaMessageStreamParams } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { runAgent, type AgentOptions } from "@/lib/agent";
 import { loadConversation, saveTurn } from "@/lib/agent-conversations";
-import { plainAnswer, type AgentEvent, type AgentLookup, type AgentReceipt, type AgentTurn, type AgentUsage } from "@/lib/agent-events";
+import { MAX_PAID_CALLS, plainAnswer, type AgentEvent, type AgentLookup, type AgentReceipt, type AgentTurn, type AgentUsage } from "@/lib/agent-events";
 import { recordQuestion, reserveQuestion, type AgentSurface } from "@/lib/agent-limits";
 import { AGENT_TOOLS, toolDefinitions, UNTRUSTED_TEXT_TOOLS } from "@/lib/agent-tools";
 import { TOKEN } from "@/lib/constants";
@@ -19,7 +19,6 @@ import { listAutonomoGateways } from "@/lib/queries";
 //   AGENT_MODEL         Optional: the model to use (default claude-haiku-5-5).
 
 const DEFAULT_MODEL = "claude-haiku-5-5";
-const MAX_PAID_CALLS = 3;
 const MAX_MODEL_TURNS = 5;
 const MAX_TOKENS = 4_000;
 const MAX_RESULT_CHARS = 8_000;
@@ -262,7 +261,7 @@ export async function askAgentWithLimits(
 
   const { conversationId, ...agentOpts } = opts;
   const conversation = await loadConversation(surface, conversationId);
-  send({ type: "conversation", id: conversation.id });
+  send({ type: "conversation", id: conversation.id, freeLeft: allowance.left });
 
   const { subject } = allowance;
   let last: Extract<AgentEvent, { type: "answer" | "fail" }> | null = null;
