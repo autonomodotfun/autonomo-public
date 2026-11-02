@@ -14,6 +14,7 @@ export const maxDuration = 120;
 
 const MINUTE = 60_000;
 const MAX_QUESTION_CHARS = 500;
+const PING_MS = 10_000;
 const recent = new Map<string, number[]>();
 
 function tooFast(visitor: string) {
@@ -42,7 +43,12 @@ export async function POST(request: Request) {
       const send = (e: AgentEvent) => {
         if (open) controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
       };
-      await askAgentWithLimits("web", visitor, question, send, { conversationId });
+      const keepAlive = setInterval(() => send({ type: "ping" }), PING_MS);
+      try {
+        await askAgentWithLimits("web", visitor, question, send, { conversationId });
+      } finally {
+        clearInterval(keepAlive);
+      }
       if (open) controller.close();
     },
     cancel() {

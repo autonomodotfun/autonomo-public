@@ -70,7 +70,7 @@ export async function quote(raw: string): Promise<Quote> {
       headers: { accept: "application/json", "user-agent": "AutonomoPlayground/1.0" },
     });
     if (res.status !== 402) {
-      await res.body?.cancel();
+      void res.body?.cancel().catch(() => {});
       return { ok: false, status: res.status, error: `Expected 402, got ${res.status}` };
     }
     let required = decodeHeader(res.headers.get("payment-required"));
@@ -82,7 +82,7 @@ export async function quote(raw: string): Promise<Quote> {
         required = null;
       }
     } else {
-      await res.body?.cancel();
+      void res.body?.cancel().catch(() => {});
     }
     const offers = (Array.isArray(required?.accepts) ? required.accepts : []).map(toOffer).filter(Boolean) as Offer[];
     if (!offers.length) return { ok: false, status: 402, error: "The 402 response had no price list" };

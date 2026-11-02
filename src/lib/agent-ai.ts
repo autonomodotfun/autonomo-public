@@ -23,6 +23,11 @@ const MAX_MODEL_TURNS = 5;
 const MAX_TOKENS = 4_000;
 const MAX_RESULT_CHARS = 8_000;
 const MODEL_TIMEOUT_MS = 30_000;
+const QUOTE_TIMEOUT_MS = 12_000;
+const PAYMENT_TIMEOUT_MS = 50_000;
+const DATABASE_TIMEOUT_MS = 10_000;
+// Below the route's maxDuration, so the visitor gets a message instead of a dropped connection.
+const QUESTION_TIMEOUT_MS = 100_000;
 // Haiku has no server-side fallback, so asking for one would be rejected.
 const HAS_FALLBACK = (model: string) => !model.startsWith("claude-haiku");
 
@@ -56,6 +61,7 @@ function conversationMessages(question: string, history: AgentTurn[]): Anthropic
 type AgentModelStream = {
   on(event: "text", listener: (delta: string) => void): unknown;
   finalMessage(): Promise<Anthropic.Beta.BetaMessage>;
+  abort?(): void;
 };
 
 export type AiAgentDeps = {
@@ -74,6 +80,30 @@ export function aiAgentEnabled() {
   return Boolean(process.env.ANTHROPIC_API_KEY?.trim()) && playgroundPaymentsEnabled();
 }
 
+class StepTimeout extends Error {}
+
+/** A step that never settles must not use up the whole request, so each one gets a limit and a name in the logs. */
+async function within<T>(step: string, ms: number, work: Promise<T>, onTimeout?: () => void): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const started = Date.now();
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      onTimeout?.();
+      reject(new StepTimeout(`${step} took over ${ms} ms`));
+    }, ms);
+  });
+  try {
+    const result = await Promise.race([work, limit]);
+    console.log(`agent: ${step} ${Date.now() - started} ms`);
+    return result;
+  } catch (e) {
+    console.error(`agent: ${step} failed after ${Date.now() - started} ms`, e);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Cut long results so a big page can't run up the model bill; the model is told when that happened. */
 function resultText(data: unknown) {
   const text = typeof data === "string" ? data : JSON.stringify(data);
@@ -88,7 +118,8 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
   const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://autonomo.fun").replace(/\/$/, "");
   const model = process.env.AGENT_MODEL?.trim() || DEFAULT_MODEL;
 
-  const gateways = new Map((await deps.liveGateways()).filter((g) => g.autonomoAmount).map((g) => [g.slug, g]));
+  const live = await within("listing APIs", DATABASE_TIMEOUT_MS, deps.liveGateways());
+  const gateways = new Map(live.filter((g) => g.autonomoAmount).map((g) => [g.slug, g]));
   const tools = toolDefinitions(new Set(gateways.keys()));
 
   const messages = conversationMessages(question, opts.history ?? []);
@@ -98,6 +129,7 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
   const seen = new Map<string, { content: string; isError: boolean }>();
   let paidCalls = 0;
   let readUntrustedText = false;
+  let paymentTimedOut = false;
   let jsonRetries = 0;
 
   async function callTool(block: Anthropic.Beta.BetaToolUseBlock): Promise<{ content: string; isError: boolean }> {
@@ -119,6 +151,7 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
       send({ type: "call", id: block.id, api: name, state: "fail", detail });
       return fail(detail);
     };
+    if (paymentTimedOut) return refuse("No more paid calls after one timed out.");
     if (readUntrustedText) return refuse("No more paid calls after reading a web page.");
     if (paidCalls >= MAX_PAID_CALLS) return refuse(`Reached the limit of ${MAX_PAID_CALLS} paid calls for one question.`);
     const stop = await opts.mayPay?.();
@@ -127,7 +160,12 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
     lookups.push({ tool: block.name, input: parsed.data });
     const url = `${site}/x/${tool.slug}${tool.path(parsed.data)}`;
     send({ type: "call", id: block.id, api: name, state: "quoting", detail: "Reading the live price…" });
-    const price = await deps.quote(url);
+    let price: Awaited<ReturnType<typeof quote>>;
+    try {
+      price = await within(`price check for ${tool.slug}`, QUOTE_TIMEOUT_MS, deps.quote(url));
+    } catch {
+      return refuse("It didn't return a $AUTONOMO price in time.");
+    }
     if (!price.ok || !price.offers.some((o) => o.token === TOKEN.symbol)) return refuse("It didn't return a $AUTONOMO price right now.");
 
     const amount = Number(gateway.autonomoAmount).toLocaleString("en-US");
@@ -135,9 +173,9 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
     paidCalls++; // counted before paying, so a payment that fails halfway still uses up the limit
     let paid: Awaited<ReturnType<typeof payAndCall>>;
     try {
-      paid = await deps.payAndCall(url, gateway.autonomoAmount);
+      paid = await within(`payment for ${tool.slug}`, PAYMENT_TIMEOUT_MS, deps.payAndCall(url, gateway.autonomoAmount));
     } catch (e) {
-      console.error("agent payment failed", e);
+      if (e instanceof StepTimeout) paymentTimedOut = true;
       return refuse("The payment didn't go through or couldn't be confirmed.");
     }
     if (!paid.ok) return refuse(paid.error);
@@ -169,11 +207,12 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
 
       let message: Anthropic.Beta.BetaMessage;
       try {
-        message = await stream.finalMessage();
+        // The SDK's own timeout stops at the first byte, so a reply that stalls midway needs this limit.
+        message = await within(`model turn ${turn}`, MODEL_TIMEOUT_MS, stream.finalMessage(), () => stream.abort?.());
         jsonRetries = 0;
       } catch (e) {
         // Tool inputs stream unvalidated, so one that can't be parsed fails here. Only that case is worth retrying.
-        if (e instanceof Anthropic.APIError || jsonRetries++ >= 2) throw e;
+        if (e instanceof Anthropic.APIError || e instanceof StepTimeout || jsonRetries++ >= 2) throw e;
         send({ type: "retract" });
         turn--;
         continue;
@@ -248,9 +287,8 @@ export async function askAgentWithLimits(
 ) {
   let allowance: Awaited<ReturnType<typeof reserveQuestion>>;
   try {
-    allowance = await reserveQuestion(surface, visitorId);
-  } catch (e) {
-    console.error("couldn't check the agent limits", e);
+    allowance = await within("checking limits", DATABASE_TIMEOUT_MS, reserveQuestion(surface, visitorId));
+  } catch {
     send({ type: "fail", detail: "The agent is unavailable right now. Try again in a moment.", receipts: [], usage: null });
     return;
   }
@@ -260,19 +298,28 @@ export async function askAgentWithLimits(
   }
 
   const { conversationId, ...agentOpts } = opts;
-  const conversation = await loadConversation(surface, conversationId);
+  const conversation = await within("loading the conversation", DATABASE_TIMEOUT_MS, loadConversation(surface, conversationId)).catch(() =>
+    loadConversation(surface, null),
+  );
   send({ type: "conversation", id: conversation.id, freeLeft: allowance.left });
 
   const { subject } = allowance;
   let last: Extract<AgentEvent, { type: "answer" | "fail" }> | null = null;
+  let timedOut = false;
+  const paidSoFar: AgentReceipt[] = [];
   try {
-    await answer(question, (e) => {
+    await within("the whole question", QUESTION_TIMEOUT_MS, answer(question, (e) => {
+      // Whatever a stuck step does after the limit, the visitor has already been told it stopped.
+      if (timedOut) return;
       if (e.type === "answer" || e.type === "fail") last = e;
+      if (e.type === "call" && e.state === "done" && e.receipt) paidSoFar.push(e.receipt);
       send(e);
-    }, { ...agentOpts, history: conversation.turns });
+    }, { ...agentOpts, history: conversation.turns }), () => {
+      timedOut = true;
+    });
   } catch (e) {
-    console.error("agent failed", e);
-    last = { type: "fail", detail: "Something went wrong. Try again.", receipts: [], usage: null };
+    const detail = e instanceof StepTimeout ? "The agent took too long, so it stopped. Any payment it made is still on-chain." : "Something went wrong. Try again.";
+    last = { type: "fail", detail, receipts: paidSoFar, usage: null };
     send(last);
   }
   const final = last as Extract<AgentEvent, { type: "answer" | "fail" }> | null;
