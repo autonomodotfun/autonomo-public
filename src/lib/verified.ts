@@ -71,6 +71,8 @@ async function swapsBetween(from: bigint, to: bigint): Promise<SwapLog[]> {
     return logs as unknown as SwapLog[];
   } catch (e) {
     const message = `${(e as { details?: string }).details ?? (e as Error).message}`;
+    // Being rate limited isn't a range problem: splitting would only send more requests.
+    if ((e as { status?: number }).status === 429 || /too many requests|rate.?limit/i.test(message)) throw e;
     if (to - from < 500n || !/exceed|limit|too many|spans|allowed/i.test(message)) throw e;
     const mid = from + (to - from) / 2n;
     return [...(await swapsBetween(from, mid)), ...(await swapsBetween(mid + 1n, to))];

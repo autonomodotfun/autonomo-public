@@ -97,7 +97,8 @@ async function within<T>(step: string, ms: number, work: Promise<T>, onTimeout?:
     console.log(`agent: ${step} ${Date.now() - started} ms`);
     return result;
   } catch (e) {
-    console.error(`agent: ${step} failed after ${Date.now() - started} ms`, e);
+    // RPC errors quote their URL, and a private RPC's URL contains its key.
+    console.error(`agent: ${step} failed after ${Date.now() - started} ms: ${String(e).replace(/https?:\/\/\S+/g, "<url>")}`);
     throw e;
   } finally {
     clearTimeout(timer);
