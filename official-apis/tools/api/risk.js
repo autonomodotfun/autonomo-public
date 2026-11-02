@@ -75,7 +75,10 @@ async function logsBetween(filter, from, to) {
   try {
     return await getLogs({ ...filter, fromBlock: toHex(from), toBlock: toHex(to) });
   } catch (e) {
-    if (to - from < 1000n || !/exceed|limit|too many|spans|allowed/i.test(`${e.details ?? e.message}`)) throw e;
+    const said = `${e.details ?? e.message}`;
+    // Being rate limited isn't a range problem: splitting would only send more requests.
+    if (e.status === 429 || /too many requests|rate.?limit/i.test(said)) throw e;
+    if (to - from < 1000n || !/exceed|limit|too many|spans|allowed/i.test(said)) throw e;
     const mid = from + (to - from) / 2n;
     const [a, b] = await Promise.all([logsBetween(filter, from, mid), logsBetween(filter, mid + 1n, to)]);
     return [...a, ...b];
@@ -275,6 +278,7 @@ async function check(token) {
         inPoolPercent: pct(inPool, supply),
         burnedPercent: pct(burned, supply),
         lockedPercent: pct(locked, supply),
+        lockedNote: locked > 0n ? "Held by the Pons launch locker, which every token receives a fixed share of at graduation and which can't withdraw it. It's a launchpad rule, not a choice by the team, and it isn't part of the liquidity pool." : null,
         creatorPercent: creatorShare,
         launchBlockBuyers: launchBlockBuyers.size,
         launchBlockBuyersPercent: bundleShare,
