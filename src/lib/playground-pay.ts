@@ -15,6 +15,7 @@ import { TOKEN } from "@/lib/constants";
 //   PLAYGROUND_AGENT_PRIVATE_KEY   A dedicated wallet holding only $AUTONOMO for the playground (plus a little ETH
 //                                  on Robinhood Chain for the one-time Permit2 approval). Without it, paying is off.
 //   PLAYGROUND_DAILY_AUTONOMO      Optional: whole $AUTONOMO the agent may spend per rolling 24 h (default 20000).
+//   ROBINHOOD_RPC_URL              Optional: a private RPC, instead of the public one. Server-side only: it holds a key.
 //
 // Limits are enforced here, never by the model or the page: only $AUTONOMO, at most 5,000 per payment, only
 // this site's /x/ gateways, and a daily budget counted from the gateway payment log.
@@ -29,6 +30,8 @@ const robinhood = defineChain({
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: { default: { http: [TOKEN.rpcUrl] } },
 });
+
+const rpcUrl = () => process.env.ROBINHOOD_RPC_URL?.trim() || TOKEN.rpcUrl;
 
 function agentAccount() {
   const key = process.env.PLAYGROUND_AGENT_PRIVATE_KEY?.trim();
@@ -85,22 +88,20 @@ export async function payAndCall(rawUrl: string, amountWhole: string): Promise<P
     return { ok: false, resting: true, error: "The agent spent today's budget. It's resting until tomorrow." };
   }
 
-  const started = Date.now();
-  const logStep = (step: string) => console.log(`agent pay: ${step} at ${Date.now() - started} ms`);
-  const pub = createPublicClient({ chain: robinhood, transport: http(TOKEN.rpcUrl) });
+  const pub = createPublicClient({ chain: robinhood, transport: http(rpcUrl()) });
   const balance = await pub.readContract({ address: TOKEN.address as Hex, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
   if (balance < amount) return { ok: false, resting: true, error: "The agent's wallet is out of $AUTONOMO for now." };
 
   // $AUTONOMO pays through Permit2: one on-chain approval, then every payment is just a signature.
   const allowance = await pub.readContract({ address: TOKEN.address as Hex, abi: erc20Abi, functionName: "allowance", args: [account.address, PERMIT2] });
   if (allowance < amount) {
-    const wallet = createWalletClient({ account, chain: robinhood, transport: http(TOKEN.rpcUrl) });
+    const wallet = createWalletClient({ account, chain: robinhood, transport: http(rpcUrl()) });
     const hash = await wallet.writeContract({ address: TOKEN.address as Hex, abi: erc20Abi, functionName: "approve", args: [PERMIT2, maxUint256] });
     await pub.waitForTransactionReceipt({ hash });
   }
 
   const client = x402Client.fromConfig({
-    schemes: [{ network: TOKEN.network, client: new ExactEvmScheme(toClientEvmSigner(account, pub), { rpcUrl: TOKEN.rpcUrl }) }],
+    schemes: [{ network: TOKEN.network, client: new ExactEvmScheme(toClientEvmSigner(account, pub), { rpcUrl: rpcUrl() }) }],
     spendControls: {
       allowedAssets: [{ network: TOKEN.network, asset: TOKEN.address, maxAmountPerPayment: amount.toString() }],
       maxAmountPerPayment: false,
@@ -108,16 +109,7 @@ export async function payAndCall(rawUrl: string, amountWhole: string): Promise<P
     paymentRequirementsSelector: (_v, reqs) => reqs.find((r) => r.asset.toLowerCase() === TOKEN.address.toLowerCase()) ?? reqs[0],
   });
 
-  logStep("wallet checks done");
-  const timedFetch: typeof fetch = async (input, init) => {
-    const paying = input instanceof Request && input.headers.has("payment-signature");
-    logStep(paying ? "sending the paid request" : "asking for the price");
-    const answer = await fetch(input, init);
-    logStep(`${paying ? "paid request" : "price request"} answered ${answer.status}`);
-    return answer;
-  };
-  const res = await wrapFetchWithPayment(timedFetch, client)(url, { signal: AbortSignal.timeout(45_000) });
-  logStep(`finished with ${res.status}`);
+  const res = await wrapFetchWithPayment(fetch, client)(url, { signal: AbortSignal.timeout(45_000) });
   const settlement = decode(res.headers.get("payment-response"));
   if (res.status !== 200) {
     // Not awaited: cancelling can wait on a copy of the body that nobody reads, which froze failed payments.
