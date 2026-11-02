@@ -7,6 +7,7 @@ import { addr, authorized, BUY, ethUsd, EXPLORER, FACTORY, LAUNCHED, rh, SELL, s
 
 const KNOWN = {
   [FACTORY]: "the launchpad",
+  "0x267444d099b10fb5ed7c3cc7b7c767adca574952": "the launchpad's liquidity locker",
   "0x402085c248eea27d92e8b30b2c58ed07f9e20001": "the x402 Permit2 proxy",
   "0x000000000022d473030f116ddee9f6b43ac78ba3": "Permit2",
 };
