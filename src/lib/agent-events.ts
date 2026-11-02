@@ -1,5 +1,8 @@
 // What the AI agent reports while it works (shared by the agent and the pages that show it).
 
+/** The most paid calls the agent may make for one question. */
+export const MAX_PAID_CALLS = 3;
+
 export type AgentReceipt = { api: string; amount: string; tx: string | null; explorer: string | null };
 
 export type AgentUsage = { model: string; inputTokens: number; cachedTokens: number; cacheWriteTokens: number; outputTokens: number };
@@ -11,7 +14,7 @@ export type AgentTurn = { question: string; answer: string; lookups: AgentLookup
 
 export type AgentEvent =
   /** The conversation this question belongs to. Send the id back with a follow-up question. */
-  | { type: "conversation"; id: string }
+  | { type: "conversation"; id: string; freeLeft: number }
   /** One API call moving through checking the price, paying and finishing. `id` ties its updates together. */
   | { type: "call"; id: string; api: string; state: "quoting" | "paying" | "fail"; detail: string }
   | { type: "call"; id: string; api: string; state: "done"; detail: string; receipt: AgentReceipt | null }
