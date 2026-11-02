@@ -27,9 +27,10 @@ const DEAD = "0x000000000000000000000000000000000000dead";
 // Graduated tokens move their liquidity from the curve into Uniswap v4, where the singleton PoolManager holds it.
 // Like the curve, that's pool liquidity rather than a holder, so it's kept out of holder concentration.
 const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
-// PonsV2LaunchLocker: at graduation the launchpad sends it the Uniswap v4 position and a fixed share of supply
-// (4/49, about 8.16%). It has no withdraw function, so those tokens can never be sold: they're reported as locked
-// and kept out of holder concentration and circulating supply, like burns.
+// PonsV2LaunchLocker: at graduation the launchpad sends it the Uniswap v4 position and a fixed amount of tokens
+// (4/49 of the original supply, about 8.16%, more as a share if holders burn). It has no withdraw function, so those
+// tokens can never be sold: they're reported as locked and kept out of holder concentration and circulating supply,
+// like burns.
 const LOCKER = "0x267444d099b10fb5ed7c3cc7b7c767adca574952";
 const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"; // data: amount0, amount1, sqrtPriceX96, …
 const signed = (w) => (w >= 2n ** 255n ? w - 2n ** 256n : w);
@@ -163,10 +164,13 @@ async function check(token) {
     else if (from === POOL_MANAGER && to !== ZERO && to !== LOCKER) buyers.add(to); // bought in the v4 pool
   }
   const inCurve = balances.get(curve) ?? 0n;
-  const burned = (balances.get(DEAD) ?? 0n) + (balances.get(ZERO) ?? 0n);
+  // Burns to the zero address have already left totalSupply; tokens sent to the dead address are still counted in it.
+  const zeroBurned = balances.get(ZERO) ?? 0n;
+  const deadHeld = balances.get(DEAD) ?? 0n;
+  const burned = zeroBurned + deadHeld;
   const inPool = balances.get(POOL_MANAGER) ?? 0n;
   const locked = balances.get(LOCKER) ?? 0n;
-  const circulating = supply - inCurve - inPool - burned - locked;
+  const circulating = supply - inCurve - inPool - deadHeld - locked;
   const holders = [...balances.entries()]
     .filter(([a, b]) => b > 0n && a !== curve && a !== POOL_MANAGER && a !== LOCKER && a !== DEAD && a !== ZERO)
     .sort((x, y) => (y[1] > x[1] ? 1 : y[1] < x[1] ? -1 : 0));
@@ -276,9 +280,9 @@ async function check(token) {
         total: Number(supply) / unit,
         inCurvePercent: pct(inCurve, supply),
         inPoolPercent: pct(inPool, supply),
-        burnedPercent: pct(burned, supply),
+        burnedPercent: pct(burned, supply + zeroBurned), // of the supply before any burns
         lockedPercent: pct(locked, supply),
-        lockedNote: locked > 0n ? "Held by the Pons launch locker, which every token receives a fixed share of at graduation and which can't withdraw it. It's a launchpad rule, not a choice by the team, and it isn't part of the liquidity pool." : null,
+        lockedNote: locked > 0n ? "Held by the Pons launch locker. Graduation sends it a fixed amount, about 8.16% of the original supply, and it has no way to send tokens out. The percentage reads higher if holders have burned tokens. It's a launchpad rule, not a choice by the team, and it isn't part of the liquidity pool." : null,
         creatorPercent: creatorShare,
         launchBlockBuyers: launchBlockBuyers.size,
         launchBlockBuyersPercent: bundleShare,
