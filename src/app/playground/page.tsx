@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { webFreeDaily } from "@/lib/agent-limits";
 import { exampleQuestion } from "@/lib/playground";
 import { playgroundPaymentsEnabled } from "@/lib/playground-pay";
 import { listAutonomoGateways } from "@/lib/queries";
@@ -6,7 +7,7 @@ import { Playground, type AvailableApi } from "./playground";
 
 export const metadata: Metadata = {
   title: "Agent Playground",
-  description: "Ask a question and watch an AI agent find a paid x402 API on Autonomo, check its price and pay for it in $AUTONOMO.",
+  description: "Ask about tokens, wallets and transactions on Robinhood Chain and watch an AI agent pay for the x402 APIs it needs in $AUTONOMO.",
 };
 
 export default async function PlaygroundPage() {
@@ -27,14 +28,18 @@ export default async function PlaygroundPage() {
       </span>
       <h1 className="heading mt-4 text-5xl sm:text-6xl">Agent Playground</h1>
       <p className="mt-3 text-lg text-muted">
-        Ask a question and watch an AI agent find a paid API on Autonomo, check its price and pay for it in $AUTONOMO.
-        No wallet, no signup.
+        Ask about tokens, wallets and transactions on Robinhood Chain, then ask a follow-up. An AI agent picks the paid
+        APIs it needs and pays for each one in $AUTONOMO. No wallet, no signup.
       </p>
       <Playground apis={apis} />
       <p className="mt-6 text-sm text-faint">
         {playgroundPaymentsEnabled()
-          ? "Every step is real: the agent searches Autonomo, reads the live 402 price and pays from its own wallet on Robinhood Chain. Free to try, a few paid questions per visitor per day."
+          ? `Every payment is real: the agent reads the live 402 price and pays from its own wallet on Robinhood Chain. Free to try, ${webFreeDaily()} questions per visitor per day.`
           : "In this preview the search and the price check are real: the agent calls the API and reads its live 402 response. Paying, and with it the answer and receipt, goes live with the agent's wallet."}
+      </p>
+      <p className="mt-2 text-sm text-faint">
+        We keep your questions and the answers for about 24 hours so you can ask follow-ups, and they go to our AI
+        provider to be answered, so don&apos;t include anything private. Answers can be wrong and aren&apos;t financial advice.
       </p>
     </div>
   );
