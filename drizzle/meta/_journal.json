@@ -29,6 +29,13 @@
       "when": 1793534323157,
       "tag": "0003_verified_wallets",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793590890679,
+      "tag": "0004_playground_payments",
+      "breakpoints": true
     }
   ]
 }

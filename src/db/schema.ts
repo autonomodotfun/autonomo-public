@@ -205,6 +205,18 @@ export const telegramQuestions = pgTable(
   (t) => [index("telegram_questions_user_created_idx").on(t.userId, t.createdAt)],
 );
 
+// One row per paid answer the Agent Playground gave a visitor, for the free daily allowance per visitor. The visitor
+// is a SHA-256 hash of their IP, so raw IPs are never stored.
+export const playgroundPayments = pgTable(
+  "playground_payments",
+  {
+    id: serial("id").primaryKey(),
+    visitor: text("visitor").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("playground_payments_visitor_created_idx").on(t.visitor, t.createdAt)],
+);
+
 // The $AUTONOMO amount a wallet is held to for Verified, saved when it first qualifies. See src/lib/verified.ts.
 export const verifiedWallets = pgTable("verified_wallets", {
   // Lowercased wallet address.
