@@ -19,7 +19,7 @@ import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { z } from "zod";
 
-const VERSION = "0.1.1";
+const VERSION = "0.1.2";
 const BASE = (process.env.AUTONOMO_BASE_URL || "https://autonomo.fun").replace(/\/+$/, "");
 const NETWORK = "eip155:4663";
 const RPC = "https://rpc.mainnet.chain.robinhood.com";
@@ -226,7 +226,7 @@ server.registerTool(
       "Search the paid APIs on Autonomo (token prices, new launches, rug-risk checks, wallet portfolios, transaction explainers, " +
       "page reader and more on Robinhood Chain). Returns each API's slug, price and the path to call. verified means the provider holds the Verified minimum of " +
       "$AUTONOMO; it isn't a review of the API. Free. " +
-      "Set include_directory to also search Autonomo's directory of 3.7K x402 projects on other networks (listed for reference; " +
+      "Set include_directory to also search Autonomo's directory of 4K+ x402 projects on other networks (listed for reference; " +
       "call_api only pays Autonomo gateways).",
     inputSchema: {
       query: z.string().max(200).optional().describe("What the API should do, e.g. 'token risk' or 'wallet holdings'. Leave empty to list all."),

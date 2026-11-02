@@ -1,6 +1,7 @@
 {
   "name": "autonomo-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
+  "mcpName": "io.github.autonomodotfun/autonomo",
   "description": "MCP server for Autonomo: AI agents find x402 APIs, check prices and pay per call in USDG or $AUTONOMO on Robinhood Chain.",
   "homepage": "https://autonomo.fun",
   "author": "Autonomo (https://autonomo.fun)",
