@@ -9,12 +9,14 @@ import { privyEnabled } from "@/lib/privy";
 import { authEnabled, currentOwner } from "@/lib/session";
 import { Badge } from "./badge";
 import { ConnectWallet, SignOut } from "./connect-wallet";
+import { PayoutWallet } from "./payout-wallet";
 import { PrivySignIn, PrivySignOut } from "./privy";
 
 export const metadata: Metadata = { title: "Dashboard", robots: { index: false } };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ payTo?: string; payToNote?: string }> }) {
   const owner = await currentOwner();
+  const params = await searchParams;
 
   if (!owner) {
     return (
@@ -109,6 +111,8 @@ export default async function DashboardPage() {
           ))}
         </ul>
       )}
+
+      {rows.length > 0 && <PayoutWallet owner={owner} payee={payeeOf(rows[0].gateway)} draft={params.payTo} note={params.payToNote} />}
     </div>
   );
 }

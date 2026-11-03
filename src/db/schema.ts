@@ -141,8 +141,8 @@ export const gateways = pgTable(
     slug: text("slug").notNull(),
     // Lowercased wallet address of the owner, who signs in and manages the gateway.
     owner: text("owner").notNull(),
-    // Lowercased wallet that gets paid and holds for Verified instead of the owner, such as a Safe. Only /admin sets it,
-    // so a signed-in owner can't redirect the money.
+    // Lowercased wallet that gets paid and holds for Verified instead of the owner, such as a Safe. The owner sets the
+    // first one with a signature from their wallet, not just their session; after that only /admin changes it.
     payTo: text("pay_to"),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
@@ -196,10 +196,30 @@ export const walletSwitches = pgTable("wallet_switches", {
   fromOwner: text("from_owner").notNull(),
   toOwner: text("to_owner").notNull(),
   slugs: text("slugs").array().notNull(),
-  // "owner" moved the gateways to a new owner; "pay_to" changed where the owner's gateways get paid.
+  // "owner" moved the gateways to a new owner; "pay_to" changed where the owner's gateways get paid, from /admin;
+  // "pay_to_signed" is an owner setting their first Safe with a signature from their sign-in wallet.
   kind: text("kind").notNull().default("owner"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// A creator asking from the dashboard to move their APIs from their Safe to another. Only /admin approves it, so a
+// signed-in session alone can't redirect the money. At most one is pending per owner.
+export const PAY_TO_REQUEST_STATUSES = ["pending", "approved", "rejected", "cancelled"] as const;
+export type PayToRequestStatus = (typeof PAY_TO_REQUEST_STATUSES)[number];
+
+export const payToRequests = pgTable(
+  "pay_to_requests",
+  {
+    id: serial("id").primaryKey(),
+    owner: text("owner").notNull(),
+    payTo: text("pay_to").notNull(),
+    status: text("status").$type<PayToRequestStatus>().notNull().default("pending"),
+    reviewNote: text("review_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("pay_to_requests_pending_idx").on(t.owner).where(sql`${t.status} = 'pending'`)],
+);
 
 export type Gateway = typeof gateways.$inferSelect;
 export type GatewayCall = typeof gatewayCalls.$inferSelect;

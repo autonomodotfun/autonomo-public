@@ -55,6 +55,7 @@ Owners sign in at `/dashboard` with Privy (email, Google, X or a wallet; users w
 - Upstreams must be https and resolve to public addresses (checked when saved and on every call); redirects aren't followed; 1 MB request and 5 MB response limits; 25 s timeout.
 - An optional upstream auth header is stored encrypted with `GATEWAY_SECRET_KEY`.
 - Owners can request a catalog listing; approving it in `/admin` creates a `service` project with the gateway URL as its endpoint.
+- Owners can have their APIs pay a Safe instead of the sign-in wallet (`gateways.pay_to`). The first Safe is set from the dashboard with a signature from the sign-in wallet, not just the session cookie, and applies straight away; it must be a Safe on Robinhood Chain needing at least 2 signatures. Moving to another Safe after that is a request (`pay_to_requests`) that `/admin` approves, with the new Safe's signers, threshold and Verified balance shown. Both are logged in `wallet_switches`. The guide for creators is at `/docs/safe`.
 
 ## Agent Playground and Telegram bot
 
