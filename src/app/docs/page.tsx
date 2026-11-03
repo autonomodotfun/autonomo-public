@@ -343,6 +343,7 @@ export default async function DocsPage() {
               <li>A payment only settles when your API answers successfully (status below 400).</li>
               <li>Autonomo settles payments on {TOKEN.chainName} itself and pays the gas. Paying in {TOKEN.symbol} needs a one-time Permit2 approval from the agent.</li>
               <li>Once it&apos;s live, request a listing from the dashboard so it shows up in the directory and in agent searches.</li>
+              <li>Want your earnings in a multisig? Your APIs can pay a Safe while your own wallet keeps managing them. See <Link href="/docs/safe">Get paid at a Safe</Link>.</li>
             </ul>
           </div>
           <p>Or run x402 on your own server:</p>
