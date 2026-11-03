@@ -201,6 +201,33 @@ export async function isContractWallet(address: string) {
   return client.getCode({ address: address as Hex }).then((code) => Boolean(code && code !== "0x")).catch(() => null);
 }
 
+const safeAbi = parseAbi([
+  "function getOwners() view returns (address[])",
+  "function getThreshold() view returns (uint256)",
+  "function VERSION() view returns (string)",
+]);
+
+/**
+ * A Safe's signers and how many must sign, read from Robinhood Chain. Null when the address isn't a Safe there;
+ * throws when the chain can't be read, so a slow RPC isn't taken as "not a Safe".
+ */
+export async function safeInfo(address: string) {
+  const contract = await isContractWallet(address);
+  if (contract === null) throw new Error("couldn't read the chain");
+  if (!contract) return null;
+  const at = { address: address as Hex, abi: safeAbi } as const;
+  try {
+    const [owners, threshold, version] = await Promise.all([
+      client.readContract({ ...at, functionName: "getOwners" }),
+      client.readContract({ ...at, functionName: "getThreshold" }),
+      client.readContract({ ...at, functionName: "VERSION" }),
+    ]);
+    return { owners: owners.map((o) => o.toLowerCase()), threshold: Number(threshold), version };
+  } catch {
+    return null;
+  }
+}
+
 const whole = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
 /** A wallet's standing for its dashboard. `balance` or `required` is null when it couldn't be read. */
