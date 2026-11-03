@@ -50,6 +50,13 @@
       "when": 1793672444226,
       "tag": "0006_wallet_switches",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793673702777,
+      "tag": "0007_gateway_pay_to",
+      "breakpoints": true
     }
   ]
 }

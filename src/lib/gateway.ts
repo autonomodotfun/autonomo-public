@@ -2,7 +2,7 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { getDb, schema } from "@/db";
 import type { Gateway } from "@/db/schema";
@@ -169,6 +169,20 @@ export async function forward(g: Gateway, request: Request, path: string): Promi
 }
 
 // ---------- queries ----------
+
+/** The wallet a gateway pays, which is also the one that holds for Verified. */
+export const payeeOf = (g: Pick<Gateway, "owner" | "payTo">) => g.payTo ?? g.owner;
+
+/** The wallet an owner's new gateways should pay: their existing pay-to wallet, if they have one. */
+export async function ownerPayTo(owner: string) {
+  const db = await getDb();
+  const [g] = await db
+    .select({ payTo: gateways.payTo })
+    .from(gateways)
+    .where(and(eq(gateways.owner, owner), isNotNull(gateways.payTo)))
+    .limit(1);
+  return g?.payTo ?? null;
+}
 
 export function gatewayOffers(g: Pick<Gateway, "priceUsd" | "acceptUsdg" | "autonomoAmount">) {
   return offers({ priceUsd: String(Number(g.priceUsd)), acceptUsdg: g.acceptUsdg, autonomoAmount: g.autonomoAmount });
