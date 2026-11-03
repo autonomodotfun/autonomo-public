@@ -5,7 +5,7 @@ import { verifiedStatus } from "@/lib/verified";
 import { notFound, redirect } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { TOKEN } from "@/lib/constants";
-import { gatewayOffers, gatewayStats, getOwnedGateway, secretsEnabled } from "@/lib/gateway";
+import { gatewayOffers, gatewayStats, getOwnedGateway, payeeOf, secretsEnabled } from "@/lib/gateway";
 import { fmtAutonomo, fmtRail, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 import { platform } from "@/lib/pro";
 import { currentOwner } from "@/lib/session";
@@ -29,7 +29,7 @@ export default async function GatewayDashboard({
   if (!owner) redirect("/dashboard");
   const g = await getOwnedGateway((await params).slug, owner);
   if (!g) notFound();
-  const [stats, { verified }] = await Promise.all([gatewayStats(g.id), verifiedStatus(owner)]);
+  const [stats, { verified }] = await Promise.all([gatewayStats(g.id), verifiedStatus(payeeOf(g))]);
   const live = gatewayOffers(g);
   const url = `${SITE}/x/${g.slug}`;
 
@@ -74,7 +74,7 @@ export default async function GatewayDashboard({
         <CopyButton text={url} label="Copy gateway URL" className="btn-brand shrink-0 px-3 py-1.5 text-xs" />
       </div>
       <p className="mt-2 text-xs text-faint">
-        Forwards to <span className="font-mono">{g.upstreamUrl}</span> · pays {shortAddr(g.owner)} ·{" "}
+        Forwards to <span className="font-mono">{g.upstreamUrl}</span> · pays {shortAddr(payeeOf(g))} ·{" "}
         {live.length
           ? live.map((o) => (o.kind === "autonomo" ? `${o.amount} AUTONOMO` : `$${o.priceUsd} ${o.kind.toUpperCase()}`)).join(" or ")
           : "no payment option available"}{" "}

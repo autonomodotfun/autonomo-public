@@ -2,7 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
 import { updating } from "@/lib/api";
-import { forward, gatewayOffers, getGateway, recordCall } from "@/lib/gateway";
+import { forward, gatewayOffers, getGateway, recordCall, payeeOf } from "@/lib/gateway";
 import { acceptsFor, railForAsset, x402Server } from "@/lib/pro";
 
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
@@ -50,7 +50,7 @@ function paidHandler(g: Gateway) {
         return new NextResponse(res.body, { status: res.status, headers: res.headers });
       },
       {
-        accepts: acceptsFor(g.owner, gatewayOffers(g)),
+        accepts: acceptsFor(payeeOf(g), gatewayOffers(g)),
         description: g.description || g.name,
         mimeType: "application/json",
       },

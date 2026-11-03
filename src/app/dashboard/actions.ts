@@ -4,7 +4,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
-import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled } from "@/lib/gateway";
+import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo } from "@/lib/gateway";
 import { currentOwner } from "@/lib/session";
 import { revalidateCatalog } from "@/lib/queries";
 
@@ -107,7 +107,7 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
   if (existing) {
     await db.update(gateways).set(fields).where(eq(gateways.id, existing.id));
   } else {
-    await db.insert(gateways).values({ ...fields, owner });
+    await db.insert(gateways).values({ ...fields, owner, payTo: await ownerPayTo(owner) });
   }
   revalidatePath("/dashboard");
   revalidateCatalog();
