@@ -196,6 +196,11 @@ export async function holdsMinimum(owner: string) {
   return (await standing(owner, balance, weekly)).verified;
 }
 
+/** Whether an address is a contract, such as a Safe, which can receive payments but can't sign in. Null if unreadable. */
+export async function isContractWallet(address: string) {
+  return client.getCode({ address: address as Hex }).then((code) => Boolean(code && code !== "0x")).catch(() => null);
+}
+
 const whole = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
 /** A wallet's standing for its dashboard. `balance` or `required` is null when it couldn't be read. */

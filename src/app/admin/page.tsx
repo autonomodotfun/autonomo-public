@@ -1,16 +1,21 @@
 import { desc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
 import { CATEGORY_INFO } from "@/lib/categories";
-import { approveGateway, approveSubmission, rejectGateway, rejectSubmission, setProjectFlags } from "./actions";
+import { isContractWallet, verifiedStatus } from "@/lib/verified";
+import { approveGateway, approveSubmission, rejectGateway, rejectSubmission, setProjectFlags, switchCreatorWallet } from "./actions";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
-export default async function AdminPage() {
+type SearchParams = Promise<{ from?: string; to?: string; switch?: string }>;
+
+export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
   await connection();
   const db = await getDb();
-  const [pending, recent, gatewayRequests] = await Promise.all([
+  const params = await searchParams;
+  const [pending, recent, gatewayRequests, switches] = await Promise.all([
     db
       .select()
       .from(schema.submissions)
@@ -29,6 +34,7 @@ export default async function AdminPage() {
       .where(eq(schema.gateways.listing, "pending"))
       .orderBy(desc(schema.gateways.updatedAt))
       .limit(100),
+    db.select().from(schema.walletSwitches).orderBy(desc(schema.walletSwitches.createdAt)).limit(20),
   ]);
 
   return (
@@ -143,6 +149,8 @@ export default async function AdminPage() {
         </form>
       </section>
 
+      <SwitchWallet from={params.from} to={params.to} message={params.switch} switches={switches} />
+
       {recent.length > 0 && (
         <section className="mt-12">
           <h2 className="text-lg font-semibold">Recently approved</h2>
@@ -154,5 +162,111 @@ export default async function AdminPage() {
         </section>
       )}
     </div>
+  );
+}
+
+async function SwitchWallet({
+  from: rawFrom,
+  to: rawTo,
+  message,
+  switches,
+}: {
+  from?: string;
+  to?: string;
+  message?: string;
+  switches: (typeof schema.walletSwitches.$inferSelect)[];
+}) {
+  const from = rawFrom?.trim().toLowerCase() ?? "";
+  const to = rawTo?.trim().toLowerCase() ?? "";
+  const ready = isAddress(from) && isAddress(to) && from !== to;
+  const db = await getDb();
+  const [moving, status, contract] = ready
+    ? await Promise.all([
+        db.select({ slug: schema.gateways.slug }).from(schema.gateways).where(eq(schema.gateways.owner, from)),
+        verifiedStatus(to),
+        isContractWallet(to),
+      ])
+    : [[], null, false];
+  const proPays = ready && process.env.PRO_PAY_TO?.trim().toLowerCase() === from;
+
+  return (
+    <section id="switch-wallet" className="mt-12">
+      <h2 className="text-lg font-semibold">Switch an API creator&apos;s wallet</h2>
+      <p className="mt-1 text-sm text-muted">
+        Moves all of a wallet&apos;s APIs to a new wallet, which then gets paid and signs in for them. Payments already
+        made stay where they went.
+      </p>
+      {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm">{message}</p>}
+      <form className="mt-3 grid gap-3 text-sm sm:max-w-xl">
+        <label className="grid gap-1">
+          Current wallet
+          <input name="from" required defaultValue={from} placeholder="0x…" spellCheck={false} className="field font-mono" />
+        </label>
+        <label className="grid gap-1">
+          New wallet
+          <input name="to" required defaultValue={to} placeholder="0x…" spellCheck={false} className="field font-mono" />
+        </label>
+        <div>
+          <button className="rounded-md border border-line px-3 py-2">Preview</button>
+        </div>
+      </form>
+
+      {ready && (
+        <div className="mt-4 rounded-lg border border-line bg-surface p-5 text-sm">
+          {moving.length === 0 ? (
+            <p>That wallet has no APIs, so there&apos;s nothing to move.</p>
+          ) : (
+            <>
+              <p className="font-medium">
+                {moving.length} {moving.length === 1 ? "API" : "APIs"} will move:
+              </p>
+              <ul className="mt-2 grid gap-1 font-mono text-xs text-muted">
+                {moving.map((g) => (
+                  <li key={g.slug}>/x/{g.slug}</li>
+                ))}
+              </ul>
+              <ul className="mt-3 grid gap-1 text-muted">
+                {status?.verified === false && (
+                  <li className="text-warn">
+                    The new wallet holds {status.balance ?? "an unknown amount of"} $AUTONOMO and needs{" "}
+                    {status.required ?? "the Verified amount"}, so these APIs would lose Verified.
+                  </li>
+                )}
+                {status?.verified && <li>The new wallet holds enough for Verified.</li>}
+                {contract && (
+                  <li className="text-warn">
+                    The new wallet is a contract, such as a Safe. It can get paid but can&apos;t sign in to manage these APIs.
+                  </li>
+                )}
+                {contract === null && <li className="text-warn">Couldn&apos;t check whether the new wallet is a contract.</li>}
+                {proPays && <li className="text-warn">PRO_PAY_TO is also this wallet. It won&apos;t change here: update it on the server.</li>}
+              </ul>
+              <form action={switchCreatorWallet} className="mt-4 flex flex-wrap items-end gap-3">
+                <input type="hidden" name="from" value={from} />
+                <input type="hidden" name="to" value={to} />
+                <label className="grid gap-1">
+                  Type the new wallet&apos;s last 6 characters
+                  <input name="confirm" required autoComplete="off" spellCheck={false} className="field w-48 font-mono" />
+                </label>
+                <button className="btn-brand px-3 py-2">Switch wallet</button>
+              </form>
+            </>
+          )}
+        </div>
+      )}
+
+      {switches.length > 0 && (
+        <>
+          <h3 className="mt-6 font-medium">Past switches</h3>
+          <ul className="mt-2 grid gap-2 font-mono text-xs text-muted">
+            {switches.map((s) => (
+              <li key={s.id} className="break-all">
+                {s.createdAt.toISOString().slice(0, 16).replace("T", " ")} · {s.fromOwner} → {s.toOwner} · {s.slugs.length} APIs
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }
