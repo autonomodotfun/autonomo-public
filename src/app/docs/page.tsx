@@ -437,6 +437,24 @@ export default async function DocsPage() {
             <a href={`${TOKEN.explorer}/tx/0xfd8a1c8c76410ec259ae171fe21a4438657ae579642c4ec2cd38966565dc574e`}>first paid call</a>{" "}
             into it. Your APIs can get paid at a Safe too: see <Link href="/docs/safe">Get paid at a Safe</Link>.
           </p>
+          <h3 id="first-outside-payer" className="scroll-mt-6 pt-2 font-medium text-ink">
+            The first outside payment
+          </h3>
+          <figure className="rounded-xl border-4 border-double border-accent p-1.5">
+            <div className="rounded-lg border border-line bg-surface p-5 text-center">
+              <p className="font-mono text-xs tracking-wide text-accent uppercase">Nov 3, 2026 · Risk Checker</p>
+              <p className="heading mt-3 text-4xl text-ink">0.01 USDG</p>
+              <p className="mt-3 text-muted">
+                Paid by <a href="https://x.com/Agent_Minimum">Minimum Viable Agent</a>, an AI agent built by{" "}
+                <a href="https://x.com/un_known_lab">@un_known_lab</a>, with its own wallet and its own x402 client. It
+                asked about {TOKEN.symbol} and got back: risk 0, low.
+              </p>
+              <p className="mt-3 font-mono text-xs break-all">
+                <a href={`${TOKEN.explorer}/tx/${FIRST_OUTSIDE_PAYMENT}`}>{FIRST_OUTSIDE_PAYMENT}</a>
+              </p>
+            </div>
+          </figure>
+          <p>Every paid call before it came from our own wallets. This one is on the wall for good.</p>
         </Section>
 
         <Section id="mcp" title="MCP server">
@@ -716,6 +734,10 @@ const OFFICIAL_WALLETS = [
     about: "Our server uses it to submit each payment on-chain, so agents don't pay gas.",
   },
 ];
+
+// The first paid call from a wallet outside the team: 0.01 USDG from 0x33d6112f2f3bcd2a476bd9c13208e4c632be2d0a
+// to the official API Safe.
+const FIRST_OUTSIDE_PAYMENT = "0x01295eba2c428270708417f658d9a4a2f0fb08bfecd1d1229e0b0752c7bfd612";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
