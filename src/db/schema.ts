@@ -187,6 +187,15 @@ export const gatewayCalls = pgTable(
   (t) => [index("gateway_calls_gateway_created_idx").on(t.gatewayId, t.createdAt)],
 );
 
+// Every change of a creator's wallet made from /admin. Rows are only ever added.
+export const walletSwitches = pgTable("wallet_switches", {
+  id: serial("id").primaryKey(),
+  fromOwner: text("from_owner").notNull(),
+  toOwner: text("to_owner").notNull(),
+  slugs: text("slugs").array().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Gateway = typeof gateways.$inferSelect;
 export type GatewayCall = typeof gatewayCalls.$inferSelect;
 export type Project = typeof projects.$inferSelect;
