@@ -404,6 +404,39 @@ export default async function DocsPage() {
             Everything is read from public chains. Try any of them without a wallet in the{" "}
             <Link href="/playground">Agent Playground</Link>.
           </p>
+          <h3 id="official-wallets" className="scroll-mt-6 pt-2 font-medium text-ink">
+            The wallets behind them
+          </h3>
+          <p>
+            Until Nov 3, 2026, one wallet signed in, got paid and held the {TOKEN.symbol} for Verified. Those jobs are now
+            split across three wallets:
+          </p>
+          <div className="overflow-x-auto rounded-lg border border-line">
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-line">
+                {OFFICIAL_WALLETS.map((w) => (
+                  <tr key={w.address}>
+                    <td className="py-2.5 pr-4 pl-4 align-top">
+                      <span className="font-medium whitespace-nowrap text-ink">{w.job}</span>
+                      <a href={`${TOKEN.explorer}/address/${w.address}`} className="block font-mono text-xs break-all">
+                        {w.address}
+                      </a>
+                    </td>
+                    <td className="py-2.5 pr-4 align-top text-muted">{w.about}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Moving anything out of the Safe takes both signatures, but it isn&apos;t a time-lock: both signers are ours, so
+            the tokens can still move if both approve. You can read the signers and threshold on Blockscout. The tokens moved
+            to the Safe in{" "}
+            <a href={`${TOKEN.explorer}/tx/0x3572d00c16b869fbeec6d267e08108b2d5decdb93d90532114f66390d6099f65`}>this transaction</a>,
+            and here&apos;s the{" "}
+            <a href={`${TOKEN.explorer}/tx/0xfd8a1c8c76410ec259ae171fe21a4438657ae579642c4ec2cd38966565dc574e`}>first paid call</a>{" "}
+            into it. Your APIs can get paid at a Safe too: see <Link href="/docs/safe">Get paid at a Safe</Link>.
+          </p>
         </Section>
 
         <Section id="mcp" title="MCP server">
@@ -664,6 +697,25 @@ export default async function DocsPage() {
     </div>
   );
 }
+
+// The wallets the official APIs use since Nov 3, 2026, when payments and the Verified tokens moved to the Safe.
+const OFFICIAL_WALLETS = [
+  {
+    job: "Gets paid",
+    address: "0x92a99FBD386F87277b6009BFF4C56728Ec5f7354",
+    about: `A 2-of-2 Safe. Every official API pays it, and it holds about 1M ${TOKEN.symbol}, including the 984,245 bought back for Verified.`,
+  },
+  {
+    job: "Signs in",
+    address: "0x0870df267e76ce27f81ea43273e152d0faefaa7a",
+    about: "Manages the APIs from the dashboard. It no longer gets paid or holds the tokens.",
+  },
+  {
+    job: "Pays gas",
+    address: "0x68aa21699247a5f0b90661c50004e426507fe9f8",
+    about: "Our server uses it to submit each payment on-chain, so agents don't pay gas.",
+  },
+];
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
