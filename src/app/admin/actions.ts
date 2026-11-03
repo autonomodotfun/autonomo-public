@@ -8,7 +8,7 @@ import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
 import { isAuthorized } from "@/lib/admin-auth";
 import { TOKEN } from "@/lib/constants";
-import { gatewayOffers } from "@/lib/gateway";
+import { gatewayOffers, payeeOf } from "@/lib/gateway";
 import { USDG } from "@/lib/pro";
 import { slugify } from "@/lib/slug";
 import { revalidateCatalog } from "@/lib/queries";
@@ -18,8 +18,8 @@ async function requireAdmin() {
   if (!isAuthorized((await headers()).get("authorization"))) throw new Error("Unauthorized");
 }
 
-// Moves all of a creator's gateways to a new wallet, which then gets paid and signs in for them. One statement, so it
-// all applies or none.
+// Moves all of a creator's gateways to a new wallet, which then signs in for them and gets paid unless they have a
+// separate pay-to wallet. One statement, so it all applies or none.
 export async function switchCreatorWallet(form: FormData) {
   await requireAdmin();
 
@@ -48,6 +48,39 @@ export async function switchCreatorWallet(form: FormData) {
   revalidatePath("/admin");
   revalidateCatalog();
   redirect(`/admin?${new URLSearchParams({ switch: `Moved ${rows[0].slugs.length} APIs to ${to}.` })}#switch-wallet`);
+}
+
+// Sets the wallet that all of an owner's gateways pay, such as a Safe. The owner keeps signing in. Naming the owner
+// itself clears it. One statement, so it all applies or none.
+export async function setCreatorPayTo(form: FormData) {
+  await requireAdmin();
+
+  const owner = String(form.get("owner") ?? "").trim().toLowerCase();
+  const payTo = String(form.get("payTo") ?? "").trim().toLowerCase();
+  const back = (message: string) => `/admin?${new URLSearchParams({ owner, payTo, payToNote: message })}#pay-to`;
+  if (!isAddress(owner) || !isAddress(payTo) || /^0x0+$/.test(payTo)) redirect(back("Those addresses aren't valid."));
+  if (String(form.get("confirm") ?? "").trim().toLowerCase() !== payTo.slice(-6)) redirect(back("The last 6 characters didn't match."));
+
+  const db = await getDb();
+  const result = await db.execute<{ slugs: string[] }>(sql`
+    with moved as (
+      update gateways set pay_to = nullif(${payTo}::text, owner), updated_at = now() where owner = ${owner} returning slug, project_id
+    ), listed as (
+      update endpoints set pay_to = ${payTo}
+      where facilitator = 'autonomo' and project_id in (select project_id from moved)
+        and lower(pay_to) in (select coalesce(pay_to, owner) from gateways where owner = ${owner})
+    ), logged as (
+      insert into wallet_switches (from_owner, to_owner, slugs, kind)
+      select ${owner}::text, ${payTo}::text, array_agg(slug), 'pay_to' from moved having count(*) > 0
+      returning slugs
+    )
+    select slugs from logged`);
+  const rows = "rows" in result ? result.rows : (result as unknown as { slugs: string[] }[]);
+  if (!rows.length) redirect(back("That wallet has no APIs."));
+
+  revalidatePath("/admin");
+  revalidateCatalog();
+  redirect(`/admin?${new URLSearchParams({ payToNote: `${rows[0].slugs.length} APIs now pay ${payTo}.` })}#pay-to`);
 }
 
 export async function approveSubmission(form: FormData) {
@@ -158,7 +191,7 @@ export async function approveGateway(form: FormData) {
       asset: offer && offer.kind !== "usdc" ? (offer.kind === "usdg" ? USDG.address : TOKEN.address) : null,
       amount: offer && offer.kind !== "usdc" ? offer.atomic : null,
       priceUsd: g.acceptUsdg ? g.priceUsd : null,
-      payTo: g.owner,
+      payTo: payeeOf(g),
       scheme: "exact",
       facilitator: "autonomo",
       x402Version: 2,

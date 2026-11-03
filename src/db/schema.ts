@@ -128,7 +128,7 @@ export const submissions = pgTable(
 );
 
 // Hosted x402 gateways: an owner puts an existing API behind autonomo.fun/x/<slug>, priced per call.
-// Payments go straight to the owner's wallet (payTo = owner); Autonomo never holds funds.
+// Payments go straight to the owner's wallet, or to payTo when one is set; Autonomo never holds funds.
 export const GATEWAY_STATUSES = ["active", "paused"] as const;
 export type GatewayStatus = (typeof GATEWAY_STATUSES)[number];
 export const GATEWAY_LISTINGS = ["unlisted", "pending", "listed", "rejected"] as const;
@@ -139,8 +139,11 @@ export const gateways = pgTable(
   {
     id: serial("id").primaryKey(),
     slug: text("slug").notNull(),
-    // Lowercased wallet address of the owner; also the payTo for every payment.
+    // Lowercased wallet address of the owner, who signs in and manages the gateway.
     owner: text("owner").notNull(),
+    // Lowercased wallet that gets paid and holds for Verified instead of the owner, such as a Safe. Only /admin sets it,
+    // so a signed-in owner can't redirect the money.
+    payTo: text("pay_to"),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     upstreamUrl: text("upstream_url").notNull(),
@@ -193,6 +196,8 @@ export const walletSwitches = pgTable("wallet_switches", {
   fromOwner: text("from_owner").notNull(),
   toOwner: text("to_owner").notNull(),
   slugs: text("slugs").array().notNull(),
+  // "owner" moved the gateways to a new owner; "pay_to" changed where the owner's gateways get paid.
+  kind: text("kind").notNull().default("owner"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

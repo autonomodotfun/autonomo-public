@@ -251,18 +251,18 @@ async function listAutonomoGatewaysFresh() {
     .orderBy(asc(gateways.createdAt));
 }
 
-// Listed, active gateways whose owner holds the Verified amount. A failed read throws, so it isn't cached.
+// Listed, active gateways whose paid wallet holds the Verified amount. A failed read throws, so it isn't cached.
 async function verifiedGatewaysFresh() {
   const db = await getDb();
   const { gateways } = schema;
   const rows = await db
-    .select({ slug: gateways.slug, owner: gateways.owner, projectSlug: projects.slug })
+    .select({ slug: gateways.slug, holder: sql<string>`coalesce(${gateways.payTo}, ${gateways.owner})`, projectSlug: projects.slug })
     .from(gateways)
     .innerJoin(projects, eq(gateways.projectId, projects.id))
     .where(and(eq(gateways.listing, "listed"), eq(gateways.status, "active"), eq(projects.status, "approved")));
-  const owners = [...new Set(rows.map((r) => r.owner))];
-  const holds = new Map(await Promise.all(owners.map(async (o) => [o, await holdsMinimum(o)] as const)));
-  const verified = rows.filter((r) => holds.get(r.owner));
+  const holders = [...new Set(rows.map((r) => r.holder))];
+  const holds = new Map(await Promise.all(holders.map(async (h) => [h, await holdsMinimum(h)] as const)));
+  const verified = rows.filter((r) => holds.get(r.holder));
   return { slugs: verified.map((r) => r.slug), projectSlugs: verified.map((r) => r.projectSlug) };
 }
 
