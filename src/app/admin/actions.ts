@@ -1,8 +1,10 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
 import { isAuthorized } from "@/lib/admin-auth";
 import { TOKEN } from "@/lib/constants";
@@ -14,6 +16,38 @@ import { revalidateCatalog } from "@/lib/queries";
 // Server actions can be invoked from any route, so each one re-checks auth rather than trusting the proxy.
 async function requireAdmin() {
   if (!isAuthorized((await headers()).get("authorization"))) throw new Error("Unauthorized");
+}
+
+// Moves all of a creator's gateways to a new wallet, which then gets paid and signs in for them. One statement, so it
+// all applies or none.
+export async function switchCreatorWallet(form: FormData) {
+  await requireAdmin();
+
+  const from = String(form.get("from") ?? "").trim().toLowerCase();
+  const to = String(form.get("to") ?? "").trim().toLowerCase();
+  const back = (message: string) => `/admin?${new URLSearchParams({ from, to, switch: message })}#switch-wallet`;
+  if (!isAddress(from) || !isAddress(to) || from === to || /^0x0+$/.test(to)) redirect(back("Those addresses aren't valid."));
+  if (String(form.get("confirm") ?? "").trim().toLowerCase() !== to.slice(-6)) redirect(back("The last 6 characters didn't match."));
+
+  const db = await getDb();
+  const result = await db.execute<{ slugs: string[] }>(sql`
+    with moved as (
+      update gateways set owner = ${to}, updated_at = now() where owner = ${from} returning slug, project_id
+    ), listed as (
+      update endpoints set pay_to = ${to}
+      where facilitator = 'autonomo' and lower(pay_to) = ${from} and project_id in (select project_id from moved)
+    ), logged as (
+      insert into wallet_switches (from_owner, to_owner, slugs)
+      select ${from}::text, ${to}::text, array_agg(slug) from moved having count(*) > 0
+      returning slugs
+    )
+    select slugs from logged`);
+  const rows = "rows" in result ? result.rows : (result as unknown as { slugs: string[] }[]);
+  if (!rows.length) redirect(back("That wallet has no APIs."));
+
+  revalidatePath("/admin");
+  revalidateCatalog();
+  redirect(`/admin?${new URLSearchParams({ switch: `Moved ${rows[0].slugs.length} APIs to ${to}.` })}#switch-wallet`);
 }
 
 export async function approveSubmission(form: FormData) {
