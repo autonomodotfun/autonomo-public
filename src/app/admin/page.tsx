@@ -4,12 +4,13 @@ import { connection } from "next/server";
 import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
 import { CATEGORY_INFO } from "@/lib/categories";
+import { payeeOf } from "@/lib/gateway";
 import { isContractWallet, verifiedStatus } from "@/lib/verified";
-import { approveGateway, approveSubmission, rejectGateway, rejectSubmission, setProjectFlags, switchCreatorWallet } from "./actions";
+import { approveGateway, approveSubmission, rejectGateway, rejectSubmission, setCreatorPayTo, setProjectFlags, switchCreatorWallet } from "./actions";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
-type SearchParams = Promise<{ from?: string; to?: string; switch?: string }>;
+type SearchParams = Promise<{ from?: string; to?: string; switch?: string; owner?: string; payTo?: string; payToNote?: string }>;
 
 export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
   await connection();
@@ -149,6 +150,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </form>
       </section>
 
+      <SetPayTo owner={params.owner} payTo={params.payTo} message={params.payToNote} />
+
       <SwitchWallet from={params.from} to={params.to} message={params.switch} switches={switches} />
 
       {recent.length > 0 && (
@@ -162,6 +165,82 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </section>
       )}
     </div>
+  );
+}
+
+async function SetPayTo({ owner: rawOwner, payTo: rawPayTo, message }: { owner?: string; payTo?: string; message?: string }) {
+  const owner = rawOwner?.trim().toLowerCase() ?? "";
+  const payTo = rawPayTo?.trim().toLowerCase() ?? "";
+  const ready = isAddress(owner) && isAddress(payTo);
+  const db = await getDb();
+  const [gateways, status] = ready
+    ? await Promise.all([
+        db.select({ slug: schema.gateways.slug, owner: schema.gateways.owner, payTo: schema.gateways.payTo }).from(schema.gateways).where(eq(schema.gateways.owner, owner)),
+        verifiedStatus(payTo),
+      ])
+    : [[], null];
+
+  return (
+    <section id="pay-to" className="mt-12">
+      <h2 className="text-lg font-semibold">Set where an API creator gets paid</h2>
+      <p className="mt-1 text-sm text-muted">
+        All of a wallet&apos;s APIs pay the wallet you name here, such as a Safe, and it holds the tokens for Verified. The
+        creator keeps signing in with their own wallet. Name their own wallet to undo this.
+      </p>
+      {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm">{message}</p>}
+      <form className="mt-3 grid gap-3 text-sm sm:max-w-xl">
+        <label className="grid gap-1">
+          Sign-in wallet
+          <input name="owner" required defaultValue={owner} placeholder="0x…" spellCheck={false} className="field font-mono" />
+        </label>
+        <label className="grid gap-1">
+          Pay-to wallet
+          <input name="payTo" required defaultValue={payTo} placeholder="0x…" spellCheck={false} className="field font-mono" />
+        </label>
+        <div>
+          <button className="rounded-md border border-line px-3 py-2">Preview</button>
+        </div>
+      </form>
+
+      {ready && (
+        <div className="mt-4 rounded-lg border border-line bg-surface p-5 text-sm">
+          {gateways.length === 0 ? (
+            <p>That wallet has no APIs, so there&apos;s nothing to change.</p>
+          ) : (
+            <>
+              <p className="font-medium">
+                {gateways.length} {gateways.length === 1 ? "API" : "APIs"} will pay {payTo === owner ? "the sign-in wallet again" : "this wallet"}:
+              </p>
+              <ul className="mt-2 grid gap-1 font-mono text-xs break-all text-muted">
+                {gateways.map((g) => (
+                  <li key={g.slug}>
+                    /x/{g.slug}, now paying {payeeOf(g)}
+                  </li>
+                ))}
+              </ul>
+              <ul className="mt-3 grid gap-1 text-muted">
+                {status?.verified === false && (
+                  <li className="text-warn">
+                    The pay-to wallet holds {status.balance ?? "an unknown amount of"} $AUTONOMO and needs{" "}
+                    {status.required ?? "the Verified amount"}, so these APIs would lose Verified.
+                  </li>
+                )}
+                {status?.verified && <li>The pay-to wallet holds enough for Verified.</li>}
+              </ul>
+              <form action={setCreatorPayTo} className="mt-4 flex flex-wrap items-end gap-3">
+                <input type="hidden" name="owner" value={owner} />
+                <input type="hidden" name="payTo" value={payTo} />
+                <label className="grid gap-1">
+                  Type the pay-to wallet&apos;s last 6 characters
+                  <input name="confirm" required autoComplete="off" spellCheck={false} className="field w-48 font-mono" />
+                </label>
+                <button className="btn-brand px-3 py-2">Set pay-to</button>
+              </form>
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -182,19 +261,20 @@ async function SwitchWallet({
   const db = await getDb();
   const [moving, status, contract] = ready
     ? await Promise.all([
-        db.select({ slug: schema.gateways.slug }).from(schema.gateways).where(eq(schema.gateways.owner, from)),
+        db.select({ slug: schema.gateways.slug, payTo: schema.gateways.payTo }).from(schema.gateways).where(eq(schema.gateways.owner, from)),
         verifiedStatus(to),
         isContractWallet(to),
       ])
     : [[], null, false];
   const proPays = ready && process.env.PRO_PAY_TO?.trim().toLowerCase() === from;
+  const paysOwner = moving.some((g) => !g.payTo);
 
   return (
     <section id="switch-wallet" className="mt-12">
       <h2 className="text-lg font-semibold">Switch an API creator&apos;s wallet</h2>
       <p className="mt-1 text-sm text-muted">
-        Moves all of a wallet&apos;s APIs to a new wallet, which then gets paid and signs in for them. Payments already
-        made stay where they went.
+        Moves all of a wallet&apos;s APIs to a new wallet, which then signs in for them and gets paid unless they have a
+        separate pay-to wallet. Payments already made stay where they went.
       </p>
       {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm">{message}</p>}
       <form className="mt-3 grid gap-3 text-sm sm:max-w-xl">
@@ -226,16 +306,18 @@ async function SwitchWallet({
                 ))}
               </ul>
               <ul className="mt-3 grid gap-1 text-muted">
-                {status?.verified === false && (
+                {!paysOwner && <li>These APIs keep paying their pay-to wallet, which holds for Verified.</li>}
+                {paysOwner && status?.verified === false && (
                   <li className="text-warn">
                     The new wallet holds {status.balance ?? "an unknown amount of"} $AUTONOMO and needs{" "}
                     {status.required ?? "the Verified amount"}, so these APIs would lose Verified.
                   </li>
                 )}
-                {status?.verified && <li>The new wallet holds enough for Verified.</li>}
+                {paysOwner && status?.verified && <li>The new wallet holds enough for Verified.</li>}
                 {contract && (
                   <li className="text-warn">
-                    The new wallet is a contract, such as a Safe. It can get paid but can&apos;t sign in to manage these APIs.
+                    The new wallet is a contract, such as a Safe. It can&apos;t sign in to manage these APIs. To keep the dashboard,
+                    make it the pay-to wallet instead.
                   </li>
                 )}
                 {contract === null && <li className="text-warn">Couldn&apos;t check whether the new wallet is a contract.</li>}
@@ -261,7 +343,8 @@ async function SwitchWallet({
           <ul className="mt-2 grid gap-2 font-mono text-xs text-muted">
             {switches.map((s) => (
               <li key={s.id} className="break-all">
-                {s.createdAt.toISOString().slice(0, 16).replace("T", " ")} · {s.fromOwner} → {s.toOwner} · {s.slugs.length} APIs
+                {s.createdAt.toISOString().slice(0, 16).replace("T", " ")} · {s.kind === "pay_to" ? "pay-to · " : ""}
+                {s.fromOwner} → {s.toOwner} · {s.slugs.length} APIs
               </li>
             ))}
           </ul>

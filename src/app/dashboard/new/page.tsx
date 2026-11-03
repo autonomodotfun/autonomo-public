@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { secretsEnabled } from "@/lib/gateway";
+import { ownerPayTo, secretsEnabled } from "@/lib/gateway";
 import { currentOwner } from "@/lib/session";
 import { VerifiedPanel } from "@/components/verified";
 import { GatewayForm } from "../gateway-form";
@@ -18,7 +18,7 @@ export default async function NewGatewayPage() {
       <p className="mt-2 text-muted">
         Autonomo puts your API behind an x402 paywall. Agents pay per call, then the request is forwarded to your API.
       </p>
-      <VerifiedPanel owner={owner} className="mt-6" />
+      <VerifiedPanel owner={(await ownerPayTo(owner)) ?? owner} className="mt-6" />
       <div className="mt-8">
         <GatewayForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} />
       </div>

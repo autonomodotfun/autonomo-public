@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { VerifiedBadge } from "@/components/verified";
 import { verifiedStatus } from "@/lib/verified";
-import { listOwnerGateways } from "@/lib/gateway";
+import { listOwnerGateways, payeeOf } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 import { platform } from "@/lib/pro";
 import { privyEnabled } from "@/lib/privy";
@@ -56,7 +56,9 @@ export default async function DashboardPage() {
     );
   }
 
-  const [rows, { verified }] = await Promise.all([listOwnerGateways(owner), verifiedStatus(owner)]);
+  const rows = await listOwnerGateways(owner);
+  const holders = [...new Set(rows.map((r) => payeeOf(r.gateway)))];
+  const verified = new Map(await Promise.all(holders.map(async (h) => [h, (await verifiedStatus(h)).verified] as const)));
 
   return (
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6">
@@ -93,7 +95,7 @@ export default async function DashboardPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{g.name}</span>
-                    {verified && <VerifiedBadge />}
+                    {verified.get(payeeOf(g)) && <VerifiedBadge />}
                     <Badge tone={g.status === "active" ? "ok" : "muted"}>{g.status}</Badge>
                     {g.listing !== "unlisted" && <Badge tone={g.listing === "listed" ? "ok" : "muted"}>{g.listing}</Badge>}
                   </div>
