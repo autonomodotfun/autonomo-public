@@ -5,12 +5,22 @@ import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { payeeOf } from "@/lib/gateway";
-import { isContractWallet, verifiedStatus } from "@/lib/verified";
-import { approveGateway, approveSubmission, rejectGateway, rejectSubmission, setCreatorPayTo, setProjectFlags, switchCreatorWallet } from "./actions";
+import { isContractWallet, safeInfo, verifiedStatus } from "@/lib/verified";
+import {
+  approveGateway,
+  approvePayToRequest,
+  approveSubmission,
+  rejectGateway,
+  rejectPayToRequest,
+  rejectSubmission,
+  setCreatorPayTo,
+  setProjectFlags,
+  switchCreatorWallet,
+} from "./actions";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
-type SearchParams = Promise<{ from?: string; to?: string; switch?: string; owner?: string; payTo?: string; payToNote?: string }>;
+type SearchParams = Promise<{ from?: string; to?: string; switch?: string; owner?: string; payTo?: string; payToNote?: string; requestNote?: string }>;
 
 export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
   await connection();
@@ -150,6 +160,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </form>
       </section>
 
+      <PayToRequests message={params.requestNote} />
+
       <SetPayTo owner={params.owner} payTo={params.payTo} message={params.payToNote} />
 
       <SwitchWallet from={params.from} to={params.to} message={params.switch} switches={switches} />
@@ -165,6 +177,90 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
         </section>
       )}
     </div>
+  );
+}
+
+// Creators asking from the dashboard to move their APIs from the Safe they set to another. Their first Safe needs no
+// approval: they set it with a signature. Shows what the chain says about the new Safe, so it can be checked against
+// what the creator told us before approving.
+async function PayToRequests({ message }: { message?: string }) {
+  const db = await getDb();
+  const { payToRequests, gateways } = schema;
+  const pending = await db.select().from(payToRequests).where(eq(payToRequests.status, "pending")).orderBy(desc(payToRequests.createdAt)).limit(50);
+  const details = await Promise.all(
+    pending.map(async (r) => {
+      const [safe, status, apis] = await Promise.all([
+        safeInfo(r.payTo).catch(() => undefined),
+        verifiedStatus(r.payTo),
+        db.select({ slug: gateways.slug, owner: gateways.owner, payTo: gateways.payTo }).from(gateways).where(eq(gateways.owner, r.owner)),
+      ]);
+      return { r, safe, status, apis };
+    }),
+  );
+
+  return (
+    <section id="pay-to-requests" className="mt-12 scroll-mt-6">
+      <h2 className="text-lg font-semibold">Payout wallet requests</h2>
+      <p className="mt-1 text-sm text-muted">{pending.length} {pending.length === 1 ? "creator" : "creators"} asking to move their APIs to another Safe</p>
+      {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm">{message}</p>}
+      <ul className="mt-4 space-y-4">
+        {details.map(({ r, safe, status, apis }) => (
+          <li key={r.id} className="rounded-lg border border-line bg-surface p-5 text-sm">
+            <dl className="grid gap-1 font-mono text-xs text-muted">
+              {[
+                ["owner", r.owner],
+                ["safe", r.payTo],
+                ["asked", r.createdAt.toISOString().slice(0, 16).replace("T", " ")],
+                ["apis", apis.length ? apis.map((a) => `/x/${a.slug}`).join(", ") : "none"],
+                ["now pays", apis.length ? [...new Set(apis.map(payeeOf))].join(", ") : "—"],
+              ].map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <dt className="w-20 shrink-0 text-faint">{k}</dt>
+                  <dd className="break-all">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <ul className="mt-3 grid gap-1 text-muted">
+              {safe === undefined && <li className="text-warn">Couldn&apos;t read the chain. Check the Safe before approving.</li>}
+              {safe === null && <li className="text-warn">This address isn&apos;t a Safe on Robinhood Chain.</li>}
+              {safe && (
+                <>
+                  <li>
+                    Safe {safe.version}, {safe.threshold} of {safe.owners.length} signers:
+                    <span className="block font-mono text-xs break-all">{safe.owners.join(", ")}</span>
+                  </li>
+                  {safe.threshold < 2 && <li className="text-warn">Only one signature moves the money, so it isn&apos;t a real multisig.</li>}
+                  {safe.owners.includes(r.owner) && <li>The sign-in wallet is one of the signers.</li>}
+                </>
+              )}
+              {status.verified ? (
+                <li>The Safe holds enough for Verified.</li>
+              ) : (
+                <li className="text-warn">
+                  The Safe holds {status.balance ?? "an unknown amount of"} $AUTONOMO and needs {status.required ?? "the Verified amount"}, so these APIs
+                  would lose Verified.
+                </li>
+              )}
+            </ul>
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <form action={approvePayToRequest} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="id" value={r.id} />
+                <label className="grid gap-1">
+                  Type the Safe&apos;s last 6 characters
+                  <input name="confirm" required autoComplete="off" spellCheck={false} className="field w-40 py-1.5 font-mono" />
+                </label>
+                <button className="btn-brand px-3 py-1.5">Approve</button>
+              </form>
+              <form action={rejectPayToRequest} className="flex gap-2">
+                <input type="hidden" name="id" value={r.id} />
+                <input name="note" placeholder="Reason (shown to the creator)" className="field w-56 py-1.5" />
+                <button className="rounded-md border border-line px-3 py-1.5">Reject</button>
+              </form>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -343,7 +439,7 @@ async function SwitchWallet({
           <ul className="mt-2 grid gap-2 font-mono text-xs text-muted">
             {switches.map((s) => (
               <li key={s.id} className="break-all">
-                {s.createdAt.toISOString().slice(0, 16).replace("T", " ")} · {s.kind === "pay_to" ? "pay-to · " : ""}
+                {s.createdAt.toISOString().slice(0, 16).replace("T", " ")} · {s.kind === "pay_to" ? "pay-to · " : s.kind === "pay_to_signed" ? "pay-to, signed by creator · " : ""}
                 {s.fromOwner} → {s.toOwner} · {s.slugs.length} APIs
               </li>
             ))}

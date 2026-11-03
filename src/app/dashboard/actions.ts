@@ -1,14 +1,20 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isAddress, isHex, verifyMessage, type Hex } from "viem";
 import { getDb, schema } from "@/db";
 import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo } from "@/lib/gateway";
-import { currentOwner } from "@/lib/session";
+import { applyPayTo, firstSafeMessage } from "@/lib/pay-to";
+import { currentOwner, seal, unseal } from "@/lib/session";
 import { revalidateCatalog } from "@/lib/queries";
+import { safeInfo } from "@/lib/verified";
 
-const { gateways } = schema;
+const { gateways, payToRequests } = schema;
+
+// How long the message to set a first Safe stays valid for signing.
+const SAFE_SIGN_TTL_S = 10 * 60;
 
 export type GatewayFormState = {
   ok: boolean;
@@ -154,4 +160,106 @@ export async function deleteGateway(form: FormData) {
   revalidatePath("/dashboard");
   revalidateCatalog();
   redirect("/dashboard");
+}
+
+/**
+ * The checks every Safe goes through before an owner's APIs can pay it. Returns an error to show, or the Safe and
+ * the wallet the owner's APIs pay now (null while they pay the sign-in wallet).
+ */
+type SafeCheck =
+  | { error: string }
+  | { safe: { owners: string[]; threshold: number; version: string }; current: string | null };
+
+async function checkSafe(owner: string, payTo: string): Promise<SafeCheck> {
+  if (!isAddress(payTo) || /^0x0+$/.test(payTo)) return { error: "That isn't a wallet address." };
+  if (payTo === owner) return { error: "That's your sign-in wallet. Enter your Safe's address." };
+  const db = await getDb();
+  const [mine] = await db.select({ payTo: gateways.payTo }).from(gateways).where(eq(gateways.owner, owner)).limit(1);
+  if (!mine) return { error: "Launch an API first, then choose where it gets paid." };
+  if (mine.payTo === payTo) return { error: "Your APIs already pay that Safe." };
+  const safe = await safeInfo(payTo).catch(() => undefined);
+  if (safe === undefined) return { error: "We couldn't read Robinhood Chain just now. Try again in a minute." };
+  if (!safe) return { error: "That address isn't a Safe on Robinhood Chain. Create one first, as the guide shows." };
+  if (safe.threshold < 2) return { error: "This Safe needs only one signature to move money. Set it to need at least 2, then try again." };
+  return { safe, current: mine.payTo };
+}
+
+export type FirstSafeState = {
+  error?: string;
+  // Filled once the Safe passes the checks: what to show, what to sign, and a sealed copy of it to send back.
+  safe?: { address: string; owners: string[]; threshold: number; version: string };
+  message?: string;
+  token?: string;
+};
+
+/** Checks the owner's first Safe and returns the message their sign-in wallet signs to set it. */
+export async function prepareFirstSafe(rawPayTo: string): Promise<FirstSafeState> {
+  const owner = await requireOwner();
+  const payTo = rawPayTo.trim().slice(0, 64).toLowerCase();
+  const check = await checkSafe(owner, payTo);
+  if ("error" in check) return { error: check.error };
+  if (check.current) return { error: "Your APIs already pay a Safe. Changing it needs a request below." };
+  const message = firstSafeMessage(owner, payTo, new Date());
+  return {
+    safe: { address: payTo, ...check.safe },
+    message,
+    token: seal({ o: owner, p: payTo, m: message }, SAFE_SIGN_TTL_S),
+  };
+}
+
+/** Sets the owner's first Safe once their sign-in wallet has signed the message from prepareFirstSafe. */
+export async function setFirstSafe(token: string, signature: string): Promise<{ error?: string }> {
+  const owner = await requireOwner();
+  const signed = unseal<{ o: string; p: string; m: string }>(token);
+  if (!signed || signed.o !== owner) return { error: "That took too long. Check the Safe again and sign the new message." };
+  if (!isHex(signature)) return { error: "The signature couldn't be read. Try again." };
+  // Signed by the sign-in wallet itself, not just this session's cookie.
+  const valid = await verifyMessage({ address: owner as Hex, message: signed.m, signature }).catch(() => false);
+  if (!valid) return { error: "That signature isn't from your sign-in wallet. Sign with the wallet shown above." };
+
+  // Checked again: the Safe or the owner's APIs may have changed since the message was made.
+  const check = await checkSafe(owner, signed.p);
+  if ("error" in check) return { error: check.error };
+  if (check.current) return { error: "Your APIs already pay a Safe. Changing it needs a request below." };
+
+  const slugs = await applyPayTo(owner, signed.p, "pay_to_signed");
+  if (!slugs.length) return { error: "Launch an API first, then choose where it gets paid." };
+  const db = await getDb();
+  await db
+    .update(payToRequests)
+    .set({ status: "cancelled", reviewedAt: new Date() })
+    .where(and(eq(payToRequests.owner, owner), eq(payToRequests.status, "pending")));
+  return {};
+}
+
+/** Asks /admin to move the owner's APIs from their current Safe to another. Replaces the Safe in any request waiting. */
+export async function requestPayTo(form: FormData) {
+  const owner = await requireOwner();
+  const payTo = str(form, "payTo", 64).toLowerCase();
+  const back = (note: string) => redirect(`/dashboard?${new URLSearchParams({ payTo, payToNote: note })}#payout`);
+  const check = await checkSafe(owner, payTo);
+  if ("error" in check) return back(check.error);
+  if (!check.current) return back("Your first Safe doesn't need a request. Set it with a signature above.");
+
+  const db = await getDb();
+  await db
+    .insert(payToRequests)
+    .values({ owner, payTo })
+    .onConflictDoUpdate({
+      target: payToRequests.owner,
+      targetWhere: sql`${payToRequests.status} = 'pending'`,
+      set: { payTo, createdAt: new Date() },
+    });
+  revalidatePath("/dashboard");
+  redirect(`/dashboard?${new URLSearchParams({ payToNote: "Request sent. Your APIs keep paying your current Safe until it's approved." })}#payout`);
+}
+
+export async function cancelPayToRequest() {
+  const owner = await requireOwner();
+  const db = await getDb();
+  await db
+    .update(payToRequests)
+    .set({ status: "cancelled", reviewedAt: new Date() })
+    .where(and(eq(payToRequests.owner, owner), eq(payToRequests.status, "pending")));
+  revalidatePath("/dashboard");
 }
