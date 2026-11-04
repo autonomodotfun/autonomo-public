@@ -2,7 +2,7 @@ import "server-only";
 import { formatUnits } from "viem";
 import { TOKEN } from "@/lib/constants";
 import { checkUpstream } from "@/lib/gateway";
-import { USDG } from "@/lib/pro";
+import { USDG } from "@/lib/payments";
 
 // Words that say nothing about which API to pick.
 const STOPWORDS = new Set(

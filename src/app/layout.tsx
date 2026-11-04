@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { burnFactory } from "@/lib/burn";
 import { Logo } from "@/components/logo";
 import { SOCIALS, Socials } from "@/components/socials";
 import { TokenBar } from "@/components/token-bar";
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <p className="flex flex-wrap gap-4">
               <Link href="/docs" className="hover:text-ink">Docs</Link>
               <Link href="/api-docs" className="hover:text-ink">API</Link>
+              {burnFactory() && <Link href="/burn" className="hover:text-ink">Burn</Link>}
               <Link href="/dashboard" className="hover:text-ink">Launch</Link>
               <a href="https://docs.x402.org" className="hover:text-ink">x402 docs</a>
               {SOCIALS.map((s) => (

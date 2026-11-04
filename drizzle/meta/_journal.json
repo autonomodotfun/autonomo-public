@@ -64,6 +64,20 @@
       "when": 1793694188404,
       "tag": "0008_pay_to_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793758981942,
+      "tag": "0009_burn_receipts",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793760625676,
+      "tag": "0010_gateway_call_burn",
+      "breakpoints": true
     }
   ]
 }

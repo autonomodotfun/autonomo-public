@@ -6,7 +6,7 @@ import { compact } from "@/components/project-row";
 import { CopyButton } from "@/components/copy-button";
 import { privyEnabled } from "@/lib/privy";
 import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
-import { proConfig } from "@/lib/pro";
+import { BURN_BPS, BURN_DEAD, burnFactory, buybackBurner } from "@/lib/burn";
 
 export const metadata: Metadata = {
   title: "Docs",
@@ -23,7 +23,6 @@ const SECTIONS = [
   { id: "agents", label: "Pay from your own code" },
   { id: "telegram", label: "Telegram bot & Playground" },
   { id: "api", label: "API reference" },
-  { id: "pro", label: "Pro API" },
   { id: "data", label: "Where the data comes from" },
   { id: "token", label: `${TOKEN.symbol} token` },
   { id: "roadmap", label: "Roadmap & status" },
@@ -97,22 +96,6 @@ const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 // Pays automatically when the API answers 402, then retries.
 const res = await fetchWithPayment("${SITE}/x/token-price/price/autonomo");
 console.log(await res.json());`;
-
-const PRO_CODE = `import { wrapFetchWithPayment } from "@x402/fetch";
-import { x402Client } from "@x402/core/client";
-import { ExactEvmScheme } from "@x402/evm/exact/client";
-import { privateKeyToAccount } from "viem/accounts";
-
-const signer = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as \`0x\${string}\`);
-const client = new x402Client();
-client.register("eip155:*", new ExactEvmScheme(signer));
-const fetchWithPayment = wrapFetchWithPayment(fetch, client);
-
-// Endpoints under $0.01 matching "weather", cheapest first
-const res = await fetchWithPayment(
-  "${SITE}/api/v1/pro/endpoints?q=weather&maxPrice=0.01&sort=price",
-);
-const { data } = await res.json(); // url, method, priceUsd, network, payTo, ...`;
 
 const MCP_CLAUDE_CODE = "claude mcp add autonomo -e AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY -- npx -y autonomo-mcp";
 
@@ -207,13 +190,16 @@ const ENDPOINTS: [string, string][] = [
   ["GET /api/v1/projects/{slug}", "One project with up to 500 paid endpoints, prices, networks and 30-day calls"],
   ["GET /api/v1/stats", "Totals, counts per category and the most common networks"],
   ["GET /api/v1/gateways", "Every live Autonomo gateway, with the URL and path to call (used by the MCP server)"],
-  ["GET /api/v1/pro/endpoints", "Paid: endpoint-level search with payment details (see Pro API)"],
 ];
 
 const FAQ: [string, React.ReactNode][] = [
   [
     "Does Autonomo take a cut of payments?",
-    <>No. Payments go straight from the agent&apos;s wallet to your <code>payTo</code> wallet. For hosted gateways, Autonomo&apos;s facilitator settles the payment on-chain and pays the gas, but never holds the money. Autonomo is only paid for its own <a href="#official-apis">official APIs</a> and the <a href="#pro">Pro API</a>.</>,
+    burnFactory() ? (
+      <>Autonomo keeps none of it, but <a href="#burn">{BURN_BPS / 100}% of each payment is burned</a>. On hosted gateways, payments go from the agent&apos;s wallet to your own splitter contract and wait there until it&apos;s flushed, which happens once a day when it holds enough to be worth the gas. Flushing sends {100 - BURN_BPS / 100}% to your <code>payTo</code> wallet and burns the rest. Nobody can take the money out of a splitter any other way, and anyone can flush one. Autonomo&apos;s facilitator settles each payment on-chain and pays the gas. Autonomo is only paid for its own <a href="#official-apis">official APIs</a>.</>
+    ) : (
+      <>No. Payments go straight from the agent&apos;s wallet to your <code>payTo</code> wallet. For hosted gateways, Autonomo&apos;s facilitator settles the payment on-chain and pays the gas, but never holds the money. Autonomo is only paid for its own <a href="#official-apis">official APIs</a>.</>
+    ),
   ],
   [
     "Does Autonomo host my API?",
@@ -225,7 +211,7 @@ const FAQ: [string, React.ReactNode][] = [
   ],
   [
     "Is the discovery API free?",
-    <>Yes, with no key. The <a href="#pro">Pro API</a> adds paid, endpoint-level search, paid per call with x402.</>,
+    <>Yes, with no key.</>,
   ],
   [
     "Is it safe to give the MCP server a private key?",
@@ -331,7 +317,7 @@ export default async function DocsPage() {
               {privyEnabled() ? " with email, Google, X or a wallet" : " with your wallet"}, paste your API&apos;s URL and set a
               price.{privyEnabled() ? " If you don't have a wallet, one is created for your earnings." : ""} Autonomo gives you a gateway at <code>autonomo.fun/x/your-api</code> that answers{" "}
               <code>402</code>, takes payment in USDG or {TOKEN.symbol} on {TOKEN.chainName}, and forwards paid requests to your
-              API. Payments go straight to your wallet, and your dashboard shows calls and earnings.
+              API. {burnFactory() ? <>Payments reach your wallet through a splitter contract, usually within a day, minus the <a href="#burn">{BURN_BPS / 100}% burn</a>.</> : "Payments go straight to your wallet."} Your dashboard shows calls and earnings.
             </p>
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
               <li>Your API must be public and use https. Gateways don&apos;t follow redirects.</li>
@@ -527,6 +513,18 @@ export default async function DocsPage() {
               Use a dedicated wallet for your agent and keep only a small balance in it. Never commit private keys.
             </p>
           </Step>
+          <h3 className="pt-2 font-medium">Paying with USDG</h3>
+          <p>
+            USDG (Global Dollar) on {TOKEN.chainName} supports EIP-3009, so each payment is a single signature: no
+            approval step and no gas for the agent. Hold USDG on {TOKEN.chainName} and the x402 client above handles the
+            rest.
+          </p>
+          <h3 className="pt-2 font-medium">Paying with {TOKEN.symbol}</h3>
+          <p>
+            {TOKEN.symbol} payments run on {TOKEN.chainName} through Permit2. Before the first payment, the paying wallet
+            approves the Permit2 contract (<code>{PERMIT2}</code>) to spend its {TOKEN.symbol}, once, which needs a little
+            ETH on {TOKEN.chainName} for gas. After that, each call is a signature and the agent pays no gas.
+          </p>
         </Section>
 
         <Section id="telegram" title="Telegram bot & Playground">
@@ -559,36 +557,6 @@ export default async function DocsPage() {
               </tbody>
             </table>
           </div>
-        </Section>
-
-        <Section id="pro" title="Pro API">
-          <p>
-            <code>GET /api/v1/pro/endpoints</code> searches individual endpoints across the whole catalog and returns
-            what an agent needs to call and pay them: URL, method, price, network, asset, <code>payTo</code>, scheme,
-            facilitator and 30-day usage. Filter by <code>q</code>, <code>network</code> and <code>maxPrice</code>{" "}
-            (USD), sort by <code>popular</code> or <code>price</code>, up to 200 results per page. Testnet endpoints
-            are left out.
-          </p>
-          <p>It is paid per call with x402 in USDG or {TOKEN.symbol}, so there is no key or account: the agent pays and gets the data.</p>
-          {!proConfig && (
-            <p className="rounded-lg border border-dashed border-line px-4 py-3 text-muted">
-              <b className="text-ink">Coming soon.</b> Until it is switched on, it answers <code>503</code>.
-            </p>
-          )}
-          <Code code={PRO_CODE} lang="ts" />
-          <h3 className="pt-2 font-medium">Paying with USDG</h3>
-          <p className="text-sm text-muted">These notes apply to every Autonomo gateway too, not only the Pro API.</p>
-          <p>
-            USDG (Global Dollar) on {TOKEN.chainName} supports EIP-3009, so each payment is a single signature: no
-            approval step and no gas for the agent. Hold USDG on {TOKEN.chainName} and the x402 client above handles the
-            rest.
-          </p>
-          <h3 className="pt-2 font-medium">Paying with {TOKEN.symbol}</h3>
-          <p>
-            {TOKEN.symbol} payments run on {TOKEN.chainName} through Permit2. Before the first payment, the paying wallet
-            approves the Permit2 contract (<code>{PERMIT2}</code>) to spend its {TOKEN.symbol}, once, which needs a little
-            ETH on {TOKEN.chainName} for gas. After that, each call is a signature and the agent pays no gas.
-          </p>
         </Section>
 
         <Section id="data" title="Where the data comes from">
@@ -627,15 +595,53 @@ export default async function DocsPage() {
           </div>
           <p>
             {TOKEN.symbol} runs on {TOKEN.chainName}. Agents can use it to pay for the{" "}
-            <a href="#official-apis">official APIs</a>, any hosted gateway whose owner accepts it, and the{" "}
-            <a href="#pro">Pro API</a>
-            {proConfig?.rails.some((r) => r.kind === "autonomo") ? "" : " once it is switched on"}. The Agent Playground
+            <a href="#official-apis">official APIs</a> and any hosted gateway whose owner accepts it. The Agent Playground
             and the Telegram bot pay in {TOKEN.symbol}.
           </p>
           <p>
             The address is also in the bar at the top of every page. Always check it on autonomo.fun before you buy:
             copies posted elsewhere can be fake. Nothing on this site is financial advice.
           </p>
+          {burnFactory() && (
+            <>
+              <h3 id="burn" className="scroll-mt-6 pt-2 font-medium text-ink">
+                Burn on paid calls
+              </h3>
+              <p>
+                {BURN_BPS / 100}% of every API payment through Autonomo is burned on-chain. Each API provider is paid at
+                their own splitter contract. Flushing it sends {BURN_BPS / 100}% of {TOKEN.symbol} payments to the dead
+                address and {BURN_BPS / 100}% of USDG payments to the buyback contract, which buys {TOKEN.symbol} with it
+                and sends it to the dead address. The provider gets the rest. The rate and addresses can&apos;t be changed, and
+                nobody can withdraw the USDG waiting to be swapped. Splitters are flushed and buybacks run once a day.
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  Splitter factory:{" "}
+                  <a href={`${TOKEN.explorer}/address/${burnFactory()}`} className="font-mono break-all">
+                    {burnFactory()}
+                  </a>
+                </li>
+                {buybackBurner() && (
+                  <li>
+                    Buyback and burn:{" "}
+                    <a href={`${TOKEN.explorer}/address/${buybackBurner()}`} className="font-mono break-all">
+                      {buybackBurner()}
+                    </a>
+                  </li>
+                )}
+                <li>
+                  Burns:{" "}
+                  <a href={`${TOKEN.explorer}/address/${BURN_DEAD}`} className="font-mono break-all">
+                    {BURN_DEAD}
+                  </a>
+                </li>
+              </ul>
+              <p>
+                Every burn is an on-chain event: <code>Flushed</code> on each splitter and <code>BoughtAndBurned</code> on
+                the buyback contract. You can read each contract&apos;s source on the explorer, at the addresses above. The <Link href="/burn">burn page</Link> lists every receipt and the full split of each payment.
+              </p>
+            </>
+          )}
         </Section>
 
         <Section id="roadmap" title="Roadmap & status">

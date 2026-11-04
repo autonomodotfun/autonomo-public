@@ -32,11 +32,13 @@ export function GatewayForm({
   site,
   secretSet = false,
   secretsEnabled,
+  burnPercent,
 }: {
   defaults?: GatewayDefaults;
   site: string;
   secretSet?: boolean;
   secretsEnabled: boolean;
+  burnPercent?: number;
 }) {
   const [state, action, pending] = useActionState<GatewayFormState, FormData>(saveGateway, { ok: false });
   const v = state.values;
@@ -131,7 +133,11 @@ export function GatewayForm({
 
       <fieldset className="space-y-4 rounded-lg border border-line p-4">
         <legend className="px-1 text-sm font-medium">Price per call</legend>
-        <p className="text-sm text-muted">Payments go straight to the wallet you signed in with. Autonomo takes no cut.</p>
+        <p className="text-sm text-muted">
+          {burnPercent
+            ? `${burnPercent}% of each payment is burned and your wallet gets the other ${100 - burnPercent}%, usually within a day. Autonomo keeps none of it.`
+            : "Payments go straight to the wallet you signed in with. Autonomo takes no cut."}
+        </p>
         {/* Labels wrap only the checkbox and its title, so clicking near a price never toggles the option. */}
         <div>
           <label className="flex items-center gap-3">

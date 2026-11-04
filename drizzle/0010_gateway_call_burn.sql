@@ -1,0 +1,1 @@
+ALTER TABLE "gateway_calls" ADD COLUMN "burn_bps" integer DEFAULT 0 NOT NULL;

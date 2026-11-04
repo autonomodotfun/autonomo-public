@@ -1,4 +1,7 @@
 {
   "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
-  "crons": [{ "path": "/api/cron/import", "schedule": "0 3 */3 * *" }]
+  "crons": [
+    { "path": "/api/cron/import", "schedule": "0 3 */3 * *" },
+    { "path": "/api/cron/burn", "schedule": "0 4 * * *" }
+  ]
 }
