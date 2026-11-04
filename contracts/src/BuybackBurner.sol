@@ -7,7 +7,8 @@ import {IERC20, IPoolManager, IUnlockCallback, PoolKey, SafeTransfer, SwapParams
 /// USDG -> ETH in the ETH/USDG pool, then ETH -> $AUTONOMO in the token's pool. The bought tokens go straight from the
 /// pool to the dead address and never pass through this contract.
 ///
-/// Nobody can withdraw the USDG. The owner can only change the keeper; the pools and tokens are fixed at deployment.
+/// Nobody can withdraw the USDG. The owner can only change the keeper or hand over ownership, which the new owner has to
+/// accept, so a wrong address can't lose it. The pools and tokens are fixed at deployment.
 /// Only the keeper can swap, with a minimum output it quotes off-chain. That limits what a sandwich in a thin pool can
 /// take from a buyback but doesn't rule one out, since a pool moved before the quote skews the quote too. A compromised
 /// keeper could force a poor price and profit from it, but can't withdraw the USDG; whatever it buys is still burned.
@@ -31,14 +32,18 @@ contract BuybackBurner is IUnlockCallback {
     address public immutable autonomoPoolHooks;
 
     address public owner;
+    address public pendingOwner;
     address public keeper;
 
     event BoughtAndBurned(uint256 usdgIn, uint256 ethIn, uint256 autonomoBurned);
     event Burned(uint256 autonomoBurned);
     event KeeperSet(address indexed keeper);
+    event OwnerProposed(address indexed owner);
     event OwnerSet(address indexed owner);
 
     error NotOwner();
+    error NotPendingOwner();
+    error ZeroOwner();
     error NotKeeper();
     error NotPoolManager();
     error BadPools();
@@ -55,6 +60,7 @@ contract BuybackBurner is IUnlockCallback {
         address owner_,
         address keeper_
     ) {
+        if (owner_ == address(0)) revert ZeroOwner();
         if (
             usdgPool.currency0 != address(0) || usdgPool.currency1 != usdg_ || autonomoPool.currency0 != address(0)
                 || autonomoPool.currency1 != autonomo_ || usdg_ == address(0) || autonomo_ == address(0)
@@ -132,10 +138,18 @@ contract BuybackBurner is IUnlockCallback {
         emit KeeperSet(keeper_);
     }
 
+    /// Proposes a new owner, who takes over by calling acceptOwner. Proposing address(0) cancels it.
     function setOwner(address owner_) external {
         if (msg.sender != owner) revert NotOwner();
-        owner = owner_;
-        emit OwnerSet(owner_);
+        pendingOwner = owner_;
+        emit OwnerProposed(owner_);
+    }
+
+    function acceptOwner() external {
+        if (msg.sender != pendingOwner) revert NotPendingOwner();
+        owner = msg.sender;
+        pendingOwner = address(0);
+        emit OwnerSet(msg.sender);
     }
 
     function _amount0(int256 delta) private pure returns (int128) {
