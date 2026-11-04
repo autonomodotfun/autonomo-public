@@ -48,6 +48,7 @@ contract BurnSplitterFactory {
     event SplitterDeployed(address indexed recipient, address splitter);
 
     error ZeroRecipient();
+    error DeployFailed();
 
     constructor(address autonomo_, address usdg_, address buyback_) {
         autonomo = autonomo_;
@@ -71,6 +72,7 @@ contract BurnSplitterFactory {
         assembly {
             splitter := create2(0, add(code, 0x20), mload(code), salt)
         }
+        if (splitter == address(0)) revert DeployFailed();
         emit SplitterDeployed(recipient, splitter);
     }
 
