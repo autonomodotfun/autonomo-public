@@ -8,7 +8,7 @@
 
 Every burn is an on-chain event: `Flushed(token, toRecipient, toBurn)` on splitters and `BoughtAndBurned(usdgIn, ethIn, autonomoBurned)` on the buyback.
 
-The app's daily keeper (`/api/cron/burn`, `src/lib/burn.ts`) flushes splitters holding at least 100 $AUTONOMO or 0.10 USDG, then buys back once the buyback holds at least 1 USDG, swapping at most 100 USDG per run because the token's pool is thin (100 USDG moves the price by about 1%, 1,000 by about 8%). Anything above that waits for later runs.
+The app (`src/lib/burn.ts`) flushes a payee's splitter once a payment takes it to 1,000 $AUTONOMO or 0.10 USDG, and a daily run (`/api/cron/burn`) flushes anything from 100 $AUTONOMO or 0.10 USDG. It buys back once the buyback holds at least 1 USDG, swapping at most 100 USDG per run because the token's pool is thin (100 USDG moves the price by about 1%, 1,000 by about 8%). Anything above that waits for later runs.
 
 ## Build and test
 
@@ -25,7 +25,7 @@ The fork tests run against the real tokens and pools.
 ## Deploy
 
 ```bash
-BURN_OWNER=<Autonomo Safe> BURN_KEEPER=<facilitator wallet> forge script script/Deploy.s.sol --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast --interactives 1 --verify --verifier blockscout --verifier-url https://robinhoodchain.blockscout.com/api/
+BURN_OWNER=<Autonomo Safe> BURN_KEEPER=<a dedicated gas-only wallet> forge script script/Deploy.s.sol --rpc-url https://rpc.mainnet.chain.robinhood.com --broadcast --interactives 1 --verify --verifier blockscout --verifier-url https://robinhoodchain.blockscout.com/api/
 ```
 
-Check that both contracts show verified source on the explorer: the docs send holders there to read the code. Then set `BUYBACK_BURNER`, `BURN_SPLITTER_FACTORY` and `BURN_START_BLOCK` (the deployment block shown on the explorer) in the app's environment. Payments start going to splitters on the next deploy; until then they go straight to payees.
+Check that both contracts show verified source on the explorer: the docs send holders there to read the code. Then set `BUYBACK_BURNER`, `BURN_SPLITTER_FACTORY`, `BURN_START_BLOCK` and `BURN_KEEPER_PRIVATE_KEY` (the deployment block shown on the explorer) in the app's environment. Payments start going to splitters on the next deploy; until then they go straight to payees.

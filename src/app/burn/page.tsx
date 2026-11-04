@@ -33,7 +33,7 @@ export default async function BurnPage() {
       <h1 className="heading mt-2 text-4xl sm:text-5xl">{TOKEN.symbol} burn</h1>
       <p className="mt-4 text-muted">
         {burn}% of each paid API call through an Autonomo gateway is burned. The rate is fixed in the contract. Burns run in
-        daily batches, so one receipt can cover many calls.
+        small batches, when an API creator&apos;s splitter reaches 1,000 {TOKEN.symbol} or 0.10 USDG and otherwise once a day, so one receipt can cover several calls.
       </p>
 
       <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
@@ -70,15 +70,15 @@ export default async function BurnPage() {
         </table>
       </div>
       <p className="mt-3 text-sm text-muted">
-        Autonomo&apos;s facilitator wallet pays the gas separately. Burning only takes a share of incoming payments, so it
+        Autonomo pays the gas separately. Burning only takes a share of incoming payments, so it
         can&apos;t touch tokens a wallet holds for Verified.
       </p>
 
       <h2 className="heading mt-12 text-2xl">Receipts</h2>
       {receipts.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-line px-4 py-3 text-muted">
-          No burns yet. Each day&apos;s batch runs once a splitter holds at least 100 {TOKEN.symbol} or 0.10 USDG, and a buyback
-          runs once 1 USDG is waiting.
+          No burns yet. A splitter is flushed once it reaches 1,000 {TOKEN.symbol} or 0.10 USDG, or once a day if it holds at least 100
+          {TOKEN.symbol}. A buyback runs once 1 USDG is waiting.
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-line">

@@ -23,9 +23,13 @@ import { USDG } from "@/lib/payments";
 // to the BuybackBurner, which buys $AUTONOMO with it and burns that; the payee gets the rest. Verified still checks
 // the payee, since the splitter holds nothing for long.
 //
+// A payment flushes its payee's splitter once that holds 1,000 $AUTONOMO or 0.10 USDG, and a daily run catches anyone below
+// that. The keeper is its own wallet: flushing from the facilitator could clash with a payment it's settling at the same moment.
+//
 // Env:
 //   BURN_SPLITTER_FACTORY   The deployed BurnSplitterFactory. Without it, payments go straight to payees as before.
-//   BUYBACK_BURNER          The deployed BuybackBurner, which the keeper (FACILITATOR_PRIVATE_KEY) triggers.
+//   BUYBACK_BURNER          The deployed BuybackBurner.
+//   BURN_KEEPER_PRIVATE_KEY The BuybackBurner's keeper: a gas-only wallet that flushes and runs buybacks.
 //   BURN_START_BLOCK        The block the contracts were deployed in, where the search for burn receipts starts.
 
 export const BURN_BPS = 500;
@@ -95,7 +99,10 @@ async function payees() {
   return rows.map((r) => r.payee).filter((p) => isAddress(p)).map((p) => getAddress(p));
 }
 
-// Below these a flush or a buyback costs more in gas than it moves.
+// A payment flushes a splitter at these.
+const FLUSH_AT_AUTONOMO = 1_000n * 10n ** 18n;
+const FLUSH_AT_USDG = 100_000n; // 0.10 USDG
+// Below these a flush or a buyback costs more in gas than it moves, so even the daily run leaves them.
 const MIN_FLUSH_AUTONOMO = 100n * 10n ** 18n;
 const MIN_FLUSH_USDG = 100_000n; // 0.10 USDG
 const MIN_BUYBACK_USDG = 1_000_000n; // 1 USDG
@@ -111,57 +118,73 @@ export type BurnRun = {
   errors: string[];
 };
 
-/** Flushes every splitter holding enough to be worth it, then buys back and burns with the USDG collected. */
-export async function runBurnKeeper(): Promise<BurnRun> {
+function keeper() {
   const factory = burnFactory();
-  const key = process.env.FACILITATOR_PRIVATE_KEY?.trim();
-  if (!factory || !key) throw new Error("BURN_SPLITTER_FACTORY and FACILITATOR_PRIVATE_KEY must be set");
+  const key = process.env.BURN_KEEPER_PRIVATE_KEY?.trim();
+  if (!factory || !key) throw new Error("BURN_SPLITTER_FACTORY and BURN_KEEPER_PRIVATE_KEY must be set");
   const account = privateKeyToAccount(key as Hex);
-  const wallet = createWalletClient({ account, chain: robinhood, transport: transport() });
+  return { factory, account, wallet: createWalletClient({ account, chain: robinhood, transport: transport() }) };
+}
+
+type Keeper = ReturnType<typeof keeper>;
+
+/** Flushes a payee's splitter if it holds enough to be worth it, or with `atThreshold`, only once it reaches a threshold. */
+async function flushPayee(k: Keeper, payee: Address, atThreshold = false) {
+  const splitter = await payToFor(payee);
+  const [autonomo, usdg] = await Promise.all(
+    [TOKEN.address, USDG.address].map((token) =>
+      publicClient.readContract({ address: token as Address, abi: balanceAbi, functionName: "balanceOf", args: [splitter as Address] }),
+    ),
+  );
+  if (atThreshold && autonomo < FLUSH_AT_AUTONOMO && usdg < FLUSH_AT_USDG) return null;
+  const tokens: Address[] = [];
+  if (autonomo >= MIN_FLUSH_AUTONOMO) tokens.push(TOKEN.address as Address);
+  if (usdg >= MIN_FLUSH_USDG) tokens.push(USDG.address);
+  if (!tokens.length) return null;
+  const hash = await k.wallet.writeContract({ address: k.factory, abi: factoryAbi, functionName: "flush", args: [payee, tokens] });
+  await publicClient.waitForTransactionReceipt({ hash });
+  return { payee, splitter, tx: hash };
+}
+
+/** Buys back and burns with the USDG collected, once there's enough to be worth it. */
+async function runBuyback(k: Keeper) {
+  const buyback = buybackBurner();
+  if (!buyback) return null;
+  const held = await publicClient.readContract({ address: USDG.address, abi: balanceAbi, functionName: "balanceOf", args: [buyback] });
+  if (held < MIN_BUYBACK_USDG) return null;
+  const usdgIn = held < MAX_BUYBACK_USDG ? held : MAX_BUYBACK_USDG;
+  const { result: quoted } = await publicClient.simulateContract({
+    account: k.account,
+    address: buyback,
+    abi: buybackAbi,
+    functionName: "buyAndBurn",
+    args: [usdgIn, 1n],
+  });
+  const minOut = (quoted * (10_000n - BUYBACK_SLIPPAGE_BPS)) / 10_000n;
+  const hash = await k.wallet.writeContract({ address: buyback, abi: buybackAbi, functionName: "buyAndBurn", args: [usdgIn, minOut] });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`buyback reverted in ${hash}`);
+  return { usdgIn: usdgIn.toString(), quotedBurn: quoted.toString(), tx: hash };
+}
+
+/** The daily backup: flushes every splitter holding enough, then buys back. Catches creators with few calls. */
+export async function runBurnKeeper(): Promise<BurnRun> {
+  const k = keeper();
   const run: BurnRun = { flushed: [], buyback: null, receipts: 0, errors: [] };
 
   for (const payee of await payees()) {
     try {
-      const splitter = await payToFor(payee);
-      const [autonomo, usdg] = await Promise.all(
-        [TOKEN.address, USDG.address].map((token) =>
-          publicClient.readContract({ address: token as Address, abi: balanceAbi, functionName: "balanceOf", args: [splitter as Address] }),
-        ),
-      );
-      const tokens: Address[] = [];
-      if (autonomo >= MIN_FLUSH_AUTONOMO) tokens.push(TOKEN.address as Address);
-      if (usdg >= MIN_FLUSH_USDG) tokens.push(USDG.address);
-      if (!tokens.length) continue;
-      const hash = await wallet.writeContract({ address: factory, abi: factoryAbi, functionName: "flush", args: [payee, tokens] });
-      await publicClient.waitForTransactionReceipt({ hash });
-      run.flushed.push({ payee, splitter, tx: hash });
+      const flushed = await flushPayee(k, payee);
+      if (flushed) run.flushed.push(flushed);
     } catch (e) {
       run.errors.push(`flush ${payee}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
-  const buyback = buybackBurner();
-  if (buyback) {
-    try {
-      const held = await publicClient.readContract({ address: USDG.address, abi: balanceAbi, functionName: "balanceOf", args: [buyback] });
-      if (held >= MIN_BUYBACK_USDG) {
-        const usdgIn = held < MAX_BUYBACK_USDG ? held : MAX_BUYBACK_USDG;
-        const { result: quoted } = await publicClient.simulateContract({
-          account,
-          address: buyback,
-          abi: buybackAbi,
-          functionName: "buyAndBurn",
-          args: [usdgIn, 1n],
-        });
-        const minOut = (quoted * (10_000n - BUYBACK_SLIPPAGE_BPS)) / 10_000n;
-        const hash = await wallet.writeContract({ address: buyback, abi: buybackAbi, functionName: "buyAndBurn", args: [usdgIn, minOut] });
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        if (receipt.status !== "success") throw new Error(`buyback reverted in ${hash}`);
-        run.buyback = { usdgIn: usdgIn.toString(), quotedBurn: quoted.toString(), tx: hash };
-      }
-    } catch (e) {
-      run.errors.push(`buyback: ${e instanceof Error ? e.message : String(e)}`);
-    }
+  try {
+    run.buyback = await runBuyback(k);
+  } catch (e) {
+    run.errors.push(`buyback: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   try {
@@ -171,6 +194,21 @@ export async function runBurnKeeper(): Promise<BurnRun> {
     run.errors.push(`receipts: ${e instanceof Error ? e.message : String(e)}`);
   }
   return run;
+}
+
+/**
+ * Called after each settled payment: flushes the payee's splitter once it reaches a threshold, then tries a buyback.
+ * Simultaneous calls can both see the threshold, which only wastes a little gas: a flush can't send money anywhere else.
+ * A failed flush isn't retried here, since the next payment or the daily run picks the money up.
+ */
+export async function noteBurnCall(payee: string) {
+  if (!burnEnabled() || !process.env.BURN_KEEPER_PRIVATE_KEY?.trim()) return;
+  const k = keeper();
+  const flushed = await flushPayee(k, getAddress(payee), true);
+  if (!flushed) return;
+  await runBuyback(k);
+  await syncBurnReceipts();
+  revalidateTag(BURNS_TAG, { expire: 0 });
 }
 
 // ---------- receipts ----------

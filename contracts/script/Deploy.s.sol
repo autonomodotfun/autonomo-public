@@ -9,7 +9,7 @@ import {Robinhood} from "./Robinhood.sol";
 
 /// Deploys the BuybackBurner and the BurnSplitterFactory that pays into it.
 ///   BURN_OWNER    Can change the keeper or hand over ownership, nothing else (the Autonomo Safe).
-///   BURN_KEEPER   Triggers buybacks (the facilitator wallet, which already pays gas).
+///   BURN_KEEPER   Triggers buybacks (a dedicated gas-only wallet, so it can't clash with settling payments).
 contract Deploy is Script {
     function run() external {
         address owner = vm.envAddress("BURN_OWNER");
