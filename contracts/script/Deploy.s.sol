@@ -8,7 +8,7 @@ import {IPoolManager} from "../src/Interfaces.sol";
 import {Robinhood} from "./Robinhood.sol";
 
 /// Deploys the BuybackBurner and the BurnSplitterFactory that pays into it.
-///   BURN_OWNER    Can change the keeper, nothing else (the Autonomo Safe).
+///   BURN_OWNER    Can change the keeper or hand over ownership, nothing else (the Autonomo Safe).
 ///   BURN_KEEPER   Triggers buybacks (the facilitator wallet, which already pays gas).
 contract Deploy is Script {
     function run() external {
