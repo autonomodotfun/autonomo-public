@@ -4,7 +4,8 @@ import { VerifiedBadge } from "@/components/verified";
 import { verifiedStatus } from "@/lib/verified";
 import { listOwnerGateways, payeeOf } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
-import { platform } from "@/lib/pro";
+import { burnPercent } from "@/lib/burn";
+import { platform } from "@/lib/payments";
 import { privyEnabled } from "@/lib/privy";
 import { authEnabled, currentOwner } from "@/lib/session";
 import { Badge } from "./badge";
@@ -25,7 +26,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <h1 className="heading mt-2 text-4xl">Launch your API in minutes</h1>
         <p className="mt-4 text-muted">
           Put any existing API behind an Autonomo gateway, set a price per call, and AI agents pay you in USDG or
-          $AUTONOMO with every request. No code changes, and payments go straight to your wallet.
+          $AUTONOMO with every request. No code changes, and {burnPercent() ? `${100 - burnPercent()!}% of each payment reaches your wallet, with ${burnPercent()}% burned.` : "payments go straight to your wallet."}
         </p>
         <ol className="mt-6 list-decimal space-y-1.5 pl-5 text-sm text-muted">
           <li>Sign in. Payments go to your wallet; if you don&apos;t have one, we create it for you.</li>
@@ -111,6 +112,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           ))}
         </ul>
       )}
+
+      {rows.length > 0 && burnPercent() && <p className="mt-2 text-xs text-faint">Earnings are your share after the {burnPercent()}% burn.</p>}
 
       {rows.length > 0 && <PayoutWallet owner={owner} payee={payeeOf(rows[0].gateway)} draft={params.payTo} note={params.payToNote} />}
     </div>

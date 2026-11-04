@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "examples",
+    "contracts",
     "official-apis",
     "mcp",
     "node_modules"

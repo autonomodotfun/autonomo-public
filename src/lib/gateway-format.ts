@@ -17,8 +17,15 @@ export function fmtAutonomo(atomic: string | null | undefined) {
   return `${trim(formatUnits(BigInt(atomic || "0"), TOKEN.decimals), 4)} AUTONOMO`;
 }
 
+/** The part of a payment its payee keeps, rounded the same way as the splitter contract. */
+export function afterBurn(atomic: string | null, burnBps: number) {
+  if (!atomic) return atomic;
+  const amount = BigInt(atomic);
+  return (amount - (amount * BigInt(burnBps)) / 10_000n).toString();
+}
+
 export function fmtRail(rail: string | null, atomic: string | null) {
-  if (rail === "usdg" || rail === "usdc") return fmtUsdg(atomic);
+  if (rail === "usdg") return fmtUsdg(atomic);
   if (rail === "autonomo") return fmtAutonomo(atomic);
   return "—";
 }

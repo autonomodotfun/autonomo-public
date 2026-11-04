@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ownerPayTo, secretsEnabled } from "@/lib/gateway";
 import { currentOwner } from "@/lib/session";
 import { VerifiedPanel } from "@/components/verified";
+import { burnPercent } from "@/lib/burn";
 import { GatewayForm } from "../gateway-form";
 
 export const metadata: Metadata = { title: "Launch an API", robots: { index: false } };
@@ -20,7 +21,7 @@ export default async function NewGatewayPage() {
       </p>
       <VerifiedPanel owner={(await ownerPayTo(owner)) ?? owner} className="mt-6" />
       <div className="mt-8">
-        <GatewayForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} />
+        <GatewayForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} burnPercent={burnPercent()} />
       </div>
     </div>
   );

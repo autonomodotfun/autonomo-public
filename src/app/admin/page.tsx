@@ -362,7 +362,6 @@ async function SwitchWallet({
         isContractWallet(to),
       ])
     : [[], null, false];
-  const proPays = ready && process.env.PRO_PAY_TO?.trim().toLowerCase() === from;
   const paysOwner = moving.some((g) => !g.payTo);
 
   return (
@@ -417,7 +416,6 @@ async function SwitchWallet({
                   </li>
                 )}
                 {contract === null && <li className="text-warn">Couldn&apos;t check whether the new wallet is a contract.</li>}
-                {proPays && <li className="text-warn">PRO_PAY_TO is also this wallet. It won&apos;t change here: update it on the server.</li>}
               </ul>
               <form action={switchCreatorWallet} className="mt-4 flex flex-wrap items-end gap-3">
                 <input type="hidden" name="from" value={from} />
