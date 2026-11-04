@@ -612,7 +612,7 @@ export default async function DocsPage() {
                 their own splitter contract. Flushing it sends {BURN_BPS / 100}% of {TOKEN.symbol} payments to the dead
                 address and {BURN_BPS / 100}% of USDG payments to the buyback contract, which buys {TOKEN.symbol} with it
                 and sends it to the dead address. The provider gets the rest. The rate and addresses can&apos;t be changed, and
-                nobody can withdraw the USDG waiting to be swapped. A splitter is flushed when it reaches 1,000 {TOKEN.symbol} or 0.10 USDG, and otherwise once a day if it holds at least 100 {TOKEN.symbol}. A buyback runs once 1 USDG is waiting.
+                nobody can withdraw the USDG waiting to be swapped. A splitter is flushed when it reaches 1,000 {TOKEN.symbol} or 0.10 USDG, and otherwise once a day if it holds at least 100 {TOKEN.symbol}. A buyback runs once 0.1 USDG is waiting.
               </p>
               <ul className="list-disc space-y-1 pl-5">
                 <li>
