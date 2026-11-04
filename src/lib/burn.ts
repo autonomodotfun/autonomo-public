@@ -10,6 +10,7 @@ import {
   http,
   isAddress,
   parseAbi,
+  parseAbiItem,
   type Address,
   type Hex,
 } from "viem";
@@ -44,11 +45,9 @@ const buybackAbi = parseAbi([
   "function keeper() view returns (address)",
 ]);
 const balanceAbi = parseAbi(["function balanceOf(address) view returns (uint256)"]);
-const burnEvents = parseAbi([
-  "event Flushed(address indexed token, uint256 toRecipient, uint256 toBurn)",
-  "event BoughtAndBurned(uint256 usdgIn, uint256 ethIn, uint256 autonomoBurned)",
-  "event Burned(uint256 autonomoBurned)",
-]);
+const flushedEvent = parseAbiItem("event Flushed(address indexed token, uint256 toRecipient, uint256 toBurn)");
+const boughtEvent = parseAbiItem("event BoughtAndBurned(uint256 usdgIn, uint256 ethIn, uint256 autonomoBurned)");
+const burnedEvent = parseAbiItem("event Burned(uint256 autonomoBurned)");
 
 const robinhood = defineChain({
   id: TOKEN.chainId,
@@ -102,10 +101,10 @@ async function payees() {
 // A payment flushes a splitter at these.
 const FLUSH_AT_AUTONOMO = 1_000n * 10n ** 18n;
 const FLUSH_AT_USDG = 100_000n; // 0.10 USDG
-// Below these a flush or a buyback costs more in gas than it moves, so even the daily run leaves them.
+// Below these, gas would take too much of what a flush or a buyback moves, so even the daily run leaves them.
 const MIN_FLUSH_AUTONOMO = 100n * 10n ** 18n;
 const MIN_FLUSH_USDG = 100_000n; // 0.10 USDG
-const MIN_BUYBACK_USDG = 1_000_000n; // 1 USDG
+const MIN_BUYBACK_USDG = 100_000n; // 0.1 USDG
 // The token's pool is thin: 100 USDG moves the price by about 1%, 1,000 by about 8%. Anything above this waits for later runs.
 const MAX_BUYBACK_USDG = 100_000_000n; // 100 USDG
 // The keeper quotes a buyback by simulating it, then accepts up to this much less when it lands.
@@ -214,8 +213,9 @@ export async function noteBurnCall(payee: string) {
 // ---------- receipts ----------
 
 const BURNS_TAG = "burns";
-const LOG_RANGE = 5_000_000n; // the public RPC refuses more than 10M blocks at once
-const LOG_ADDRESSES = 200;
+// The public RPC allows 10M blocks for one address and one event, but only 100,000 for a search with several of either.
+// So each contract and event gets its own search.
+const LOG_RANGE = 5_000_000n;
 
 /**
  * Copies burns from the chain into burn_receipts and returns how many it saw. Only logs from this deployment's
@@ -232,27 +232,28 @@ async function syncBurnReceipts() {
   if (last === null && !startBlock) throw new Error("BURN_START_BLOCK is not set");
   let from = BigInt(last ?? startBlock!);
 
-  const addresses = (await Promise.all((await payees()).map((p) => payToFor(p)))) as Address[];
-  if (buyback) addresses.push(buyback);
-  const buybackKey = buyback?.toLowerCase();
+  const splitterAddresses = (await Promise.all((await payees()).map((p) => payToFor(p)))) as Address[];
 
   // Not cached: viem otherwise reuses the block number for a few seconds and would miss a flush that just landed.
   const latest = await publicClient.getBlockNumber({ cacheTime: 0 });
   const rows: { tx: Hex; logIndex: number; kind: string; burned: bigint; usdgIn: string | null; block: bigint }[] = [];
   for (; from <= latest; from += LOG_RANGE) {
     const to = from + LOG_RANGE - 1n < latest ? from + LOG_RANGE - 1n : latest;
-    for (let i = 0; i < addresses.length; i += LOG_ADDRESSES) {
-      const logs = await publicClient.getLogs({ address: addresses.slice(i, i + LOG_ADDRESSES), events: burnEvents, fromBlock: from, toBlock: to });
-      for (const log of logs) {
-        const fromBuyback = log.address.toLowerCase() === buybackKey;
-        const at = { tx: log.transactionHash, logIndex: log.logIndex, block: log.blockNumber };
-        if (log.eventName === "Flushed" && !fromBuyback && log.args.token?.toLowerCase() === TOKEN.address && log.args.toBurn) {
-          rows.push({ ...at, kind: "payment", burned: log.args.toBurn, usdgIn: null });
-        } else if (log.eventName === "BoughtAndBurned" && fromBuyback) {
-          rows.push({ ...at, kind: "buyback", burned: log.args.autonomoBurned!, usdgIn: log.args.usdgIn!.toString() });
-        } else if (log.eventName === "Burned" && fromBuyback) {
-          rows.push({ ...at, kind: "other", burned: log.args.autonomoBurned!, usdgIn: null });
+    const range = { fromBlock: from, toBlock: to };
+    const at = (log: { transactionHash: Hex; logIndex: number; blockNumber: bigint }) => ({ tx: log.transactionHash, logIndex: log.logIndex, block: log.blockNumber });
+    for (const address of splitterAddresses) {
+      for (const log of await publicClient.getLogs({ address, event: flushedEvent, ...range })) {
+        if (log.args.token?.toLowerCase() === TOKEN.address && log.args.toBurn) {
+          rows.push({ ...at(log), kind: "payment", burned: log.args.toBurn, usdgIn: null });
         }
+      }
+    }
+    if (buyback) {
+      for (const log of await publicClient.getLogs({ address: buyback, event: boughtEvent, ...range })) {
+        rows.push({ ...at(log), kind: "buyback", burned: log.args.autonomoBurned!, usdgIn: log.args.usdgIn!.toString() });
+      }
+      for (const log of await publicClient.getLogs({ address: buyback, event: burnedEvent, ...range })) {
+        rows.push({ ...at(log), kind: "other", burned: log.args.autonomoBurned!, usdgIn: null });
       }
     }
   }
