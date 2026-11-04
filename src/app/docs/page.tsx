@@ -196,7 +196,7 @@ const FAQ: [string, React.ReactNode][] = [
   [
     "Does Autonomo take a cut of payments?",
     burnFactory() ? (
-      <>Autonomo keeps none of it, but <a href="#burn">{BURN_BPS / 100}% of each payment is burned</a>. On hosted gateways, payments go from the agent&apos;s wallet to your own splitter contract and wait there until it&apos;s flushed, which happens once a day when it holds enough to be worth the gas. Flushing sends {100 - BURN_BPS / 100}% to your <code>payTo</code> wallet and burns the rest. Nobody can take the money out of a splitter any other way, and anyone can flush one. Autonomo&apos;s facilitator settles each payment on-chain and pays the gas. Autonomo is only paid for its own <a href="#official-apis">official APIs</a>.</>
+      <>Autonomo keeps none of it, but <a href="#burn">{BURN_BPS / 100}% of each payment is burned</a>. On hosted gateways, payments go from the agent&apos;s wallet to your own splitter contract and wait there until it&apos;s flushed, which happens when it reaches 1,000 {TOKEN.symbol} or 0.10 USDG, or otherwise once a day if it holds at least 100 {TOKEN.symbol}. Flushing sends {100 - BURN_BPS / 100}% to your <code>payTo</code> wallet and burns the rest. Nobody can take the money out of a splitter any other way, and anyone can flush one. Autonomo&apos;s facilitator settles each payment on-chain and pays the gas. Autonomo is only paid for its own <a href="#official-apis">official APIs</a>.</>
     ) : (
       <>No. Payments go straight from the agent&apos;s wallet to your <code>payTo</code> wallet. For hosted gateways, Autonomo&apos;s facilitator settles the payment on-chain and pays the gas, but never holds the money. Autonomo is only paid for its own <a href="#official-apis">official APIs</a>.</>
     ),
@@ -612,7 +612,7 @@ export default async function DocsPage() {
                 their own splitter contract. Flushing it sends {BURN_BPS / 100}% of {TOKEN.symbol} payments to the dead
                 address and {BURN_BPS / 100}% of USDG payments to the buyback contract, which buys {TOKEN.symbol} with it
                 and sends it to the dead address. The provider gets the rest. The rate and addresses can&apos;t be changed, and
-                nobody can withdraw the USDG waiting to be swapped. Splitters are flushed and buybacks run once a day.
+                nobody can withdraw the USDG waiting to be swapped. A splitter is flushed when it reaches 1,000 {TOKEN.symbol} or 0.10 USDG, and otherwise once a day if it holds at least 100 {TOKEN.symbol}. A buyback runs once 1 USDG is waiting.
               </p>
               <ul className="list-disc space-y-1 pl-5">
                 <li>
