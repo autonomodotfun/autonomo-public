@@ -99,6 +99,8 @@ async function payees() {
 const MIN_FLUSH_AUTONOMO = 100n * 10n ** 18n;
 const MIN_FLUSH_USDG = 100_000n; // 0.10 USDG
 const MIN_BUYBACK_USDG = 1_000_000n; // 1 USDG
+// The token's pool is thin: 100 USDG moves the price by about 1%, 1,000 by about 8%. Anything above this waits for later runs.
+const MAX_BUYBACK_USDG = 100_000_000n; // 100 USDG
 // The keeper quotes a buyback by simulating it, then accepts up to this much less when it lands.
 const BUYBACK_SLIPPAGE_BPS = 200n;
 
@@ -143,18 +145,19 @@ export async function runBurnKeeper(): Promise<BurnRun> {
     try {
       const held = await publicClient.readContract({ address: USDG.address, abi: balanceAbi, functionName: "balanceOf", args: [buyback] });
       if (held >= MIN_BUYBACK_USDG) {
+        const usdgIn = held < MAX_BUYBACK_USDG ? held : MAX_BUYBACK_USDG;
         const { result: quoted } = await publicClient.simulateContract({
           account,
           address: buyback,
           abi: buybackAbi,
           functionName: "buyAndBurn",
-          args: [held, 1n],
+          args: [usdgIn, 1n],
         });
         const minOut = (quoted * (10_000n - BUYBACK_SLIPPAGE_BPS)) / 10_000n;
-        const hash = await wallet.writeContract({ address: buyback, abi: buybackAbi, functionName: "buyAndBurn", args: [held, minOut] });
+        const hash = await wallet.writeContract({ address: buyback, abi: buybackAbi, functionName: "buyAndBurn", args: [usdgIn, minOut] });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         if (receipt.status !== "success") throw new Error(`buyback reverted in ${hash}`);
-        run.buyback = { usdgIn: held.toString(), quotedBurn: quoted.toString(), tx: hash };
+        run.buyback = { usdgIn: usdgIn.toString(), quotedBurn: quoted.toString(), tx: hash };
       }
     } catch (e) {
       run.errors.push(`buyback: ${e instanceof Error ? e.message : String(e)}`);
