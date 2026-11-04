@@ -78,7 +78,7 @@ export default async function BurnPage() {
       {receipts.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-line px-4 py-3 text-muted">
           No burns yet. A splitter is flushed once it reaches 1,000 {TOKEN.symbol} or 0.10 USDG, or once a day if it holds at least 100
-          {TOKEN.symbol}. A buyback runs once 1 USDG is waiting.
+          {TOKEN.symbol}. A buyback runs once 0.1 USDG is waiting.
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-line">
