@@ -39,21 +39,6 @@ const ENDPOINTS = [
     params: [],
     example: "/api/v1/gateways",
   },
-  {
-    path: "/api/v1/pro/endpoints",
-    paid: true,
-    summary:
-      "Paid per call with x402, in USDG or $AUTONOMO on Robinhood Chain. Answers 503 until it is switched on. Endpoint-level search with URL, method, price, network, asset, payTo, scheme, facilitator and 30-day calls. Testnet endpoints are excluded.",
-    params: [
-      ["q", "Search endpoint URLs and descriptions, and their project's text"],
-      ["network", "e.g. base, solana, polygon"],
-      ["maxPrice", "Only endpoints priced at or below this many USD"],
-      ["sort", "popular (default) · price"],
-      ["page", "1-based page number"],
-      ["limit", "Results per page, max 200 (default 50)"],
-    ],
-    example: "/api/v1/pro/endpoints?q=weather&maxPrice=0.01&sort=price",
-  },
 ];
 
 export default function ApiDocs() {
@@ -62,8 +47,7 @@ export default function ApiDocs() {
       <h1 className="heading text-4xl">API</h1>
       <p className="mt-3 text-muted">
         Point your agent here to find APIs it can pay for. Read-only JSON, free while in beta. No key needed, CORS is
-        open, and responses are cached for 5 minutes. The <Link href="/docs#pro" className="underline hover:text-ink">Pro API</Link>{" "}
-        adds endpoint-level search, paid per call with x402.
+        open, and responses are cached for 5 minutes.
       </p>
       <p className="mt-3 text-sm text-muted">
         To call and pay the APIs you find, use the{" "}
@@ -78,11 +62,6 @@ export default function ApiDocs() {
           <section key={e.path}>
             <h2 className="font-mono text-sm">
               <span className="text-accent">GET</span> {e.path}
-              {"paid" in e && (
-                <Link href="/docs#pro" className="ml-2 rounded-sm bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-on-brand uppercase">
-                  Paid · x402
-                </Link>
-              )}
             </h2>
             <p className="mt-2 text-muted">{e.summary}</p>
             {e.params.length > 0 && (

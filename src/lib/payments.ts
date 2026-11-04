@@ -1,25 +1,20 @@
 import "server-only";
-import { HTTPFacilitatorClient, x402ResourceServer, type FacilitatorClient } from "@x402/core/server";
+import { x402ResourceServer, type FacilitatorClient } from "@x402/core/server";
 import { x402Facilitator } from "@x402/core/facilitator";
 import type { Network } from "@x402/core/types";
 import { toFacilitatorEvmSigner } from "@x402/evm";
 import { ExactEvmScheme as ExactEvmServer } from "@x402/evm/exact/server";
 import { ExactEvmScheme as ExactEvmFacilitator } from "@x402/evm/exact/facilitator";
-import { createWalletClient, defineChain, http, isAddress, parseUnits, publicActions, type Hex } from "viem";
+import { createWalletClient, defineChain, http, parseUnits, publicActions, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { TOKEN } from "@/lib/constants";
 
-// x402 payments for Autonomo: the paid ("pro") API tier and hosted gateways share one resource server.
+// x402 payments for hosted gateways.
 //
-// Platform settlement (env):
+// Env:
 //   FACILITATOR_PRIVATE_KEY   Gas-only wallet that settles Robinhood Chain payments in-process (USDG via EIP-3009,
 //                             $AUTONOMO via Permit2; the token has no EIP-3009/EIP-2612). No hosted facilitator
 //                             covers Robinhood Chain. Keep a little ETH on Robinhood Chain in it, nothing else.
-//   PRO_USDC_NETWORK + PRO_USDC_FACILITATOR_URL   Optional USDC through a hosted facilitator.
-//
-// Pro tier (env), paying PRO_PAY_TO:
-//   PRO_ACCEPT_USDG=1, PRO_PRICE_USD (USDG and USDC), PRO_AUTONOMO_AMOUNT (whole tokens per call).
-// With no pay-to address or no rail configured, the tier is off.
 
 const robinhood = defineChain({
   id: 4663,
@@ -43,25 +38,19 @@ function env(name: string) {
 // What this deployment can settle, independent of who gets paid.
 export const platform = {
   robinhood: Boolean(env("FACILITATOR_PRIVATE_KEY")),
-  usdc:
-    env("PRO_USDC_NETWORK") && env("PRO_USDC_FACILITATOR_URL")
-      ? { network: env("PRO_USDC_NETWORK") as Network, facilitatorUrl: env("PRO_USDC_FACILITATOR_URL")! }
-      : null,
 };
 
-export type Rail = "usdg" | "autonomo" | "usdc";
+export type Rail = "usdg" | "autonomo";
 
 export type Pricing = {
   priceUsd: string;
   acceptUsdg: boolean;
   autonomoAmount: string | null;
-  acceptUsdc?: boolean;
 };
 
 export type RailOffer =
   | { kind: "usdg"; network: Network; priceUsd: string; atomic: string }
-  | { kind: "autonomo"; network: Network; amount: string; atomic: string }
-  | { kind: "usdc"; network: Network; priceUsd: string };
+  | { kind: "autonomo"; network: Network; amount: string; atomic: string };
 
 /** The payment options a price can actually be settled in on this deployment. */
 export function offers(p: Pricing): RailOffer[] {
@@ -77,9 +66,6 @@ export function offers(p: Pricing): RailOffer[] {
       atomic: parseUnits(p.autonomoAmount, TOKEN.decimals).toString(),
     });
   }
-  if (platform.usdc && p.acceptUsdc && Number(p.priceUsd) > 0) {
-    out.push({ kind: "usdc", network: platform.usdc.network, priceUsd: p.priceUsd });
-  }
   return out;
 }
 
@@ -92,8 +78,6 @@ export function acceptsFor(payTo: string, list: RailOffer[]) {
         return { ...base, price: { amount: o.atomic, asset: USDG.address, extra: { ...USDG.eip712 } } };
       case "autonomo":
         return { ...base, price: { amount: o.atomic, asset: TOKEN.address, extra: { assetTransferMethod: "permit2" } } };
-      case "usdc":
-        return { ...base, price: `$${o.priceUsd}` };
     }
   });
 }
@@ -101,10 +85,9 @@ export function acceptsFor(payTo: string, list: RailOffer[]) {
 /** Which rail an asset address belongs to (for recording payments). */
 export function railForAsset(asset: string | undefined): Rail | null {
   const a = asset?.toLowerCase();
-  if (!a) return null;
   if (a === USDG.address.toLowerCase()) return "usdg";
   if (a === TOKEN.address.toLowerCase()) return "autonomo";
-  return "usdc";
+  return null;
 }
 
 // Adapts the in-process facilitator to the FacilitatorClient interface the resource server expects.
@@ -138,37 +121,8 @@ let server: x402ResourceServer | undefined;
 /** Shared resource server for every paid route; null when nothing can be settled. */
 export function x402Server() {
   if (server) return server;
-  if (!platform.robinhood && !platform.usdc) return null;
-  const facilitators: FacilitatorClient[] = [];
-  if (platform.robinhood) facilitators.push(localFacilitator());
-  if (platform.usdc) facilitators.push(new HTTPFacilitatorClient({ url: platform.usdc.facilitatorUrl }));
-  const evm = new ExactEvmServer();
-  server = new x402ResourceServer(facilitators);
-  if (platform.robinhood) server.register(TOKEN.network, evm);
-  if (platform.usdc) server.register(platform.usdc.network, evm);
+  if (!platform.robinhood) return null;
+  server = new x402ResourceServer([localFacilitator()]);
+  server.register(TOKEN.network, new ExactEvmServer());
   return server;
-}
-
-// ---- Pro tier ----
-
-export type ProConfig = { payTo: `0x${string}`; rails: RailOffer[] };
-
-export const proConfig: ProConfig | null = (() => {
-  const payTo = env("PRO_PAY_TO");
-  if (!payTo || !isAddress(payTo)) return null;
-  const rails = offers({
-    priceUsd: env("PRO_PRICE_USD") ?? "0.01",
-    acceptUsdg: env("PRO_ACCEPT_USDG") === "1",
-    autonomoAmount: env("PRO_AUTONOMO_AMOUNT") ?? null,
-    acceptUsdc: true,
-  });
-  return rails.length ? { payTo, rails } : null;
-})();
-
-export function proServer(_config: ProConfig) {
-  return x402Server()!;
-}
-
-export function proAccepts(config: ProConfig) {
-  return acceptsFor(config.payTo, config.rails);
 }

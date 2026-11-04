@@ -6,7 +6,6 @@ import { cache } from "react";
 import { getDb, schema } from "@/db";
 import { CATEGORIES, type Category } from "@/db/schema";
 import { TOKEN } from "@/lib/constants";
-import { TESTNET_PATTERN } from "@/lib/networks";
 import { holdsMinimum } from "@/lib/verified";
 
 const { projects, endpoints } = schema;
@@ -106,92 +105,6 @@ async function searchProjectsFresh(query: ProjectQuery) {
     db.select({ count: sql<number>`count(*)::int` }).from(projects).where(and(...where)),
   ]);
   return { rows: rows as ProjectListItem[], total: count, page, limit, sort };
-}
-
-export type EndpointQuery = {
-  q?: string;
-  network?: string;
-  maxPriceUsd?: number;
-  sort: "popular" | "price";
-  page: number;
-  limit: number;
-};
-
-export function parseEndpointQuery(params: URLSearchParams): EndpointQuery {
-  const one = (k: string) => params.get(k)?.trim() || undefined;
-  const page = Number(one("page") ?? 1);
-  const limit = Number(one("limit") ?? 50);
-  const maxPrice = Number(one("maxPrice"));
-  return {
-    q: one("q")?.slice(0, 100),
-    network: one("network")?.toLowerCase().slice(0, 40),
-    maxPriceUsd: Number.isFinite(maxPrice) && maxPrice > 0 ? maxPrice : undefined,
-    sort: one("sort") === "price" ? "price" : "popular",
-    page: Number.isInteger(page) && page > 0 ? Math.min(page, 1000) : 1,
-    limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : 50,
-  };
-}
-
-// Endpoint-level search across the whole catalog (paid tier): callable URLs with price and payment details.
-async function searchEndpointsFresh(query: EndpointQuery) {
-  const db = await getDb();
-  const { q, network, maxPriceUsd, sort, page, limit } = query;
-
-  // Agents pay real money here, so testnet endpoints are left out.
-  const where: SQL[] = [
-    eq(projects.status, "approved"),
-    sql`coalesce(${endpoints.network}, '') !~* ${TESTNET_PATTERN}`,
-  ];
-  if (q) {
-    const like = `%${escapeLike(q)}%`;
-    where.push(
-      or(
-        sql`${projects.search} @@ websearch_to_tsquery('english', ${q})`,
-        ilike(endpoints.description, like),
-        ilike(endpoints.url, like),
-      )!,
-    );
-  }
-  if (network) where.push(eq(sql`lower(${endpoints.network})`, network));
-  if (maxPriceUsd !== undefined) where.push(sql`${endpoints.priceUsd} <= ${maxPriceUsd}`);
-
-  const order =
-    sort === "price"
-      ? [sql`${endpoints.priceUsd} asc nulls last`, desc(endpoints.calls30d)]
-      : [desc(endpoints.calls30d), sql`${endpoints.priceUsd} asc nulls last`];
-
-  const [rows, [{ count }]] = await Promise.all([
-    db
-      .select({
-        url: endpoints.url,
-        method: endpoints.method,
-        description: endpoints.description,
-        network: endpoints.network,
-        priceUsd: endpoints.priceUsd,
-        amount: endpoints.amount,
-        asset: endpoints.asset,
-        payTo: endpoints.payTo,
-        scheme: endpoints.scheme,
-        facilitator: endpoints.facilitator,
-        x402Version: endpoints.x402Version,
-        calls30d: endpoints.calls30d,
-        payers30d: endpoints.payers30d,
-        lastCalledAt: endpoints.lastCalledAt,
-        project: { slug: projects.slug, name: projects.name, website: projects.website },
-      })
-      .from(endpoints)
-      .innerJoin(projects, eq(endpoints.projectId, projects.id))
-      .where(and(...where))
-      .orderBy(...order, asc(endpoints.id))
-      .limit(limit)
-      .offset((page - 1) * limit),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(endpoints)
-      .innerJoin(projects, eq(endpoints.projectId, projects.id))
-      .where(and(...where)),
-  ]);
-  return { rows, total: count, page, limit, sort };
 }
 
 // Playground: listed, active Autonomo gateways that accept $AUTONOMO, best match first.
@@ -376,7 +289,6 @@ function cachedRead<A extends unknown[], R>(fn: (...args: A) => Promise<R>, key:
 }
 
 export const searchProjects = cachedRead(searchProjectsFresh, "search-projects", DAY, CATALOG_TAGS.directory);
-export const searchEndpoints = cachedRead(searchEndpointsFresh, "search-endpoints", DAY, CATALOG_TAGS.directory);
 export const getStats = cachedRead(getStatsFresh, "stats", DAY, CATALOG_TAGS.directory);
 export const getFeatured = cachedRead(getFeaturedFresh, "featured", DAY, CATALOG_TAGS.directory);
 export const getAllSlugs = cachedRead(getAllSlugsFresh, "all-slugs", DAY, CATALOG_TAGS.directory);

@@ -10,7 +10,7 @@ import { isAuthorized } from "@/lib/admin-auth";
 import { TOKEN } from "@/lib/constants";
 import { gatewayOffers, payeeOf } from "@/lib/gateway";
 import { applyPayTo } from "@/lib/pay-to";
-import { USDG } from "@/lib/pro";
+import { USDG } from "@/lib/payments";
 import { slugify } from "@/lib/slug";
 import { revalidateCatalog } from "@/lib/queries";
 
@@ -201,8 +201,8 @@ export async function approveGateway(form: FormData) {
       method: "GET",
       description: g.description,
       network: "eip155:4663",
-      asset: offer && offer.kind !== "usdc" ? (offer.kind === "usdg" ? USDG.address : TOKEN.address) : null,
-      amount: offer && offer.kind !== "usdc" ? offer.atomic : null,
+      asset: offer ? (offer.kind === "usdg" ? USDG.address : TOKEN.address) : null,
+      amount: offer ? offer.atomic : null,
       priceUsd: g.acceptUsdg ? g.priceUsd : null,
       payTo: payeeOf(g),
       scheme: "exact",
