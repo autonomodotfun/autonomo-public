@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   customType,
   date,
@@ -8,6 +9,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -128,7 +130,8 @@ export const submissions = pgTable(
 );
 
 // Hosted x402 gateways: an owner puts an existing API behind autonomo.fun/x/<slug>, priced per call.
-// Payments go straight to the owner's wallet, or to payTo when one is set; Autonomo never holds funds.
+// Payments go straight to the owner's wallet, or to payTo when one is set, unless burning is on: then they go through
+// that wallet's burn splitter (src/lib/burn.ts). Autonomo never holds funds.
 export const GATEWAY_STATUSES = ["active", "paused"] as const;
 export type GatewayStatus = (typeof GATEWAY_STATUSES)[number];
 export const GATEWAY_LISTINGS = ["unlisted", "pending", "listed", "rejected"] as const;
@@ -181,7 +184,10 @@ export const gatewayCalls = pgTable(
     latencyMs: integer("latency_ms").notNull(),
     rail: text("rail"),
     asset: text("asset"),
+    // The whole payment, whatever share of it is burned.
     amount: text("amount"),
+    // The share of this payment burned, in basis points. 0 for payments that went straight to the payee.
+    burnBps: integer("burn_bps").notNull().default(0),
     payer: text("payer"),
     settled: boolean("settled").notNull().default(false),
     tx: text("tx"),
@@ -201,6 +207,23 @@ export const walletSwitches = pgTable("wallet_switches", {
   kind: text("kind").notNull().default("owner"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Every burn, copied from the chain's events by the burn keeper for the public /burn page. See src/lib/burn.ts.
+export const burnReceipts = pgTable(
+  "burn_receipts",
+  {
+    tx: text("tx").notNull(),
+    logIndex: integer("log_index").notNull(),
+    // "payment" burned part of a $AUTONOMO payment; "buyback" bought with USDG; "other" burned tokens sent to the buyback.
+    kind: text("kind").notNull(),
+    // Atomic units, as text.
+    burned: text("burned").notNull(),
+    usdgIn: text("usdg_in"),
+    blockNumber: bigint("block_number", { mode: "number" }).notNull(),
+    burnedAt: timestamp("burned_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tx, t.logIndex] }), index("burn_receipts_block_idx").on(t.blockNumber)],
+);
 
 // A creator asking from the dashboard to move their APIs from their Safe to another. Only /admin approves it, so a
 // signed-in session alone can't redirect the money. At most one is pending per owner.

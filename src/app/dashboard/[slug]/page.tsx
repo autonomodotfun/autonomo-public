@@ -6,8 +6,9 @@ import { notFound, redirect } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { TOKEN } from "@/lib/constants";
 import { gatewayOffers, gatewayStats, getOwnedGateway, payeeOf, secretsEnabled } from "@/lib/gateway";
-import { fmtAutonomo, fmtRail, fmtUsdg, shortAddr } from "@/lib/gateway-format";
-import { platform } from "@/lib/pro";
+import { afterBurn, fmtAutonomo, fmtRail, fmtUsdg, shortAddr } from "@/lib/gateway-format";
+import { burnPercent } from "@/lib/burn";
+import { platform } from "@/lib/payments";
 import { currentOwner } from "@/lib/session";
 import { deleteGateway, requestListing, setGatewayStatus } from "../actions";
 import { Badge } from "../badge";
@@ -95,6 +96,11 @@ export default async function GatewayDashboard({
       <p className="mt-2 text-xs text-faint">
         All time: {stats.allTime.settled} paid calls · {fmtUsdg(stats.allTime.usdg)} USDG · {fmtAutonomo(stats.allTime.autonomo)}
       </p>
+      {burnPercent() && (
+        <p className="mt-1 text-xs text-faint">
+          Earnings are your share after the {burnPercent()}% burn. New payments reach your wallet through your splitter contract, usually within a day.
+        </p>
+      )}
 
       <section className="mt-8">
         <h2 className="heading text-xl">Last 14 days</h2>
@@ -122,7 +128,7 @@ export default async function GatewayDashboard({
             <table className="w-full text-sm">
               <thead className="border-b border-line text-left text-xs text-faint">
                 <tr>
-                  {["Time (UTC)", "Request", "Status", "Amount", "Payer", "Tx"].map((h) => (
+                  {["Time (UTC)", "Request", "Status", "You earned", "Payer", "Tx"].map((h) => (
                     <th key={h} className="px-3 py-2 font-medium">{h}</th>
                   ))}
                 </tr>
@@ -133,7 +139,7 @@ export default async function GatewayDashboard({
                     <td className="px-3 py-2 whitespace-nowrap">{c.createdAt.toISOString().slice(5, 19).replace("T", " ")}</td>
                     <td className="max-w-56 truncate px-3 py-2">{c.method} {c.path}</td>
                     <td className={`px-3 py-2 ${c.status < 400 ? "" : "text-warn"}`}>{c.status}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{c.settled ? fmtRail(c.rail, c.amount) : <span className="text-faint">not settled</span>}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{c.settled ? <>{fmtRail(c.rail, afterBurn(c.amount, c.burnBps))}{c.burnBps > 0 && <span className="text-faint"> · {c.burnBps / 100}% burned</span>}</> : <span className="text-faint">not settled</span>}</td>
                     <td className="px-3 py-2">{shortAddr(c.payer)}</td>
                     <td className="px-3 py-2">
                       {c.tx ? (
@@ -166,6 +172,7 @@ export default async function GatewayDashboard({
           <h2 className="heading text-xl">Settings</h2>
           <div className="mt-4">
             <GatewayForm
+              burnPercent={burnPercent()}
               site={SITE}
               secretsEnabled={secretsEnabled()}
               secretSet={Boolean(g.upstreamAuthSecret)}

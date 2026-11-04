@@ -11,7 +11,7 @@ git cat-file -e "$prev^{commit}" 2>/dev/null || exit 1
 # Same commit again: a redeploy, for example after changing an env var.
 [ "$(git rev-parse "$prev")" != "$(git rev-parse HEAD)" ] || exit 1
 
-if git diff --quiet "$prev" HEAD -- . ':(exclude)mcp' ':(exclude)brand' ':(exclude)official-apis' ':(exclude)examples' ':(exclude)README.md'; then
+if git diff --quiet "$prev" HEAD -- . ':(exclude)mcp' ':(exclude)brand' ':(exclude)official-apis' ':(exclude)examples' ':(exclude)contracts' ':(exclude)README.md'; then
   echo "No site files changed since $prev: skipping the build."
   exit 0
 fi

@@ -10,7 +10,6 @@ The agentic x402 launchpad for APIs. Launch an endpoint with an x402 price and A
 - **Ecosystem projects** (facilitators, SDKs, extensions, explorers) are hand-checked in [`src/data/curated.ts`](src/data/curated.ts).
 - **Launch requests** (`/submit`) and gateway listing requests go into a review queue at `/admin`.
 - **Free JSON API** for agents at `/api/v1/*` (projects, stats, gateways), documented at `/api-docs`.
-- **Pro API** at `/api/v1/pro/endpoints`: endpoint-level search paid per call with x402, in USDG or $AUTONOMO on Robinhood Chain (optionally USDC). Off until configured; see below.
 - **Agent payment demo** in [`examples/agent-demo/`](examples/agent-demo/): a script that pays a gateway and prints every step.
 
 Stack: Next.js 16 (App Router), Tailwind 4, Drizzle ORM, Postgres (Neon in production, embedded PGlite locally).
@@ -37,25 +36,19 @@ Without `DATABASE_URL`, the app uses an embedded Postgres in `./.pglite`. Only o
 | `npm run db:import` | Re-import Bazaar data. Refreshes stats; keeps names, categories and visibility you've edited. `-- --dry-run` prints stats only |
 | `npm run db:remove -- <slug>` | Delete a project |
 
-## Pro API
-
-`/api/v1/pro/endpoints` is protected with x402 (`@x402/next`). It stays off, answering `503`, until `PRO_PAY_TO` and at least one payment rail are set (see `.env.example`):
-
-- **USDG:** `PRO_ACCEPT_USDG=1`, priced at `PRO_PRICE_USD`, on Robinhood Chain (`eip155:4663`). USDG supports EIP-3009, so each payment is one signature.
-- **$AUTONOMO:** `PRO_AUTONOMO_AMOUNT` whole tokens per call on Robinhood Chain. The token has no EIP-3009 or EIP-2612, so payments use Permit2; payers approve Permit2 once before their first payment.
-- **USDC (optional):** `PRO_USDC_NETWORK` (e.g. `eip155:8453`) and `PRO_USDC_FACILITATOR_URL`, priced at `PRO_PRICE_USD`.
-
-No hosted facilitator covers Robinhood Chain, so the app settles USDG and $AUTONOMO payments itself with `FACILITATOR_PRIVATE_KEY`, a gas-only wallet that needs a little ETH on Robinhood Chain. Paid responses are sent with `Cache-Control: private, no-store`.
-
 ## Hosted gateways
 
-Owners sign in at `/dashboard` with Privy (email, Google, X or a wallet; users without a wallet get a Privy embedded wallet) when `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_SECRET` are set, or directly with a browser wallet (Sign-In with Ethereum). Either way the server keeps an HMAC session cookie (`SESSION_SECRET`) for the owner's address: their own external wallet if they linked one, otherwise the embedded wallet. Owners paste an existing API URL and set a price. Agents call `/x/<slug>/<path>`; the gateway answers `402`, verifies the payment, forwards the request to `<upstream>/<path>` and settles only if the upstream answers below 400. Payments go to the owner's wallet (`payTo` = the signed-in address), in USDG or $AUTONOMO on Robinhood Chain, settled by the same `FACILITATOR_PRIVATE_KEY` wallet as the Pro API. Every paid attempt is logged in `gateway_calls` for the owner's dashboard.
+Owners sign in at `/dashboard` with Privy (email, Google, X or a wallet; users without a wallet get a Privy embedded wallet) when `NEXT_PUBLIC_PRIVY_APP_ID` and `PRIVY_APP_SECRET` are set, or directly with a browser wallet (Sign-In with Ethereum). Either way the server keeps an HMAC session cookie (`SESSION_SECRET`) for the owner's address: their own external wallet if they linked one, otherwise the embedded wallet. Owners paste an existing API URL and set a price. Agents call `/x/<slug>/<path>`; the gateway answers `402`, verifies the payment, forwards the request to `<upstream>/<path>` and settles only if the upstream answers below 400. Payments go to the owner's wallet (`payTo` = the signed-in address), in USDG or $AUTONOMO on Robinhood Chain, settled by the app itself with `FACILITATOR_PRIVATE_KEY`, a gas-only wallet that needs a little ETH on Robinhood Chain (no hosted facilitator covers the chain). USDG supports EIP-3009, so each payment is one signature; $AUTONOMO has no EIP-3009 or EIP-2612, so payers approve Permit2 once before their first payment. Paid responses are sent with `Cache-Control: private, no-store`. Every paid attempt is logged in `gateway_calls` for the owner's dashboard.
 
 - Launching is free. A wallet holding about `VERIFIED_USD` dollars of $AUTONOMO (default 27; 0 turns it off) shows a Verified badge on its APIs: in the directory, on the dashboard and in `/api/v1/gateways`. The amount in tokens is set once a week from the previous week's average pool price, rounded to the nearest 100,000, and stays between 100,000 and 5,000,000. Balances are read live from the chain (the public lists cache them for 5 minutes), so the badge goes away if the wallet drops below the amount. A wallet's amount is saved in `verified_wallets` when it first qualifies: it never goes up, it moves down if the weekly amount falls below it, and it's dropped if the wallet is found below it.
 - Upstreams must be https and resolve to public addresses (checked when saved and on every call); redirects aren't followed; 1 MB request and 5 MB response limits; 25 s timeout.
 - An optional upstream auth header is stored encrypted with `GATEWAY_SECRET_KEY`.
 - Owners can request a catalog listing; approving it in `/admin` creates a `service` project with the gateway URL as its endpoint.
 - Owners can have their APIs pay a Safe instead of the sign-in wallet (`gateways.pay_to`). The first Safe is set from the dashboard with a signature from the sign-in wallet, not just the session cookie, and applies straight away; it must be a Safe on Robinhood Chain needing at least 2 signatures. Moving to another Safe after that is a request (`pay_to_requests`) that `/admin` approves, with the new Safe's signers, threshold and Verified balance shown. Both are logged in `wallet_switches`. The guide for creators is at `/docs/safe`.
+
+## Burn on paid calls
+
+With `BURN_SPLITTER_FACTORY` set, gateways are paid at each payee's `BurnSplitter` (`contracts/`, address from `splitterOf(payee)`) instead of the payee itself. Flushing a splitter burns 5% of $AUTONOMO, sends 5% of USDG to the `BuybackBurner` (`BUYBACK_BURNER`), which swaps it for $AUTONOMO through Uniswap v4 and burns that, and pays the payee the rest. The daily cron `/api/cron/burn` (`src/lib/burn.ts`) runs the flushes and buybacks with `FACILITATOR_PRIVATE_KEY`, which must be the buyback's keeper. Verified still checks the payee. The keeper also copies burn events from the chain into `burn_receipts` (starting at `BURN_START_BLOCK`), which the public `/burn` page shows with the full split of each payment. See `contracts/README.md` to build, test and deploy.
 
 ## Agent Playground and Telegram bot
 

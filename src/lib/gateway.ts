@@ -6,7 +6,7 @@ import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { getDb, schema } from "@/db";
 import type { Gateway } from "@/db/schema";
-import { offers } from "@/lib/pro";
+import { offers } from "@/lib/payments";
 
 const { gateways, gatewayCalls } = schema;
 
@@ -222,16 +222,17 @@ export async function recordCall(row: typeof gatewayCalls.$inferInsert) {
 
 const since = (days: number) => new Date(Date.now() - days * 86_400_000);
 
-// Revenue sums per rail in atomic units (as text, to keep precision), over settled calls.
+// What the owner earned per rail in atomic units (as text, to keep precision), over settled calls. Each call's own burn
+// rate is used, so payments from before burning started still count in full.
+const earned = sql`${gatewayCalls.amount}::numeric - floor(${gatewayCalls.amount}::numeric * ${gatewayCalls.burnBps} / 10000)`;
 const revenueCols = {
   calls: sql<number>`count(*)::int`,
   settled: sql<number>`count(*) filter (where ${gatewayCalls.settled})::int`,
-  usdg: sql<string>`coalesce(sum(${gatewayCalls.amount}::numeric) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'usdg'), 0)::text`,
-  autonomo: sql<string>`coalesce(sum(${gatewayCalls.amount}::numeric) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'autonomo'), 0)::text`,
-  usdc: sql<string>`coalesce(sum(${gatewayCalls.amount}::numeric) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'usdc'), 0)::text`,
+  usdg: sql<string>`coalesce(sum(${earned}) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'usdg'), 0)::text`,
+  autonomo: sql<string>`coalesce(sum(${earned}) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'autonomo'), 0)::text`,
 };
 
-export type RevenueTotals = { calls: number; settled: number; usdg: string; autonomo: string; usdc: string };
+export type RevenueTotals = { calls: number; settled: number; usdg: string; autonomo: string };
 
 export async function listOwnerGateways(owner: string) {
   await connection();
