@@ -2,7 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
 import { updating } from "@/lib/api";
-import { BURN_BPS, payToFor } from "@/lib/burn";
+import { BURN_BPS, noteBurnCall, payToFor } from "@/lib/burn";
 import { forward, gatewayOffers, getGateway, recordCall, payeeOf } from "@/lib/gateway";
 import { acceptsFor, railForAsset, x402Server } from "@/lib/payments";
 
@@ -98,8 +98,10 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
     const settlement = decodeHeader(res.headers.get("payment-response"));
     const accepted = payment.accepted ?? {};
     const auth = payment.payload?.authorization ?? payment.payload?.permit2Authorization ?? {};
-    after(() =>
-      recordCall({
+    const settled = settlement?.success === true;
+    const burnBps = payTo === payeeOf(g) ? 0 : BURN_BPS;
+    after(async () => {
+      await recordCall({
         gatewayId: g.id,
         method: request.method,
         path: request.nextUrl.pathname.slice(`/x/${slug}`.length).slice(0, 300) || "/",
@@ -108,12 +110,13 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
         rail: railForAsset(accepted.asset),
         asset: typeof accepted.asset === "string" ? accepted.asset : null,
         amount: typeof accepted.amount === "string" ? accepted.amount : null,
-        burnBps: payTo === payeeOf(g) ? 0 : BURN_BPS,
+        burnBps,
         payer: (settlement?.payer ?? auth.from ?? null)?.toString().toLowerCase() ?? null,
-        settled: settlement?.success === true,
+        settled,
         tx: typeof settlement?.transaction === "string" ? settlement.transaction : null,
-      }).catch((e) => console.error("gateway call log failed", e)),
-    );
+      }).catch((e) => console.error("gateway call log failed", e));
+      if (settled && burnBps > 0) await noteBurnCall(payeeOf(g)).catch((e) => console.error("burn flush failed", e));
+    });
   }
   return withHeaders(res, slug);
 }
