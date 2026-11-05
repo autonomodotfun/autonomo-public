@@ -331,3 +331,45 @@ export const agentConversations = pgTable(
   },
   (t) => [index("agent_conversations_updated_idx").on(t.updatedAt)],
 );
+
+// Gloam cash-out payments (see src/lib/gloam.ts). An agent pays from its private Gloam balance by cashing out an exact
+// amount to the gateway's splitter. Each 402 issues a quote; the retry names the quote and the cash-out transaction.
+export const gloamQuotes = pgTable(
+  "gloam_quotes",
+  {
+    // Random and unguessable, never on chain: only the agent that got the 402 can redeem a payment against it.
+    id: text("id").primaryKey(),
+    gatewayId: integer("gateway_id")
+      .notNull()
+      .references(() => gateways.id, { onDelete: "cascade" }),
+    method: text("method").notNull(),
+    path: text("path").notNull(),
+    // Lowercased splitter (or payee) the cash-out must reach.
+    payTo: text("pay_to").notNull(),
+    // The exact gross amount to cash out, in USDG base units: the price plus the vault fee plus a unique tag.
+    gross: text("gross").notNull(),
+    // The price the splitter must receive at least, in USDG base units.
+    price: text("price").notNull(),
+    // A hash of the requester's IP, to limit how many open quotes one visitor holds.
+    requester: text("requester").notNull(),
+    // While open, the gross amount is reserved for this splitter; a used or expired quote frees it.
+    open: boolean("open").notNull().default(true),
+    tx: text("tx"),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("gloam_quotes_open_amount_idx").on(t.payTo, t.gross).where(sql`${t.open}`),
+    index("gloam_quotes_requester_idx").on(t.requester, t.issuedAt),
+    index("gloam_quotes_issued_idx").on(t.issuedAt),
+  ],
+);
+
+// Every cash-out transaction a gateway has taken. A row is claimed (locked) while the call runs, then marked used once
+// the API answers below 400. A failed call releases it so the agent can retry with the same transaction.
+export const gloamPayments = pgTable("gloam_payments", {
+  tx: text("tx").primaryKey(),
+  quoteId: text("quote_id").notNull(),
+  used: boolean("used").notNull().default(false),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
