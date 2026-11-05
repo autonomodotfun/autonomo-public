@@ -48,7 +48,7 @@ export async function VerifiedPanel({ owner, className = "" }: { owner: string; 
       </p>
       <p className="mt-1 font-mono text-xs break-all text-faint">
         {owner} ·{" "}
-        <Link href="/docs#launch" className="underline hover:text-ink">
+        <Link href="/docs/token#verified" className="underline hover:text-ink">
           How it works
         </Link>
       </p>

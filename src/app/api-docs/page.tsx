@@ -51,8 +51,8 @@ export default function ApiDocs() {
       </p>
       <p className="mt-3 text-sm text-muted">
         To call and pay the APIs you find, use the{" "}
-        <Link href="/docs#mcp" className="underline hover:text-ink">MCP server</Link> or an{" "}
-        <Link href="/docs#agents" className="underline hover:text-ink">x402 client in your own code</Link>.
+        <Link href="/docs/agents#mcp" className="underline hover:text-ink">MCP server</Link> or an{" "}
+        <Link href="/docs/agents#code" className="underline hover:text-ink">x402 client in your own code</Link>.
       </p>
       <p className="mt-3 text-sm text-muted">
         New to Autonomo? Start with the <Link href="/docs" className="underline hover:text-ink">docs</Link>.

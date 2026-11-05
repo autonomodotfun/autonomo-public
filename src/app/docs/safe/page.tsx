@@ -12,11 +12,8 @@ const SAFE_APP = "https://app.safe.global";
 
 export default function SafeGuidePage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6">
-      <Link href="/docs#launch" className="text-sm text-muted hover:text-ink">
-        ← Docs
-      </Link>
-      <p className="mt-6 font-mono text-xs tracking-wide text-accent uppercase">Guide</p>
+    <article className="min-w-0 max-w-3xl">
+      <p className="font-mono text-xs tracking-wide text-accent uppercase">Guide</p>
       <h1 className="heading mt-2 text-4xl sm:text-5xl">Get paid at a Safe</h1>
 
       <div className="docs-body mt-6 space-y-4">
@@ -143,7 +140,7 @@ export default function SafeGuidePage() {
           </dl>
         </Section>
       </div>
-    </div>
+    </article>
   );
 }
 
