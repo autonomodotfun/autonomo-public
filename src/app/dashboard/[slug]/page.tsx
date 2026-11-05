@@ -162,7 +162,7 @@ export default async function GatewayDashboard({
         <h2 className="heading text-xl">Try it</h2>
         <p className="mt-2 text-sm text-muted">
           Without payment, the gateway answers <code>402 Payment Required</code> with the price. An x402 client (see the{" "}
-          <Link href="/docs#agents" className="underline">docs</Link>) pays and retries automatically.
+          <Link href="/docs/agents#code" className="underline">docs</Link>) pays and retries automatically.
         </p>
         <pre className="mt-3 overflow-x-auto rounded-lg border border-line bg-surface p-4 font-mono text-[13px]">curl -i {url}/</pre>
       </section>

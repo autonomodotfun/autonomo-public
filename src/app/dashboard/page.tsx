@@ -33,6 +33,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <li>Paste your API&apos;s URL and set a price.</li>
           <li>Share your gateway URL with agents, or list it in the catalog.</li>
         </ol>
+        <p className="mt-3 text-sm text-muted">
+          New to this? Follow the <Link href="/docs/launch" className="underline hover:text-ink">step-by-step launch guide</Link>.
+        </p>
         <div className="mt-8">
           {authEnabled() && privyEnabled() ? (
             <>

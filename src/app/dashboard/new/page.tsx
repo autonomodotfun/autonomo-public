@@ -17,7 +17,8 @@ export default async function NewGatewayPage() {
       <Link href="/dashboard" className="text-sm text-muted hover:text-ink">← Your APIs</Link>
       <h1 className="heading mt-3 text-4xl">Launch an API</h1>
       <p className="mt-2 text-muted">
-        Autonomo puts your API behind an x402 paywall. Agents pay per call, then the request is forwarded to your API.
+        Autonomo puts your API behind an x402 paywall. Agents pay per call, then the request is forwarded to your API.{" "}
+        <Link href="/docs/launch" className="underline hover:text-ink">Read the launch guide</Link>.
       </p>
       <VerifiedPanel owner={(await ownerPayTo(owner)) ?? owner} className="mt-6" />
       <div className="mt-8">
