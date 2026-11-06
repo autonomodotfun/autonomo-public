@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: { default: "Autonomo: the agentic x402 launchpad for APIs", template: "%s · Autonomo" },
+  title: { default: "Autonomo: the agentic x402 launchpad and directory", template: "%s · Autonomo" },
   description:
     "Launch your API with x402 and let AI agents pay for it per call. Discover thousands of paid endpoints, facilitators and SDKs, with live pricing and usage from facilitator discovery data.",
   twitter: { site: "@useautonomo", creator: "@useautonomo" },
@@ -38,20 +38,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="flex items-center gap-2.5" aria-label="Autonomo home">
               <Logo className="h-7 w-auto" />
             </Link>
-            <nav className="hidden gap-5 text-sm text-muted sm:flex">
+            <nav className="hidden gap-4 text-sm text-muted md:flex lg:gap-5">
               {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="hover:text-ink">
+                <Link key={n.href} href={n.href} className="whitespace-nowrap hover:text-ink">
                   {n.label}
                 </Link>
               ))}
             </nav>
-            <Socials className="ml-auto" />
+            {/* From md the full menu shows, and only from lg is there room for the social icons too. */}
+            <Socials className="ml-auto md:hidden lg:flex" />
             <Link
               href="/dashboard"
-              className="btn-brand whitespace-nowrap px-3 py-1.5 text-sm"
+              className="btn-brand whitespace-nowrap px-3 py-1.5 text-sm md:ml-auto lg:ml-0"
             >
-              <span className="sm:hidden">Launch</span>
-              <span className="hidden sm:inline">Launch your API</span>
+              <span className="lg:hidden">Launch</span>
+              <span className="hidden lg:inline">Launch your API</span>
             </Link>
           </div>
         </header>
