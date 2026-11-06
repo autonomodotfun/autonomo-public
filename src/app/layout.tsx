@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { burnFactory } from "@/lib/burn";
+import { TOKEN } from "@/lib/constants";
+import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
 import { SOCIALS, Socials } from "@/components/socials";
-import { TokenBar } from "@/components/token-bar";
 import "./globals.css";
 
 const barlow = Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-barlow" });
@@ -32,7 +33,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${barlow.variable} ${barlowCondensed.variable} ${geistMono.variable}`}>
       <body className="min-h-dvh font-sans">
-        <TokenBar />
         <header className="border-b border-line">
           <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:gap-6 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5" aria-label="Autonomo home">
@@ -58,7 +58,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main>{children}</main>
         <footer className="mt-24 border-t border-line">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:justify-between sm:px-6">
-            <p>Service data comes from the Coinbase CDP and PayAI discovery endpoints and is refreshed regularly.</p>
+            <div className="space-y-2">
+              <p>Service data comes from the Coinbase CDP and PayAI discovery endpoints and is refreshed regularly.</p>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs">
+                <span className="text-ink">{TOKEN.symbol} CA</span>
+                <a href={`${TOKEN.explorer}/token/${TOKEN.address}`} className="break-all text-muted hover:text-ink">
+                  {TOKEN.address}
+                </a>
+                <CopyButton
+                  text={TOKEN.address}
+                  label={`Copy ${TOKEN.symbol} contract address`}
+                  className="rounded-sm border border-line px-1.5 py-0.5 uppercase hover:text-ink"
+                />
+              </p>
+            </div>
             <p className="flex flex-wrap gap-4">
               <Link href="/docs" className="hover:text-ink">Docs</Link>
               <Link href="/api-docs" className="hover:text-ink">API</Link>
