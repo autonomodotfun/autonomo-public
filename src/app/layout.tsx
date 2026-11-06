@@ -5,6 +5,7 @@ import { burnFactory } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
 import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
+import { TokenBar } from "@/components/token-bar";
 import { SOCIALS, Socials } from "@/components/socials";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${barlow.variable} ${barlowCondensed.variable} ${geistMono.variable}`}>
       <body className="min-h-dvh font-sans">
+        <TokenBar />
         <header className="border-b border-line">
           <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:gap-6 sm:px-6">
             <Link href="/" className="flex items-center gap-2.5" aria-label="Autonomo home">
