@@ -33,7 +33,7 @@ export function PartnerMark({ partner, className }: { partner: Partner; classNam
 export function PartnersRow() {
   if (!PARTNERS.length) return null;
   return (
-    <div className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
       <span className="text-sm text-muted">Works with</span>
       <span className="flex flex-wrap items-center gap-x-6 gap-y-3">
         {PARTNERS.map((p) => (

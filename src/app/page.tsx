@@ -31,15 +31,14 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
-      <section className="pt-16 pb-12 sm:pt-24">
-        <p className="font-mono text-xs tracking-wide text-accent uppercase">The agentic x402 launchpad for APIs</p>
+      <section className="flex min-h-[calc(80svh-4.5rem)] flex-col pt-16 sm:pt-24">
+        <p className="font-mono text-xs tracking-wide text-accent uppercase">The agentic x402 launchpad and directory</p>
         <h1 className="heading mt-3 max-w-3xl text-5xl leading-[0.95] text-balance sm:text-7xl">
-          Launch your API. Let <span className="bg-brand px-2 text-on-brand">agents</span> pay.
+          Launch your API. Let <span className="underline decoration-brand decoration-[0.14em] underline-offset-[0.1em]">agents</span> pay.
         </h1>
         <p className="mt-5 max-w-2xl text-lg text-muted">
           Put an x402 price on any endpoint and AI agents can discover it and pay per call, with no keys, accounts or
-          invoices. {compact(stats.projects)} projects and {compact(stats.endpoints)} paid endpoints have already
-          launched.
+          invoices.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/dashboard" className="btn-brand px-5 py-2.5 text-sm">Launch your API</Link>
@@ -47,21 +46,11 @@ export default async function Home() {
             Connect your agent
           </Link>
         </div>
-        <form action="/projects" className="mt-6 flex max-w-xl gap-2">
-          <input
-            name="q"
-            type="search"
-            placeholder="Search for weather, image generation, Solana data…"
-            aria-label="Search projects"
-            className="field h-11 flex-1 text-base"
-          />
-          <button className="btn-brand h-11 px-5 text-sm">Search</button>
-        </form>
-        <dl className="mt-10 grid max-w-2xl grid-cols-3 gap-6 border-t border-line pt-6">
-          <Stat label="Projects" value={compact(stats.projects)} />
-          <Stat label="Paid endpoints" value={compact(stats.endpoints)} />
-          <Stat label="Paid calls, last 30 days" value={compact(stats.calls30d)} />
-        </dl>
+        {/* Any spare height splits evenly above and below, so the row sits midway between the buttons and the next
+            section. pb-4 plus that section's own pt-8 matches pt-12. */}
+        <div className="flex flex-1 items-center pt-12 pb-4">
+          <PartnersRow />
+        </div>
       </section>
 
       <section className="py-8">
@@ -75,12 +64,29 @@ export default async function Home() {
             </li>
           ))}
         </ol>
-        <PartnersRow />
       </section>
 
       <section className="py-8">
-        <SectionHead title="Browse by category" />
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3 lg:grid-cols-5">
+        <SectionHead title="The x402 directory" href="/projects" />
+        <p className="max-w-2xl text-muted">
+          Every x402 project we can find, on {stats.networks.length} networks, with live prices and usage.
+        </p>
+        <form action="/projects" className="mt-5 flex max-w-xl gap-2">
+          <input
+            name="q"
+            type="search"
+            placeholder="Search for weather, image generation, Solana data…"
+            aria-label="Search projects"
+            className="field h-11 flex-1 text-base"
+          />
+          <button className="btn-brand h-11 px-5 text-sm">Search</button>
+        </form>
+        <dl className="mt-8 grid max-w-2xl grid-cols-3 gap-6">
+          <Stat label="Projects" value={compact(stats.projects)} />
+          <Stat label="Paid endpoints" value={compact(stats.endpoints)} />
+          <Stat label="Paid calls, last 30 days" value={compact(stats.calls30d)} />
+        </dl>
+        <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3 lg:grid-cols-5">
           {CATEGORIES.filter((c) => stats.categories[c]).map((c) => (
             <Link key={c} href={`/projects?category=${c}`} className="bg-bg p-4 hover:bg-surface">
               <div className="flex items-baseline justify-between gap-2">
