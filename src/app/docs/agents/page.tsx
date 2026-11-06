@@ -140,6 +140,11 @@ export default function AgentsGuidePage() {
           approves the Permit2 contract (<code>{PERMIT2}</code>) to spend its {TOKEN.symbol}, once, which needs a little ETH
           on {TOKEN.chainName} for gas. After that, each call is a signature and the agent pays no gas.
         </p>
+        <h3 className="pt-2 font-medium">Paying privately with Gloam</h3>
+        <p>
+          The official APIs also accept a cash-out from a private Gloam balance, so the payment doesn&apos;t link back to
+          your wallet. See <Link href="/docs/gloam">Pay privately with Gloam</Link>.
+        </p>
       </Section>
 
       <Section id="telegram" title="Agent Playground and Telegram bot">

@@ -16,6 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/docs/token`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/self-hosted`, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/docs/safe`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/docs/gloam`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/partners`, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/api-docs`, changeFrequency: "monthly", priority: 0.6 },
     ...(burnEnabled() ? [{ url: `${base}/burn`, changeFrequency: "daily" as const, priority: 0.7 }] : []),
     ...slugs.map((s) => ({ url: `${base}/projects/${s.slug}`, lastModified: s.updatedAt, priority: 0.6 })),

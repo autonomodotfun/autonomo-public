@@ -4,6 +4,7 @@ import { CATEGORY_INFO } from "@/lib/categories";
 import { networkLabel } from "@/lib/networks";
 import { getFeatured, getStats, searchProjects } from "@/lib/queries";
 import { compact, ProjectList } from "@/components/project-row";
+import { PartnersRow } from "@/components/partners";
 
 const LAUNCH_STEPS = [
   {
@@ -74,6 +75,7 @@ export default async function Home() {
             </li>
           ))}
         </ol>
+        <PartnersRow />
       </section>
 
       <section className="py-8">

@@ -66,7 +66,8 @@ export default function OfficialApisPage() {
       />
       <p>
         Try any of them without a wallet in the <Link href="/playground">Agent Playground</Link>, or call them from your
-        agent: see <Link href="/docs/agents">Use Autonomo from your agent</Link>.
+        agent: see <Link href="/docs/agents">Use Autonomo from your agent</Link>. They also accept private payments from a
+        Gloam balance: see <Link href="/docs/gloam">Pay privately with Gloam</Link>.
       </p>
 
       <Section id="official-wallets" title="The wallets behind them">
