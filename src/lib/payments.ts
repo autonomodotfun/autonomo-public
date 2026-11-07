@@ -90,6 +90,8 @@ export function railForAsset(asset: string | undefined): Rail | null {
   return null;
 }
 
+const INSUFFICIENT_BALANCE = new Set(["invalid_exact_evm_insufficient_balance", "permit2_insufficient_balance"]);
+
 // Adapts the in-process facilitator to the FacilitatorClient interface the resource server expects.
 function localFacilitator(): FacilitatorClient {
   const account = privateKeyToAccount(env("FACILITATOR_PRIVATE_KEY") as Hex);
@@ -110,7 +112,15 @@ function localFacilitator(): FacilitatorClient {
   });
   const facilitator = new x402Facilitator().register(TOKEN.network, new ExactEvmFacilitator(signer));
   return {
-    verify: (payload, requirements) => facilitator.verify(payload, requirements),
+    // The balance is already read at the latest block, but a payer who just received the money (an agent that
+    // borrowed the price a moment before paying) can still look short on an RPC node a block behind. So a payment
+    // refused only for its balance is checked once more, 2 seconds later. Nothing is sent before settle, so this is safe.
+    verify: async (payload, requirements) => {
+      const first = await facilitator.verify(payload, requirements);
+      if (first.isValid || !INSUFFICIENT_BALANCE.has(first.invalidReason ?? "")) return first;
+      await new Promise((r) => setTimeout(r, 2000));
+      return facilitator.verify(payload, requirements);
+    },
     settle: (payload, requirements) => facilitator.settle(payload, requirements),
     getSupported: async () => facilitator.getSupported() as Awaited<ReturnType<FacilitatorClient["getSupported"]>>,
   };
