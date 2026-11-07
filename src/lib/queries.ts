@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, or, sql, type SQL } from "drizzle-orm";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { connection } from "next/server";
 import { cache } from "react";
@@ -7,6 +7,7 @@ import { getDb, schema } from "@/db";
 import { CATEGORIES, type Category } from "@/db/schema";
 import { TOKEN } from "@/lib/constants";
 import { holdsMinimum } from "@/lib/verified";
+import { summarize, TRACK_RECORD_DAYS, type TrackRecord } from "@/lib/track-record";
 
 const { projects, endpoints } = schema;
 
@@ -271,6 +272,71 @@ async function getAllSlugsFresh() {
     .limit(10000);
 }
 
+// The track record of every listed, active gateway, from its paid calls in the last TRACK_RECORD_DAYS days.
+async function trackRecordsFresh() {
+  const db = await getDb();
+  const { gateways, gatewayCalls } = schema;
+  const since = sql`now() - make_interval(days => ${TRACK_RECORD_DAYS})`;
+  const live = and(eq(gateways.listing, "listed"), eq(gateways.status, "active"), eq(projects.status, "approved"));
+  const [rows, totals, payers] = await Promise.all([
+    db
+      .select({
+        id: gateways.id,
+        slug: gateways.slug,
+        name: gateways.name,
+        owner: gateways.owner,
+        payTo: gateways.payTo,
+        createdAt: gateways.createdAt,
+        projectSlug: projects.slug,
+      })
+      .from(gateways)
+      .innerJoin(projects, eq(gateways.projectId, projects.id))
+      .where(live),
+    db
+      .select({
+        gatewayId: gatewayCalls.gatewayId,
+        attempts: sql<number>`count(*) filter (where ${gatewayCalls.createdAt} >= ${since} and ${gatewayCalls.status} <> 402)::int`,
+        answered: sql<number>`count(*) filter (where ${gatewayCalls.createdAt} >= ${since} and ${gatewayCalls.status} <> 402 and ${gatewayCalls.status} < 500)::int`,
+        medianMs: sql<number | null>`percentile_cont(0.5) within group (order by ${gatewayCalls.latencyMs}) filter (where ${gatewayCalls.createdAt} >= ${since} and ${gatewayCalls.settled})`,
+        settled: sql<number>`count(*) filter (where ${gatewayCalls.createdAt} >= ${since} and ${gatewayCalls.settled})::int`,
+        refused: sql<number>`count(*) filter (where ${gatewayCalls.createdAt} >= ${since} and ${gatewayCalls.status} = 402)::int`,
+        failed: sql<number>`count(*) filter (where ${gatewayCalls.createdAt} >= ${since} and ${gatewayCalls.status} >= 500)::int`,
+        settledAllTime: sql<number>`count(*) filter (where ${gatewayCalls.settled})::int`,
+      })
+      .from(gatewayCalls)
+      .groupBy(gatewayCalls.gatewayId),
+    db
+      .select({
+        gatewayId: gatewayCalls.gatewayId,
+        payer: gatewayCalls.payer,
+        days: sql<number>`count(distinct date_trunc('day', ${gatewayCalls.createdAt} at time zone 'UTC'))::int`,
+        calls: sql<number>`count(*)::int`,
+      })
+      .from(gatewayCalls)
+      .where(and(gte(gatewayCalls.createdAt, since), eq(gatewayCalls.settled, true), sql`${gatewayCalls.payer} is not null`))
+      .groupBy(gatewayCalls.gatewayId, gatewayCalls.payer),
+  ]);
+  const out: Record<string, TrackRecord & { gatewaySlug: string; name: string; owner: string; projectSlug: string }> = {};
+  for (const g of rows) {
+    const t = totals.find((x) => x.gatewayId === g.id);
+    const record = summarize(
+      g,
+      {
+        attempts: t?.attempts ?? 0,
+        answered: t?.answered ?? 0,
+        medianMs: t?.medianMs == null ? null : Number(t.medianMs),
+        settled: t?.settled ?? 0,
+        refused: t?.refused ?? 0,
+        failed: t?.failed ?? 0,
+        settledAllTime: t?.settledAllTime ?? 0,
+      },
+      payers.filter((p) => p.gatewayId === g.id).map((p) => ({ payer: p.payer!, days: p.days, calls: p.calls })),
+    );
+    out[g.slug] = { ...record, gatewaySlug: g.slug, name: g.name, owner: g.owner, projectSlug: g.projectSlug };
+  }
+  return out;
+}
+
 // ---------- cached reads ----------
 // Every page view and API call used to query the database, which kept it awake around the clock. These reads are
 // cached (shared across server instances), so most requests never reach it. Admin changes and the directory refresh
@@ -294,6 +360,8 @@ export const getFeatured = cachedRead(getFeaturedFresh, "featured", DAY, CATALOG
 export const getAllSlugs = cachedRead(getAllSlugsFresh, "all-slugs", DAY, CATALOG_TAGS.directory);
 export const getProject = cache(cachedRead(getProjectFresh, "project", DAY, CATALOG_TAGS.directory));
 export const listAutonomoGateways = cachedRead(listAutonomoGatewaysFresh, "autonomo-gateways", 300, CATALOG_TAGS.gateways);
+/** Track records keyed by gateway slug, refreshed hourly so page views don't keep the database awake. */
+export const getTrackRecords = cachedRead(trackRecordsFresh, "track-records", 3600, CATALOG_TAGS.gateways);
 const verifiedGatewaysCached = cachedRead(verifiedGatewaysFresh, "verified-gateways", 300, CATALOG_TAGS.gateways);
 
 /** Slugs of Verified gateways and their projects; empty while balances can't be read, so a badge never blocks a page. */

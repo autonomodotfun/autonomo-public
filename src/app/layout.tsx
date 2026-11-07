@@ -80,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/api-docs" className="hover:text-ink">API</Link>
               {burnFactory() && <Link href="/burn" className="hover:text-ink">Burn</Link>}
               <Link href="/dashboard" className="hover:text-ink">Launch</Link>
+              <Link href="/numbers" className="hover:text-ink">Numbers</Link>
               <Link href="/partners" className="hover:text-ink">Partners</Link>
               <a href="https://docs.x402.org" className="hover:text-ink">x402 docs</a>
               {SOCIALS.map((s) => (
