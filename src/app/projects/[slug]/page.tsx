@@ -3,9 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { formatUsd, networkLabel } from "@/lib/networks";
-import { getProject, getVerifiedGateways } from "@/lib/queries";
+import { getProject, getTrackRecords, getVerifiedGateways } from "@/lib/queries";
 import { VerifiedBadge } from "@/components/verified";
 import { compact, NetworkChips } from "@/components/project-row";
+import { TrackRecordBlock } from "@/components/track-record";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -26,7 +27,8 @@ export default async function ProjectPage({ params }: Props) {
   const data = await getProject((await params).slug);
   if (!data) notFound();
   const { project: p, endpoints } = data;
-  const { projectSlugs } = await getVerifiedGateways();
+  const [{ projectSlugs }, records] = await Promise.all([getVerifiedGateways(), trackRecordsOrNone()]);
+  const record = Object.values(records).find((r) => r.projectSlug === p.slug);
 
   const links = [
     { label: "Website", url: p.website },
@@ -90,6 +92,8 @@ export default async function ProjectPage({ params }: Props) {
         </dl>
       </header>
 
+      {record && <TrackRecordBlock record={record} />}
+
       {endpoints.length > 0 && (
         <section className="mt-10">
           <h2 className="heading mb-1 text-xl">Paid endpoints</h2>
@@ -143,6 +147,16 @@ export default async function ProjectPage({ params }: Props) {
       </p>
     </article>
   );
+}
+
+/** A failed read only hides the block, so the page still renders. */
+async function trackRecordsOrNone() {
+  try {
+    return await getTrackRecords();
+  } catch (e) {
+    console.error("track records failed", e);
+    return {};
+  }
 }
 
 function pathOf(url: string, host: string | null) {
