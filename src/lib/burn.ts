@@ -214,8 +214,22 @@ export async function noteBurnCall(payee: string) {
 
 const BURNS_TAG = "burns";
 // The public RPC allows 10M blocks for one address and one event, but only 100,000 for a search with several of either.
-// So each contract and event gets its own search.
+// So each contract and event gets its own search. A paid RPC can allow less (Alchemy: 10,000 blocks, or any range
+// returning 10,000 logs or fewer), so a search it refuses as too big is split in half until it fits.
 const LOG_RANGE = 5_000_000n;
+
+async function logsIn<T>(from: bigint, to: bigint, get: (from: bigint, to: bigint) => Promise<T[]>): Promise<T[]> {
+  try {
+    return await get(from, to);
+  } catch (e) {
+    const said = `${(e as { details?: string }).details ?? (e as Error).message}`;
+    // Being rate limited isn't a range problem: splitting would only send more requests.
+    if ((e as { status?: number }).status === 429 || /too many requests|rate.?limit/i.test(said)) throw e;
+    if (to - from < 500n || !/exceed|limit|too many|spans|allowed|range/i.test(said)) throw e;
+    const mid = from + (to - from) / 2n;
+    return [...(await logsIn(from, mid, get)), ...(await logsIn(mid + 1n, to, get))];
+  }
+}
 
 /**
  * Copies burns from the chain into burn_receipts and returns how many it saw. Only logs from this deployment's
@@ -239,20 +253,19 @@ async function syncBurnReceipts() {
   const rows: { tx: Hex; logIndex: number; kind: string; burned: bigint; usdgIn: string | null; block: bigint }[] = [];
   for (; from <= latest; from += LOG_RANGE) {
     const to = from + LOG_RANGE - 1n < latest ? from + LOG_RANGE - 1n : latest;
-    const range = { fromBlock: from, toBlock: to };
     const at = (log: { transactionHash: Hex; logIndex: number; blockNumber: bigint }) => ({ tx: log.transactionHash, logIndex: log.logIndex, block: log.blockNumber });
     for (const address of splitterAddresses) {
-      for (const log of await publicClient.getLogs({ address, event: flushedEvent, ...range })) {
+      for (const log of await logsIn(from, to, (a, b) => publicClient.getLogs({ address, event: flushedEvent, fromBlock: a, toBlock: b }))) {
         if (log.args.token?.toLowerCase() === TOKEN.address && log.args.toBurn) {
           rows.push({ ...at(log), kind: "payment", burned: log.args.toBurn, usdgIn: null });
         }
       }
     }
     if (buyback) {
-      for (const log of await publicClient.getLogs({ address: buyback, event: boughtEvent, ...range })) {
+      for (const log of await logsIn(from, to, (a, b) => publicClient.getLogs({ address: buyback, event: boughtEvent, fromBlock: a, toBlock: b }))) {
         rows.push({ ...at(log), kind: "buyback", burned: log.args.autonomoBurned!, usdgIn: log.args.usdgIn!.toString() });
       }
-      for (const log of await publicClient.getLogs({ address: buyback, event: burnedEvent, ...range })) {
+      for (const log of await logsIn(from, to, (a, b) => publicClient.getLogs({ address: buyback, event: burnedEvent, fromBlock: a, toBlock: b }))) {
         rows.push({ ...at(log), kind: "other", burned: log.args.autonomoBurned!, usdgIn: null });
       }
     }
