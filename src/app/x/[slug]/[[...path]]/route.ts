@@ -11,7 +11,7 @@ import { acceptsFor, railForAsset, x402Server } from "@/lib/payments";
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
 // Payments go to the owner's wallet, or to its burn splitter when burning is on (src/lib/burn.ts); the upstream is
 // only called after the payment verifies, and the payment only settles when the upstream answers below 400.
-// Gateways listed in GLOAM_CASHOUT_GATEWAYS also offer a Gloam cash-out (src/lib/gloam.ts), where the payment lands
+// Gateways that accept USDG also offer a Gloam cash-out (src/lib/gloam.ts), where the payment lands
 // before the call; its transaction is only marked used once the upstream answers below 400.
 
 // Upstream calls may take up to 25 s (see forward()); leave headroom for payment verification and settlement.
@@ -95,11 +95,11 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
 
   const started = Date.now();
   const path = request.nextUrl.pathname.slice(`/x/${slug}`.length) || "/";
-  const gloam = gloamEnabledFor(slug) && g.acceptUsdg ? gloamPaymentOf(request) : null;
+  const gloam = gloamEnabledFor(g) ? gloamPaymentOf(request) : null;
   if (gloam) return withHeaders(await gloamCall(request, g, payTo, path, gloam, started), slug);
 
   let res = await paidHandler(g, payTo)(request);
-  if (res.status === 402 && gloamEnabledFor(slug) && g.acceptUsdg) res = await withGloamOption(res, request, g, payTo, path);
+  if (res.status === 402 && gloamEnabledFor(g)) res = await withGloamOption(res, request, g, payTo, path);
 
   // Record attempts that carried a payment, after the response is sent.
   const payment = decodeHeader(request.headers.get("payment-signature"));

@@ -142,8 +142,8 @@ export default function AgentsGuidePage() {
         </p>
         <h3 className="pt-2 font-medium">Paying privately with Gloam</h3>
         <p>
-          The official APIs also accept a cash-out from a private Gloam balance, so the payment doesn&apos;t link back to
-          your wallet. See <Link href="/docs/gloam">Pay privately with Gloam</Link>.
+          Every API that accepts USDG also accepts a cash-out from a private Gloam balance, so the payment doesn&apos;t
+          link back to your wallet. See <Link href="/docs/gloam">Pay privately with Gloam</Link>.
         </p>
       </Section>
 

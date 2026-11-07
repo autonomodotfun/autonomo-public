@@ -24,7 +24,7 @@ import { checkCashout, GLOAM_SCHEME, GLOAM_USDG, GLOAM_VAULT, grossFor, MAX_TAG,
 // lasts.
 //
 // Env:
-//   GLOAM_CASHOUT_GATEWAYS   Comma-separated gateway slugs that offer it (start with the official APIs). Unset: off.
+//   GLOAM_CASHOUT            Set to "off" to stop offering it everywhere. Unset: every gateway that accepts USDG.
 //   ROBINHOOD_RPC_URL        Optional private RPC, as elsewhere.
 
 /** How long after the 402 a quote can still be redeemed, including retries after a failed call. */
@@ -38,9 +38,9 @@ const SMALL_TAG = 999n;
 
 const { gloamQuotes, gloamPayments } = schema;
 
-export function gloamEnabledFor(slug: string) {
-  const list = process.env.GLOAM_CASHOUT_GATEWAYS?.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean) ?? [];
-  return list.includes(slug.toLowerCase());
+/** Every gateway that accepts USDG offers it, unless GLOAM_CASHOUT=off. */
+export function gloamEnabledFor(gateway: Pick<Gateway, "acceptUsdg">) {
+  return gateway.acceptUsdg && process.env.GLOAM_CASHOUT?.trim().toLowerCase() !== "off";
 }
 
 let client: PublicClient | undefined;

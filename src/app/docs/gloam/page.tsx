@@ -5,7 +5,7 @@ import { Code, Page, Section, Step, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Pay privately with Gloam",
-  description: `Pay Autonomo's official APIs from a private Gloam balance on ${TOKEN.chainName}, so the payment doesn't link back to your wallet.`,
+  description: `Pay any API on Autonomo that accepts USDG from a private Gloam balance on ${TOKEN.chainName}, so the payment doesn't link back to your wallet.`,
 };
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun";
@@ -33,8 +33,9 @@ export default function GloamGuidePage() {
   return (
     <Page title="Pay privately with Gloam">
       <p>
-        <a href={GLOAM}>Gloam</a> lets you hold USDG privately on {TOKEN.chainName}. Autonomo&apos;s{" "}
-        <Link href="/docs/official-apis">official APIs</Link> accept a Gloam cash-out as payment. It&apos;s sent from
+        <a href={GLOAM}>Gloam</a> lets you hold USDG privately on {TOKEN.chainName}. Every API on Autonomo that accepts
+        USDG, including the <Link href="/docs/official-apis">official APIs</Link>, also accepts a Gloam cash-out as
+        payment. It&apos;s sent from
         Gloam&apos;s vault through its relay, so the payment doesn&apos;t link back to your wallet. The API gets paid
         the same as with any other payment.
       </p>
@@ -78,7 +79,7 @@ export default function GloamGuidePage() {
           <li>Each transaction pays for one call. Sending it again is refused.</li>
           <li>If the API fails, you can retry with the same transaction while the quote lasts.</li>
           <li>A cash-out of the wrong amount, or to the wrong address, isn&apos;t accepted, and the money doesn&apos;t come back automatically.</li>
-          <li>It&apos;s on Autonomo&apos;s official APIs for now, not on APIs launched by other creators.</li>
+          <li>APIs priced only in {TOKEN.symbol} don&apos;t offer it, because Gloam pays in USDG.</li>
         </ul>
       </Section>
     </Page>

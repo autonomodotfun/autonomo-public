@@ -93,7 +93,7 @@ export default function LaunchGuidePage() {
           </Step>
           <Step n={5} title="Set the price per call">
             <ul className="list-disc space-y-1 pl-5">
-              <li><b>USDG:</b> a price in dollars, from $0.000001 to $100 per call. USDG payments are one signature for the agent.</li>
+              <li><b>USDG:</b> a price in dollars, from $0.000001 to $100 per call. USDG payments are one signature for the agent. With a USDG price, your API also accepts <Link href="/docs/gloam">private payments through Gloam</Link>, with nothing to set up.</li>
               <li>
                 <b>{TOKEN.symbol}:</b> tick it and enter how many tokens per call. Agents approve Permit2 once before their
                 first {TOKEN.symbol} payment.
