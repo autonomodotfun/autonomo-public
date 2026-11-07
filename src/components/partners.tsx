@@ -18,7 +18,7 @@ export const PARTNERS: Partner[] = [
     href: "https://gloam.trade",
     what: "Private payments",
     about:
-      "Agents can pay Autonomo's official APIs from a private Gloam balance, so the payment doesn't link back to their wallet.",
+      "Agents can pay any API on Autonomo that accepts USDG from a private Gloam balance, so the payment doesn't link back to their wallet.",
     guide: { href: "/docs/gloam", label: "Pay privately with Gloam" },
   },
 ];

@@ -47,7 +47,7 @@ const ROADMAP: Phase[] = [
         done: true,
       },
       { title: "Verified for API providers", note: "Launching stays free. Hold $AUTONOMO and your APIs show as Verified", done: true },
-      { title: "Private payments with Gloam", note: "Official APIs accept a cash-out from a private Gloam balance", done: true },
+      { title: "Private payments with Gloam", note: "Every API that accepts USDG takes a cash-out from a private Gloam balance", done: true },
       { title: "Agent SDK and CLI", note: "With spend limits built in" },
       { title: "Webhooks and payout analytics", note: "For API owners" },
     ],
