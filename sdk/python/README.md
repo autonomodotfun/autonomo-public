@@ -11,8 +11,10 @@ One call for AI agents. Say what you need, and the SDK:
 6. **Returns the answer and a receipt**: which API, how it was paid, the amount and the transaction link.
 
 ```bash
-pip install autonomo
+pip install autonomo-sdk
 ```
+
+The same package is also on PyPI as `autonomo`. Either way, you import it as `autonomo`.
 
 Full examples for each way to pay: [autonomo.fun/docs/sdk](https://autonomo.fun/docs/sdk).
 
