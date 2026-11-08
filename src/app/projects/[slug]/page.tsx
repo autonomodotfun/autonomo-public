@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORY_INFO } from "@/lib/categories";
-import { formatUsd, networkLabel } from "@/lib/networks";
+import { TOKEN } from "@/lib/constants";
+import { formatUsd, isTestnet, networkLabel } from "@/lib/networks";
 import { getProject, getTrackRecords, getVerifiedGateways } from "@/lib/queries";
 import { VerifiedBadge } from "@/components/verified";
-import { compact, NetworkChips } from "@/components/project-row";
+import { Avatar, compact, NetworkChips } from "@/components/project-row";
 import { TrackRecordBlock } from "@/components/track-record";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -49,7 +50,10 @@ export default async function ProjectPage({ params }: Props) {
 
       <header className="mt-6 grid gap-8 border-b border-line pb-8 lg:grid-cols-[1fr_auto]">
         <div className="min-w-0">
-          <h1 className="heading text-4xl normal-case sm:text-5xl">{p.name}</h1>
+          <div className="flex items-center gap-4">
+            <Avatar name={p.name} size="lg" />
+            <h1 className="heading min-w-0 text-4xl normal-case break-words sm:text-5xl">{p.name}</h1>
+          </div>
           {projectSlugs.includes(p.slug) && (
             <p className="mt-2">
               <VerifiedBadge />
@@ -87,12 +91,15 @@ export default async function ProjectPage({ params }: Props) {
             <>
               <Fact label="Starting price" value={<span className="font-mono">{formatUsd(p.minPriceUsd)}</span>} />
               <Fact label="Paid calls, 30 days" value={<span className="font-mono">{compact(p.calls30d)}</span>} />
+              <Fact label="Payers, 30 days" value={<span className="font-mono">{compact(p.payers30d)}</span>} />
             </>
           )}
         </dl>
       </header>
 
       {record && <TrackRecordBlock record={record} />}
+
+      {endpoints.length > 0 && <HowToPay onAutonomo={!!record} networks={p.networks} />}
 
       {endpoints.length > 0 && (
         <section className="mt-10">
@@ -166,6 +173,34 @@ function pathOf(url: string, host: string | null) {
   } catch {
     return url;
   }
+}
+
+/** How an agent pays this API: through Autonomo's gateway, or straight to the provider on its own chain. */
+function HowToPay({ onAutonomo, networks }: { onAutonomo: boolean; networks: string[] }) {
+  const chains = networks.filter((n) => !isTestnet(n)).map(networkLabel);
+  return (
+    <section className="mt-10 rounded-lg border border-line bg-surface p-5">
+      <h2 className="heading text-xl">How to pay</h2>
+      {onAutonomo ? (
+        <p className="mt-2 max-w-3xl text-sm text-muted">
+          This API runs on an Autonomo gateway. Call an endpoint, read the price in the <code>402</code> answer, and pay
+          per call in USDG or {TOKEN.symbol} on {TOKEN.chainName}, with no account or key. See{" "}
+          <Link href="/docs/agents" className="underline hover:text-ink">Use Autonomo from your agent</Link>.
+        </p>
+      ) : (
+        <p className="mt-2 max-w-3xl text-sm text-muted">
+          Call an endpoint, read the price in the <code>402</code> answer, and pay from your own wallet with any x402
+          client{chains.length ? <> on {listOf(chains)}</> : null}. The payment goes straight to the provider: Autonomo
+          lists this API but isn&apos;t part of the payment. See{" "}
+          <Link href="/docs/directory" className="underline hover:text-ink">The x402 directory</Link>.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function listOf(items: string[]) {
+  return items.length < 3 ? items.join(" or ") : `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`;
 }
 
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {

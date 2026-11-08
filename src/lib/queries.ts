@@ -89,7 +89,10 @@ async function searchProjectsFresh(query: ProjectQuery) {
     relevance: rank
       ? [desc(projects.featured), sql`${rank} desc`, desc(projects.calls30d)]
       : [desc(projects.featured), desc(projects.calls30d)],
-    popular: [desc(projects.featured), desc(projects.calls30d), desc(projects.endpointCount)],
+    // Featured tools (facilitators, SDKs) have no calls of their own, so they only lead their own category's list.
+    popular: category
+      ? [desc(projects.featured), desc(projects.calls30d), desc(projects.endpointCount)]
+      : [desc(projects.calls30d), desc(projects.endpointCount)],
     new: [desc(projects.createdAt), desc(projects.id)],
     name: [asc(sql`lower(${projects.name})`)],
     price: [sql`${projects.minPriceUsd} asc nulls last`, desc(projects.calls30d)],
