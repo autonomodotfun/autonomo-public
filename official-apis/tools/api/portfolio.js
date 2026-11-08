@@ -81,7 +81,8 @@ async function portfolio(wallet, days) {
       else {
         // Each lookup gets at most 6 s, so one slow token can't hold up the whole answer.
         const lookup = (async () => {
-          const launch = await findLaunch(token, latest).catch(() => null);
+          // Only recent launches: a wallet can hold many tokens, and each older search costs more requests.
+          const launch = await findLaunch(token, latest, { recentOnly: true }).catch(() => null);
           return launch ? await launchPrice(token, launch, latest).catch(() => null) : null;
         })();
         const last = await Promise.race([lookup, new Promise((r) => setTimeout(() => r(null), 6_000))]);

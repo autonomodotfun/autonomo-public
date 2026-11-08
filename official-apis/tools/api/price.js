@@ -3,7 +3,7 @@
 // USDG is always $1 and WETH tracks ETH; other tokens must come from the launchpad.
 
 import { isAddress } from "viem";
-import { AUTONOMO, authorized, erc20, ethUsd, EXPLORER, findLaunch, launchPrice, rh, sendJson, tokenMeta, USDG, WETH } from "./_lib.js";
+import { AUTONOMO, authorized, erc20, ethUsd, EXPLORER, findLaunch, fullHistory, launchPrice, rh, sendJson, tokenMeta, USDG, WETH } from "./_lib.js";
 
 const cache = new Map();
 
@@ -35,7 +35,7 @@ async function price(token) {
   const latest = await rh.getBlockNumber();
   const launch = await findLaunch(token, latest);
   if (!launch) {
-    return { status: 404, body: { error: "not_found", message: "This token wasn't launched on the Robinhood Chain launchpad in the last ~13 days, so there's no curve price." } };
+    return { status: 404, body: { error: "not_found", message: fullHistory() ? "This token wasn't launched on the Robinhood Chain launchpad, so there's no curve price." : "This token wasn't launched on the Robinhood Chain launchpad in the last ~13 days, so there's no curve price." } };
   }
   const [last, supply] = await Promise.all([
     launchPrice(token, launch, latest),

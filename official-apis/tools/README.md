@@ -19,6 +19,10 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
 
 - Everything is read from public chains (Robinhood Chain RPC; ETH/USD from Chainlink on Base). Launchpad tokens are
   found through the factory's launch event, like the Risk Checker.
+- `ROBINHOOD_RPC_URL` (optional, a paid RPC such as Alchemy): with it, Token Risk and Token Lookup find tokens from
+  the launchpad's whole history (from block 27,000,000). Without it they search only the last ~13 days, since the
+  public RPC caps each log search at 10M blocks and rate limits the many searches an older token needs. Wallet
+  Portfolio prices only recent launches either way.
 - Portfolio discovery scans incoming transfers within a time budget so answers stay well inside the gateway's 25 s.
 - Page reader safety: https only, no credentials, every hop (redirects included) must resolve to a public address,
   max 3 redirects, 2 MB, 10 s, HTML or plain text only.
