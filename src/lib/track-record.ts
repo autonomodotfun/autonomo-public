@@ -14,14 +14,10 @@ export const MIN_OUTSIDE_PAYERS = 3;
 /** Fewer paid attempts than this, and the success rate and speed aren't shown yet. */
 export const MIN_CALLS = 5;
 
-const AUTONOMO_WALLETS = [
-  "0xREDACTED", // team agent demo
-  "0xREDACTED", // team MCP test
-];
-
+/** Autonomo's own test wallets, kept out of outside payers. Comma-separated in TRACK_RECORD_EXCLUDE. */
 export function internalWallets(): Set<string> {
-  const extra = (process.env.TRACK_RECORD_EXCLUDE ?? "").split(",");
-  return new Set([...AUTONOMO_WALLETS, ...extra].map((a) => a.trim().toLowerCase()).filter(Boolean));
+  const listed = (process.env.TRACK_RECORD_EXCLUDE ?? "").split(",");
+  return new Set(listed.map((a) => a.trim().toLowerCase()).filter(Boolean));
 }
 
 /** The wallet that manages the official APIs, so their gateways can be picked out. */
