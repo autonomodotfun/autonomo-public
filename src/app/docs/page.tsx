@@ -166,6 +166,7 @@ export default async function DocsPage() {
             items={[
               ["/docs/directory", "The x402 directory", "What's in it, how to search it and where the data comes from."],
               ["/docs/agents", "Use Autonomo from your agent", "MCP server, your own code, Playground and Telegram."],
+              ["/docs/sdk", "SDK for TypeScript and Python", "One call finds an API and pays, privately with Gloam or on Borro credit."],
               ["/docs/official-apis", "Official APIs", "The APIs Autonomo runs, and the wallets behind them."],
               ["/api-docs", "API reference", "The free discovery API: every endpoint and parameter."],
             ]}

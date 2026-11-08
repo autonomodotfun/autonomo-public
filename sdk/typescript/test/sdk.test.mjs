@@ -85,32 +85,38 @@ test("refuses before signing when today's budget is used up", async () => {
 
 test("private calls never fall back to a public payment", async () => {
   const f = fakeFetch({ accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" })] });
-  const a = new Autonomo({ privateKey: KEY, fetch: f, spendStore: memoryStore(), gloam: { cashOut: async () => assert.fail("no Gloam option, so no cash-out") } });
+  const a = new Autonomo({ privateKey: KEY, fetch: f, spendStore: memoryStore(), gloam: { fetchPaid: async () => assert.fail("no Gloam option, so nothing is paid") } });
   await assert.rejects(a.call("newest launches", { private: true }), (e) => e.code === "no_private_option");
   const b = new Autonomo({ privateKey: KEY, fetch: f, spendStore: memoryStore() });
   await assert.rejects(b.call("newest launches", { private: true }), (e) => e.code === "no_gloam");
 });
 
-test("pays a private call through Gloam and records it as USDG", async () => {
+test("pays a private call through Gloam's gloam_fetch_paid and records it as USDG", async () => {
   const gloamOffer = { scheme: "gloam-cashout", network: "eip155:4663", asset: USDG, amount: "10051", payTo: PAY_TO, extra: { quoteId: "q1" } };
-  const base = fakeFetch({ accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" }), gloamOffer] });
-  const f = async (url, init = {}) => {
-    if (init.headers?.["X-PAYMENT"]) {
-      base.calls.push({ url: String(url), headers: init.headers });
-      return Response.json({ ok: true });
-    }
-    return base(url, init);
-  };
+  const f = fakeFetch({ accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" }), gloamOffer] });
   const store = memoryStore();
-  let bill;
-  const a = new Autonomo({ privateKey: KEY, fetch: f, spendStore: store, gloam: { cashOut: async (b) => ((bill = b), `0x${"cd".repeat(32)}`) } });
+  let args;
+  const hash = `0x${"cd".repeat(32)}`;
+  const a = new Autonomo({
+    fetch: f, // no wallet key: a private call doesn't need one
+    spendStore: store,
+    gloam: { fetchPaid: async (x) => ((args = x), { status: "ok", hash, httpStatus: 200, body: JSON.stringify({ ok: true }) }) },
+  });
   const { data, receipt } = await a.call("newest launches", { private: true });
   assert.deepEqual(data, { ok: true });
-  assert.equal(bill.amount, 10051n);
+  assert.deepEqual(args, { url: "https://autonomo.fun/x/new-launches/launches?limit=10", maxAmount: 0.011051, prefer: "gloam-cashout" });
   assert.equal(receipt.route, "gloam");
   assert.equal(receipt.payer, "private (Gloam)");
   assert.equal(receipt.amount, "0.010051");
-  const sent = JSON.parse(base.calls.at(-1).headers["X-PAYMENT"]);
-  assert.deepEqual(sent, { scheme: "gloam-cashout", txHash: `0x${"cd".repeat(32)}`, quoteId: "q1" });
+  assert.equal(receipt.tx, hash);
   assert.equal(store.get(new Date().toISOString().slice(0, 10)).usdg, 10051n);
+});
+
+test("a Gloam refusal pays nothing and records nothing", async () => {
+  const gloamOffer = { scheme: "gloam-cashout", network: "eip155:4663", asset: USDG, amount: "10051", payTo: PAY_TO, extra: { quoteId: "q1" } };
+  const f = fakeFetch({ accepts: [gloamOffer] });
+  const store = memoryStore();
+  const a = new Autonomo({ privateKey: KEY, fetch: f, spendStore: store, gloam: { fetchPaid: async () => ({ status: "refused", code: "over_daily", message: "over the daily limit" }) } });
+  await assert.rejects(a.call("newest launches", { private: true }), (e) => e.code === "payment_refused" && /over the daily limit/.test(e.message));
+  assert.equal(store.get(new Date().toISOString().slice(0, 10)).usdg, undefined);
 });

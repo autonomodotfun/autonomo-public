@@ -110,7 +110,7 @@ def test_refuses_when_todays_budget_is_used():
 
 def test_private_never_falls_back_to_public():
     client, _ = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"})])
-    a = Autonomo(private_key=KEY, http=client, spend_store=MemoryStore(), gloam_cash_out=lambda bill: pytest.fail("no Gloam option"))
+    a = Autonomo(private_key=KEY, http=client, spend_store=MemoryStore(), gloam_fetch_paid=lambda args: pytest.fail("no Gloam option"))
     with pytest.raises(AutonomoError) as e:
         a.call("newest launches", private=True)
     assert e.value.code == "no_private_option"
@@ -122,17 +122,33 @@ def test_private_never_falls_back_to_public():
 
 def test_pays_privately_through_gloam():
     gloam = {"scheme": "gloam-cashout", "network": "eip155:4663", "asset": USDG, "amount": "10051", "payTo": PAY_TO, "extra": {"quoteId": "q1"}}
-    client, sent = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"}), gloam], on_paid=lambda r: httpx.Response(200, json={"ok": True}))
+    client, _ = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"}), gloam])
     store = MemoryStore()
-    bills = []
-    a = Autonomo(private_key=KEY, http=client, spend_store=store, gloam_cash_out=lambda bill: (bills.append(bill), "0x" + "cd" * 32)[1])
+    calls = []
+    h = "0x" + "cd" * 32
+
+    def fetch_paid(args):
+        calls.append(args)
+        return {"status": "ok", "hash": h, "httpStatus": 200, "body": json.dumps({"ok": True})}
+
+    a = Autonomo(http=client, spend_store=store, gloam_fetch_paid=fetch_paid)  # no wallet key needed
     result = a.call("newest launches", private=True)
     assert result.data == {"ok": True}
-    assert bills[0]["amount"] == 10051
+    assert calls[0] == {"url": "https://autonomo.fun/x/new-launches/launches?limit=10", "maxAmount": 0.011051, "prefer": "gloam-cashout"}
     r = result.receipt
-    assert (r.route, r.payer, r.amount) == ("gloam", "private (Gloam)", "0.010051")
-    assert json.loads(sent[-1].headers["x-payment"]) == {"scheme": "gloam-cashout", "txHash": "0x" + "cd" * 32, "quoteId": "q1"}
+    assert (r.route, r.payer, r.amount, r.tx) == ("gloam", "private (Gloam)", "0.010051", h)
     assert store.get(datetime.now(timezone.utc).strftime("%Y-%m-%d"))["usdg"] == 10051
+
+
+def test_gloam_refusal_pays_and_records_nothing():
+    gloam = {"scheme": "gloam-cashout", "network": "eip155:4663", "asset": USDG, "amount": "10051", "payTo": PAY_TO, "extra": {"quoteId": "q1"}}
+    client, _ = _fake([gloam])
+    store = MemoryStore()
+    a = Autonomo(private_key=KEY, http=client, spend_store=store, gloam_fetch_paid=lambda args: {"status": "refused", "code": "over_daily", "message": "over the daily limit"})
+    with pytest.raises(AutonomoError) as e:
+        a.call("newest launches", private=True)
+    assert e.value.code == "payment_refused" and "over the daily limit" in str(e.value)
+    assert store.get(datetime.now(timezone.utc).strftime("%Y-%m-%d")) == {}
 
 
 def test_signed_usdg_payment_header():

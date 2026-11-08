@@ -19,6 +19,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/docs/directory", label: "The x402 directory" },
       { href: "/docs/agents", label: "Use Autonomo from your agent" },
+      { href: "/docs/sdk", label: "SDK for TypeScript and Python" },
       { href: "/docs/official-apis", label: "Official APIs" },
       { href: "/docs/gloam", label: "Pay privately with Gloam" },
       { href: "/docs/borro", label: "Pay with a Borro credit line" },

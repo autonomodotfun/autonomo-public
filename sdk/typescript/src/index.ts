@@ -58,8 +58,13 @@ export type Limits = {
   daily?: Partial<Record<TokenName, string>>;
 };
 
-/** Pays a Gloam cash-out from your private balance and returns its transaction hash. Wire it to Gloam's SDK or MCP. */
-export type GloamCashOut = (bill: { amount: bigint; amountUsdg: string; payTo: Hex; asset: Hex; url: string }) => Promise<Hex>;
+/**
+ * Runs Gloam's `gloam_fetch_paid` tool (from `npx -y @gloamtrade/mcp`) with these arguments and returns its result:
+ * Gloam cashes out exactly the quoted USDG from your private balance through its relay, retries the request with the
+ * payment, and answers `{ status: "ok", hash, body, httpStatus, … }`. The SDK holds no Gloam keys.
+ */
+export type GloamFetchPaid = (args: { url: string; maxAmount: number; prefer: "gloam-cashout" }) => Promise<GloamResult>;
+export type GloamResult = { status: string; hash?: string; body?: string; httpStatus?: number; message?: string; error?: string; code?: string; paymentHeader?: string };
 
 /** Where today's spending is kept. The default is a JSON file in ~/.autonomo. */
 export type SpendStore = {
@@ -74,7 +79,7 @@ export type AutonomoOptions = {
   payWith?: TokenName | "auto";
   limits?: Limits;
   /** Pay privately through Gloam when a call asks for `private: true`. */
-  gloam?: { cashOut: GloamCashOut };
+  gloam?: { fetchPaid: GloamFetchPaid };
   /** Borrow from a Borro credit line when the wallet is short of USDG. `account` is the line's address. */
   borro?: { account: Hex | string; mcpUrl?: string };
   spendStore?: SpendStore;
@@ -258,7 +263,7 @@ export class Autonomo {
   private readonly perCall: Record<TokenName, bigint>;
   private readonly daily: Record<TokenName, bigint>;
   private readonly store: SpendStore;
-  private readonly gloam?: { cashOut: GloamCashOut };
+  private readonly gloam?: { fetchPaid: GloamFetchPaid };
   private readonly borro?: { account: Hex; mcpUrl: string };
   private readonly chain = defineChain({
     id: CHAIN_ID,
@@ -327,7 +332,8 @@ export class Autonomo {
 
   /** Finds the right API, pays for one call and returns its answer with a receipt. */
   async call<T = unknown>(query: string, opts: CallOptions = {}): Promise<CallResult<T>> {
-    const account = this.account ?? fail("no_wallet", "No wallet set. Pass privateKey (a wallet just for this agent).");
+    if (!opts.private && !this.account) fail("no_wallet", "No wallet set. Pass privateKey (a wallet just for this agent).");
+    const account = this.account as PrivateKeyAccount;
     const { api, url } = await this.resolve(query, opts);
     const required = await this.priceList(url);
     const day = today();
@@ -384,17 +390,22 @@ export class Autonomo {
 
     // Private: Gloam only.
     if (opts.private) {
-      const gloam = this.gloam ?? fail("no_gloam", "private: true needs a Gloam cash-out function (options.gloam.cashOut).");
+      const gloam = this.gloam ?? fail("no_gloam", "private: true needs Gloam set up (options.gloam.fetchPaid).");
       const offer = required.accepts.find((a) => a.scheme === "gloam-cashout") ?? fail("no_private_option", `${api.name} doesn't offer private payment.`);
       const amount = BigInt(offer.amount);
       const why = within(TOKENS.usdg, amount);
       if (why) fail("over_limit", `Not paid: ${why}.`);
-      const payTo = getAddress(offer.payTo);
+      // Gloam asks for its own quote, whose tag can differ by under 0.001 USDG; never more than the per-call cap.
+      const most = amount + 1000n < this.perCall.usdg ? amount + 1000n : this.perCall.usdg;
       return pay("gloam", TOKENS.usdg, amount, async () => {
-        const txHash = await gloam.cashOut({ amount, amountUsdg: formatUnits(amount, 6), payTo, asset: getAddress(offer.asset), url });
-        const header = JSON.stringify({ scheme: "gloam-cashout", txHash, quoteId: offer.extra?.quoteId });
-        const res = await this.fetch(url, { headers: { "X-PAYMENT": header }, signal: AbortSignal.timeout(60_000) });
-        return { res, tx: txHash, extra: { payTo } };
+        const r = await gloam.fetchPaid({ url, maxAmount: Number(formatUnits(most, 6)), prefer: "gloam-cashout" });
+        if (r.status === "paid_not_served") {
+          await this.store.add(day, "usdg", amount);
+          fail("paid_not_served", `Paid through Gloam, but the API didn't answer yet: ${r.message ?? ""} Retry gloam_fetch_paid with this paymentHeader, don't pay again: ${r.paymentHeader ?? "(none)"}`);
+        }
+        if (r.status !== "ok") fail("payment_refused", `Gloam didn't pay: ${r.message ?? r.error ?? r.code ?? r.status}`);
+        const res = new Response(r.body ?? "", { status: r.httpStatus ?? 200 });
+        return { res, tx: r.hash ?? null, extra: { payTo: getAddress(offer.payTo) } };
       });
     }
 

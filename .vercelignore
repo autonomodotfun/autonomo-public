@@ -4,7 +4,6 @@
 .next
 node_modules
 .claude
-examples
+/examples
 mcp
 contracts
-/sdk
