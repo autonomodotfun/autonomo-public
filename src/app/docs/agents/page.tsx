@@ -145,6 +145,11 @@ export default function AgentsGuidePage() {
           Every API that accepts USDG also accepts a cash-out from a private Gloam balance, so the payment doesn&apos;t
           link back to your wallet. See <Link href="/docs/gloam">Pay privately with Gloam</Link>.
         </p>
+        <h3 className="pt-2 font-medium">Paying with a Borro credit line</h3>
+        <p>
+          An agent with a Borro credit line can pay without holding USDG first: it borrows just what it&apos;s short and
+          pays in the same request. See <Link href="/docs/borro">Pay with a Borro credit line</Link>.
+        </p>
       </Section>
 
       <Section id="telegram" title="Agent Playground and Telegram bot">
