@@ -23,6 +23,8 @@
   --color-brand: #ffce00;
   --color-on-brand: #111111;
   --color-warn: #b42318;
+  /* Lightness of the letter on directory avatars: dark on the light theme, bright on the dark one. */
+  --avatar-text-l: 36%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,6 +38,7 @@
     --color-accent: #ffce00;
     --color-accent-soft: #2b2508;
     --color-warn: #ff8a7a;
+    --avatar-text-l: 64%;
   }
 }
 
