@@ -11,12 +11,10 @@
 // This is a heuristic, not advice: a low score doesn't make a token safe.
 
 import { timingSafeEqual } from "node:crypto";
-import { createPublicClient, defineChain, http, isAddress, pad, parseAbi, toHex } from "viem";
+import { createPublicClient, defineChain, http, isAddress, parseAbi, toHex } from "viem";
 import { base } from "viem/chains";
-import { findPool } from "./_lib.js";
+import { findPool, fullHistory, launchLog } from "./_lib.js";
 
-const FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
-const LAUNCHED = "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607"; // topics: token, curve, creator
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const BUY = "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455"; // data: ethIn, tokensOut, fee, fee
 const SELL = "0x8113d738abdcb6b38357e9d53a54a7157861a09031b453651f0fe7fe151f59df"; // data: tokensIn, ethOut, fee, fee
@@ -36,7 +34,6 @@ const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad71
 const signed = (w) => (w >= 2n ** 255n ? w - 2n ** 256n : w);
 
 // Log queries filtered by contract may span millions of blocks; the RPC caps results, so big ranges split in half.
-const LOOKBACK = 9_000_000n; // about 13 days of launch history (~0.125 s blocks)
 const BLOCKS_PER_DAY = 690_000n;
 
 const robinhood = defineChain({
@@ -57,7 +54,6 @@ const feedAbi = parseAbi(["function latestRoundData() view returns (uint80,int25
 
 const CACHE_MS = 60_000;
 const cache = new Map(); // token -> { at, status, body }
-const launchCache = new Map(); // token -> launch log (launches never change)
 
 function authorized(req) {
   const expected = process.env.TOOLS_API_KEY;
@@ -98,14 +94,8 @@ async function curveTrades(curve, from, to) {
   return [...buys, ...sells].sort((a, b) => (order(a) < order(b) ? -1 : order(a) > order(b) ? 1 : 0));
 }
 
-/** The factory's launch event for this token within the lookback window. */
-async function findLaunch(token, latest) {
-  if (launchCache.has(token)) return launchCache.get(token);
-  const logs = await logsBetween({ address: FACTORY, topics: [LAUNCHED, pad(token)] }, latest > LOOKBACK ? latest - LOOKBACK : 0n, latest);
-  const hit = logs[0] ?? null;
-  if (hit) launchCache.set(token, hit);
-  return hit;
-}
+/** The factory's launch event for this token, from anywhere in the launchpad's history. */
+const findLaunch = (token, latest) => launchLog(token, latest);
 
 async function ethUsd() {
   const [round, decimals] = await Promise.all([
@@ -123,7 +113,7 @@ async function check(token) {
   if (!launch) {
     return {
       status: 404,
-      body: { error: "not_found", message: "No launch found for this token on the Robinhood Chain launchpad in the last ~13 days." },
+      body: { error: "not_found", message: fullHistory() ? "No launch found for this token on the Robinhood Chain launchpad." : "No launch found for this token on the Robinhood Chain launchpad in the last ~13 days." },
     };
   }
   const curve = addr(launch.topics[2]);

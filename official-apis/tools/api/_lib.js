@@ -15,7 +15,11 @@ export const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73";
 export const AUTONOMO = "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96";
 const CHAINLINK_ETH_USD_BASE = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70";
 export const BLOCKS_PER_DAY = 690_000n; // ~0.125 s blocks
-const LOOKBACK = 9_000_000n; // ~13 days of launch history
+const LOOKBACK = 9_000_000n; // ~13 days: how far back curve prices look when no launch block is known
+// The launchpad's first launch is at block 27,027,321, so a launch search never needs to look earlier.
+export const LAUNCHPAD_START = 27_000_000n;
+// How far back launch searches look on the public RPC (~13 days), under its 10M-block cap for one contract's logs.
+const SEARCH_SPAN = 9_000_000n;
 
 const robinhood = defineChain({
   id: 4663,
@@ -87,15 +91,41 @@ export async function tokenMeta(token) {
   return meta;
 }
 
-const launchCache = new Map();
-/** The launchpad factory's launch event for a token, or null if it wasn't launched there recently. */
-export async function findLaunch(token, latest) {
+const launchLogs = new Map();
+const misses = new Map();
+const MISS_MS = 60_000;
+
+/** Whether launch searches cover the launchpad's whole history. Only with an RPC of our own (ROBINHOOD_RPC_URL, a
+ * paid plan): checking an old token reads every transfer and trade since its launch, and the public RPC caps each
+ * search at 10M blocks, so months of history become dozens of requests at once and get rate limited. */
+export const fullHistory = () => Boolean(process.env.ROBINHOOD_RPC_URL?.trim());
+
+/** The launchpad factory's launch log for a token, or null if it wasn't launched there (within ~13 days on the
+ * public RPC). With `recentOnly`, always just ~13 days, for callers that look up many tokens in one answer. */
+export async function launchLog(token, latest, { recentOnly = false } = {}) {
   const key = token.toLowerCase();
-  if (launchCache.has(key)) return launchCache.get(key);
-  const logs = await logsBetween({ address: FACTORY, topics: [LAUNCHED, pad(key)] }, latest > LOOKBACK ? latest - LOOKBACK : 0n, latest);
-  const hit = logs[0] ? { curve: addr(logs[0].topics[2]), creator: addr(logs[0].topics[3]), block: BigInt(logs[0].blockNumber), tx: logs[0].transactionHash } : null;
-  if (hit) launchCache.set(key, hit);
-  return hit;
+  if (launchLogs.has(key)) return launchLogs.get(key);
+  const whole = fullHistory() && !recentOnly;
+  const missKey = `${key}:${whole}`;
+  if (Date.now() - (misses.get(missKey) ?? 0) < MISS_MS) return null;
+
+  const recent = latest > SEARCH_SPAN ? latest - SEARCH_SPAN : 0n;
+  const from = whole ? LAUNCHPAD_START : recent > LAUNCHPAD_START ? recent : LAUNCHPAD_START;
+  // Filtered by token, the search returns at most one log, so one request covers any range on a paid RPC.
+  const [hit] = await logsBetween({ address: FACTORY, topics: [LAUNCHED, pad(key)] }, from, latest);
+
+  if (hit) launchLogs.set(key, hit);
+  else {
+    if (misses.size > 5000) misses.clear();
+    misses.set(missKey, Date.now());
+  }
+  return hit ?? null;
+}
+
+/** The launch of a token on the launchpad (creator, curve, block), or null if it wasn't launched there. */
+export async function findLaunch(token, latest, options) {
+  const log = await launchLog(token, latest, options);
+  return log ? { curve: addr(log.topics[2]), creator: addr(log.topics[3]), block: BigInt(log.blockNumber), tx: log.transactionHash } : null;
 }
 
 /** Price in ETH from the latest buy or sell on a curve since `fromBlock`.
