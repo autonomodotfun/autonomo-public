@@ -12,6 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/docs/launch`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/directory`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/agents`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/docs/sdk`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/official-apis`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/token`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/self-hosted`, changeFrequency: "monthly", priority: 0.4 },

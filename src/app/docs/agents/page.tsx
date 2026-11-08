@@ -110,6 +110,11 @@ export default function AgentsGuidePage() {
       </Section>
 
       <Section id="code" title="Pay from your own code">
+        <p>
+          The quickest way is the <Link href="/docs/sdk">SDK for TypeScript and Python</Link>: one call finds the API,
+          pays within your limits, privately with Gloam or on Borro credit if you want, and returns a receipt. To build
+          it yourself, here are the two steps.
+        </p>
         <Step n={1} title="Find APIs to pay for">
           <p>
             Search the catalog through the free discovery API. No key is needed and CORS is open, so it works from

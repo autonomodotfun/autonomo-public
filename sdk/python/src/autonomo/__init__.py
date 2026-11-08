@@ -331,8 +331,11 @@ def find_transactions(value: Any) -> list[dict]:
 
 # ---------- The client ----------
 
-GloamCashOut = Callable[[dict], str]
-"""Pays a Gloam cash-out from your private balance and returns its tx hash. Gets {amount, amount_usdg, pay_to, asset, url}."""
+GloamFetchPaid = Callable[[dict], dict]
+"""Runs Gloam's gloam_fetch_paid tool (from `npx -y @gloamtrade/mcp`) with these arguments ({url, maxAmount, prefer})
+and returns its result: Gloam cashes out exactly the quoted USDG from your private balance through its relay, retries the
+request with the payment, and answers {"status": "ok", "hash": ..., "body": ..., "httpStatus": ...}. The SDK holds no
+Gloam keys."""
 
 
 class Autonomo:
@@ -342,7 +345,7 @@ class Autonomo:
         pay_with: str = "auto",
         per_call: Optional[dict] = None,
         daily: Optional[dict] = None,
-        gloam_cash_out: Optional[GloamCashOut] = None,
+        gloam_fetch_paid: Optional[GloamFetchPaid] = None,
         borro_account: Optional[str] = None,
         borro_mcp_url: str = BORRO_MCP,
         spend_store: Optional[SpendStore] = None,
@@ -362,7 +365,7 @@ class Autonomo:
         dl = {**DEFAULT_DAILY, **(daily or {})}
         self.per_call = {t: _units(pc[t], TOKENS[t].decimals) for t in TOKENS}
         self.daily = {t: _units(dl[t], TOKENS[t].decimals) for t in TOKENS}
-        self.gloam_cash_out = gloam_cash_out
+        self.gloam_fetch_paid = gloam_fetch_paid
         self.borro_account = to_checksum_address(borro_account) if borro_account else None
         self.borro_mcp_url = borro_mcp_url
         self.store: SpendStore = spend_store or FileStore()
@@ -421,7 +424,7 @@ class Autonomo:
         pay_with: Optional[str] = None,
     ) -> CallResult:
         """Finds the right API, pays for one call and returns its answer with a receipt."""
-        if not self._key:
+        if not private and not self._key:
             _fail("no_wallet", "No wallet set. Pass private_key (a wallet just for this agent).")
         api, url = self._resolve(query, input, slug, path)
         required = self._price_list(url)
@@ -475,8 +478,8 @@ class Autonomo:
 
         # Private: Gloam only.
         if private:
-            if not self.gloam_cash_out:
-                _fail("no_gloam", "private=True needs a Gloam cash-out function (gloam_cash_out=...).")
+            if not self.gloam_fetch_paid:
+                _fail("no_gloam", "private=True needs Gloam set up (gloam_fetch_paid=...).")
             offer = next((a for a in required["accepts"] if a["scheme"] == "gloam-cashout"), None)
             if not offer:
                 _fail("no_private_option", f"{api.name} doesn't offer private payment.")
@@ -484,13 +487,19 @@ class Autonomo:
             why = within(TOKENS["usdg"], amount)
             if why:
                 _fail("over_limit", f"Not paid: {why}.")
-            pay_to = to_checksum_address(offer["payTo"])
-            tx_hash = self.gloam_cash_out(
-                {"amount": amount, "amount_usdg": _fmt(amount, 6), "pay_to": pay_to, "asset": to_checksum_address(offer["asset"]), "url": url}
-            )
-            header = json.dumps({"scheme": "gloam-cashout", "txHash": tx_hash, "quoteId": (offer.get("extra") or {}).get("quoteId")})
-            res = self.http.get(url, headers={"X-PAYMENT": header}, timeout=60)
-            return finish("gloam", TOKENS["usdg"], amount, res, tx_hash, {"pay_to": pay_to})
+            # Gloam asks for its own quote, whose tag can differ by under 0.001 USDG; never more than the per-call cap.
+            most = min(amount + 1000, self.per_call["usdg"])
+            r = self.gloam_fetch_paid({"url": url, "maxAmount": float(_fmt(most, 6)), "prefer": "gloam-cashout"})
+            if r.get("status") == "paid_not_served":
+                self.store.add(day, "usdg", amount)
+                _fail(
+                    "paid_not_served",
+                    f"Paid through Gloam, but the API didn't answer yet: {r.get('message', '')} Retry gloam_fetch_paid with this paymentHeader, don't pay again: {r.get('paymentHeader')}",
+                )
+            if r.get("status") != "ok":
+                _fail("payment_refused", f"Gloam didn't pay: {r.get('message') or r.get('error') or r.get('code') or r.get('status')}")
+            res = httpx.Response(r.get("httpStatus") or 200, content=(r.get("body") or "").encode())
+            return finish("gloam", TOKENS["usdg"], amount, res, r.get("hash"), {"pay_to": to_checksum_address(offer["payTo"])})
 
         # Public: the wallet's tokens, then Borro.
         want = pay_with or self.pay_with

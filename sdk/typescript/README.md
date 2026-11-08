@@ -14,6 +14,8 @@ One call for AI agents. Say what you need, and the SDK:
 npm install autonomo-sdk
 ```
 
+Full examples for each way to pay: [autonomo.fun/docs/sdk](https://autonomo.fun/docs/sdk).
+
 ```ts
 import { Autonomo } from "autonomo-sdk";
 
@@ -58,22 +60,25 @@ that.
 
 ## Private payments with Gloam
 
-Pass a function that cashes out from your Gloam private balance and returns the transaction hash, using Gloam's own
-SDK or MCP server. The SDK holds no Gloam keys.
+`private: true` pays from a private Gloam balance through Gloam's own MCP server, `@gloamtrade/mcp`, running on your
+machine with its key and limits in `~/.gloam/agent.env`. The SDK calls its `gloam_fetch_paid` tool; Gloam cashes out
+exactly the price through its relay and calls the API with it. The SDK holds no Gloam keys, and no wallet key is needed.
+See the [SDK guide](https://autonomo.fun/docs/sdk) for the setup and a full example.
 
 ```ts
 const autonomo = new Autonomo({
-  privateKey,
   gloam: {
-    // bill: { amount: 10278n, amountUsdg: "0.010278", payTo, asset, url }
-    cashOut: async (bill) => myGloamWallet.cashOut(bill.amount, bill.payTo), // returns the tx hash
+    fetchPaid: async (args) => {
+      const out = await gloam.callTool({ name: "gloam_fetch_paid", arguments: args }); // an MCP client for @gloamtrade/mcp
+      return JSON.parse((out.content as Array<{ text: string }>)[0].text);
+    },
   },
 });
 await autonomo.call("newest launches", { private: true });
 ```
 
-A private call only ever pays through Gloam. If the API doesn't offer it, or no cash-out function is set, it's refused,
-never sent as a public payment. The price includes Gloam's 0.5% cash-out fee.
+A private call only ever pays through Gloam. If the API doesn't offer it, or Gloam isn't set up, it's refused, never
+sent as a public payment. The price includes Gloam's 0.5% cash-out fee.
 
 ## Borrowing with Borro
 

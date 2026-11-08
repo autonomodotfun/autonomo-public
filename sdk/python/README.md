@@ -14,6 +14,8 @@ One call for AI agents. Say what you need, and the SDK:
 pip install autonomo
 ```
 
+Full examples for each way to pay: [autonomo.fun/docs/sdk](https://autonomo.fun/docs/sdk).
+
 ```python
 import os
 from autonomo import Autonomo
@@ -55,20 +57,22 @@ that.
 
 ## Private payments with Gloam
 
-Pass a function that cashes out from your Gloam private balance and returns the transaction hash, using Gloam's own
-SDK or MCP server. The SDK holds no Gloam keys.
+`private=True` pays from a private Gloam balance through Gloam's own MCP server, `@gloamtrade/mcp`, running on your
+machine with its key and limits in `~/.gloam/agent.env`. The SDK calls its `gloam_fetch_paid` tool; Gloam cashes out
+exactly the price through its relay and calls the API with it. The SDK holds no Gloam keys, and no wallet key is needed.
+See the [SDK guide](https://autonomo.fun/docs/sdk) for the setup and a full example (it uses `pip install mcp`).
 
 ```python
-def cash_out(bill):
-    # bill: {"amount": 10278, "amount_usdg": "0.010278", "pay_to": "0x…", "asset": "0x…", "url": "…"}
-    return my_gloam_wallet.cash_out(bill["amount"], bill["pay_to"])   # returns the tx hash
+def fetch_paid(args):   # runs gloam_fetch_paid on an MCP session with @gloamtrade/mcp
+    out = asyncio.run_coroutine_threadsafe(gloam.call_tool("gloam_fetch_paid", args), loop).result()
+    return json.loads(out.content[0].text)
 
-autonomo = Autonomo(private_key=..., gloam_cash_out=cash_out)
+autonomo = Autonomo(gloam_fetch_paid=fetch_paid)
 autonomo.call("newest launches", private=True)
 ```
 
-A private call only ever pays through Gloam. If the API doesn't offer it, or no cash-out function is set, it's refused,
-never sent as a public payment. The price includes Gloam's 0.5% cash-out fee.
+A private call only ever pays through Gloam. If the API doesn't offer it, or Gloam isn't set up, it's refused, never
+sent as a public payment. The price includes Gloam's 0.5% cash-out fee.
 
 ## Borrowing with Borro
 
