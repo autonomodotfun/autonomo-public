@@ -1,0 +1,21 @@
+{
+  "name": "autonomo-sdk",
+  "version": "0.1.0",
+  "description": "One call for AI agents: find the right paid API on Autonomo, pay in USDG or $AUTONOMO (privately through Gloam, or on Borro credit), within spending caps, and get a receipt.",
+  "homepage": "https://autonomo.fun",
+  "author": "Autonomo (https://autonomo.fun)",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": ["x402", "autonomo", "ai-agents", "robinhood-chain", "usdg", "payments", "gloam", "borro"],
+  "dependencies": { "viem": "2.57.12" },
+  "devDependencies": { "typescript": "7.0.2", "@types/node": "26.6.5" }
+}

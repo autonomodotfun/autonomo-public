@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "autonomo"
+version = "0.1.0"
+description = "One call for AI agents: find the right paid API on Autonomo, pay in USDG or $AUTONOMO (privately through Gloam, or on Borro credit), within spending caps, and get a receipt."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Autonomo" }]
+keywords = ["x402", "autonomo", "ai-agents", "robinhood-chain", "usdg", "payments", "gloam", "borro"]
+dependencies = ["eth-account>=0.13", "httpx>=0.27"]
+
+[project.urls]
+Homepage = "https://autonomo.fun"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autonomo"]
