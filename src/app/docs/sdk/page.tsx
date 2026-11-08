@@ -45,9 +45,10 @@ export default function SdkGuidePage() {
 
       <Section title="Install">
         <Code code="npm install autonomo-sdk" lang="bash" />
-        <Code code="pip install autonomo" lang="bash" />
+        <Code code="pip install autonomo-sdk" lang="bash" />
         <p>
-          TypeScript needs Node 20 or later, Python 3.10 or later. Make a <b>new wallet just for your agent</b> and keep only
+          TypeScript needs Node 20 or later, Python 3.10 or later. The Python SDK is also on PyPI as <code>autonomo</code>;
+          either way, you import it from <code>autonomo</code>. Make a <b>new wallet just for your agent</b> and keep only
           what it may spend in it. Most APIs cost 0.01 USDG, so 1 USDG is about 100 calls. Paying in {TOKEN.symbol} needs a
           little ETH once, for a Permit2 approval.
         </p>

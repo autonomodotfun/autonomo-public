@@ -7,7 +7,10 @@ caps, and return the answer with a receipt.
 | | Package | Folder |
 | --- | --- | --- |
 | TypeScript | `autonomo-sdk` on npm | [typescript](typescript) |
-| Python | `autonomo` on PyPI | [python](python) |
+| Python | `autonomo-sdk` on PyPI (also as `autonomo`) | [python](python) |
+
+`autonomo-sdk` on PyPI is a second name with no code of its own ([python-alias](python-alias)): it installs
+`autonomo`, so the install matches npm.
 
 Both build the x402 payment themselves (EIP-3009 for USDG, Permit2 for $AUTONOMO), so one call can switch between
 routes. Their payment headers match `@x402/core`'s field for field, and the two SDKs sign the same payment

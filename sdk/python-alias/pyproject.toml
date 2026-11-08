@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+# A second name for the Autonomo Python SDK, to match the npm package (autonomo-sdk).
+# It holds no code: installing it installs `autonomo`, and you still `from autonomo import Autonomo`.
+[project]
+name = "autonomo-sdk"
+version = "0.1.0"
+description = "Another name for the Autonomo Python SDK (pip install autonomo): one call for AI agents to find, pay for and get a receipt from paid APIs on Autonomo."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Autonomo" }]
+keywords = ["x402", "autonomo", "ai-agents", "robinhood-chain", "usdg", "payments"]
+dependencies = ["autonomo>=0.1.0"]
+
+[project.urls]
+Homepage = "https://autonomo.fun"
+Documentation = "https://autonomo.fun/docs/sdk"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
