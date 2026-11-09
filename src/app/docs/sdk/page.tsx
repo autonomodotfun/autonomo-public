@@ -11,10 +11,27 @@ export const metadata: Metadata = {
 };
 
 // The examples on this page are the files in sdk/*/examples, which are type-checked and run against the live site.
-const example = (lang: "typescript" | "python", name: string) => {
-  const file = join(process.cwd(), "sdk", lang, "examples", `${name}.${lang === "typescript" ? "ts" : "py"}`);
-  return readFileSync(file, "utf8").replace(/\r\n/g, "\n").trim();
-};
+const exampleFile = (lang: "typescript" | "python", file: string) =>
+  readFileSync(join(process.cwd(), "sdk", lang, "examples", file), "utf8").replace(/\r\n/g, "\n").trim();
+const example = (lang: "typescript" | "python", name: string) => exampleFile(lang, `${name}.${lang === "typescript" ? "ts" : "py"}`);
+
+const TRY_SETUP = `mkdir try-autonomo && cd try-autonomo
+npm init -y
+npm install autonomo-sdk @modelcontextprotocol/sdk`;
+const TRY_KEYS = `# macOS and Linux
+export AUTONOMO_WALLET_KEY=0x…
+
+# Windows PowerShell
+$env:AUTONOMO_WALLET_KEY = "0x…"`;
+const TRY_BORRO = `# macOS and Linux
+export AUTONOMO_WALLET_KEY=0x…   # the agent wallet set on the credit line
+export BORRO_CREDIT_LINE=0x…     # the credit line
+node try-every-route.mjs borro
+
+# Windows PowerShell
+$env:AUTONOMO_WALLET_KEY = "0x…"
+$env:BORRO_CREDIT_LINE = "0x…"
+node try-every-route.mjs borro`;
 
 const GLOAM_ENV = `GLOAM_NETWORK=robinhood-mainnet
 GLOAM_AGENT_PRIVATE_KEY=0x…
@@ -80,7 +97,7 @@ export default function SdkGuidePage() {
         </Step>
       </Section>
 
-      <Section title="Pay privately with Gloam">
+      <Section id="pay-privately-with-gloam" title="Pay privately with Gloam">
         <p>
           With <code>private: true</code> (<code>private=True</code>), the call is paid from a{" "}
           <Link href="/docs/gloam">private Gloam balance</Link>, so it doesn&apos;t link back to your wallet. The SDK hands
@@ -110,9 +127,13 @@ export default function SdkGuidePage() {
         </Step>
         <ul className="list-disc space-y-1 pl-5">
           <li>A private call is only ever paid through Gloam. If the API doesn&apos;t offer it, the call is refused, never paid publicly.</li>
-          <li>The price includes Gloam&apos;s 0.5% cash-out fee, so 0.01 USDG becomes about 0.0101.</li>
+          <li>The price includes Gloam&apos;s cash-out fee, so 0.01 USDG becomes about 0.0105.</li>
           <li>What stays public: the amount, the API&apos;s payment address and the time. What stays private: which wallet paid.</li>
-          <li>On Windows, start the server with <code>command: &quot;cmd&quot;</code> and <code>args: [&quot;/c&quot;, &quot;npx&quot;, &quot;-y&quot;, &quot;@gloamtrade/mcp&quot;]</code>.</li>
+          <li>
+            Gloam builds the payment&apos;s proofs on your machine, which can take a minute or two. MCP clients give up after
+            60 seconds by default, so the examples wait up to 5 minutes.
+          </li>
+          <li>On Windows, <code>npx</code> is a script, so the TypeScript example starts the server through <code>cmd /c</code>.</li>
         </ul>
       </Section>
 
@@ -133,6 +154,95 @@ export default function SdkGuidePage() {
           <li>The receipt&apos;s route is <code>borro</code> when it borrowed, with the borrow transaction, or <code>usdg</code> when the wallet already had enough.</li>
           <li>Repaying the line is between you and Borro.</li>
         </ul>
+      </Section>
+
+      <Section title="Try every route yourself">
+        <p>
+          One script tries each way to pay with one small call to{" "}
+          <Link href="/projects/new-launches">New Launches</Link>: 0.01 USDG, or 100 {TOKEN.symbol}. Each command prints
+          the receipt with its transaction link, so you can check what happened on-chain. It&apos;s capped at 0.02 USDG a
+          call and 0.10 USDG a day. It runs on Node, which Gloam&apos;s server needs anyway; the Python examples above do
+          the same things.
+        </p>
+        <Step n={1} title="Set up a folder">
+          <Code code={TRY_SETUP} lang="bash" />
+          <p>
+            Save the script below in it as <code>try-every-route.mjs</code>, then check it works. <code>quote</code> is
+            free and needs no wallet: it shows the API the calls will use and every price it takes.
+          </p>
+          <Code code="node try-every-route.mjs quote" lang="bash" />
+        </Step>
+        <Step n={2} title="Pay from a wallet: usdg and autonomo">
+          <p>
+            Use a <b>new wallet</b> with a few cents in it: 0.01 USDG for <code>usdg</code>, and 100 {TOKEN.symbol} plus
+            a little ETH (once, for the Permit2 approval) for <code>autonomo</code>. Set its key in the terminal only,
+            never in a file you share or commit.
+          </p>
+          <Code code={TRY_KEYS} lang="bash" />
+          <Code code={"node try-every-route.mjs usdg\nnode try-every-route.mjs autonomo"} lang="bash" />
+          <p>
+            On Blockscout, the token moves from your wallet to the API&apos;s payment address. Autonomo&apos;s facilitator
+            sends the transaction and pays the gas, so your wallet spends no ETH on it. Anyone can see this wallet paid.
+          </p>
+        </Step>
+        <Step n={3} title="Pay privately: gloam">
+          <p>Before you start:</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              Set up <code>~/.gloam/agent.env</code> as in <a href="#pay-privately-with-gloam">Pay privately with Gloam</a>.
+              Its key is the wallet Gloam deposits from. It holds the USDG to deposit and a little ETH for the deposit&apos;s
+              gas. This step needs no <code>AUTONOMO_WALLET_KEY</code>.
+            </li>
+            <li>
+              Gloam&apos;s own limits must allow the payment: <code>USDG</code> as the asset, at least 0.011 per payment,
+              and recipients <code>any</code>. The settings in that section do.
+            </li>
+            <li>
+              <b>The deposit is public.</b> Anyone can see that the key&apos;s wallet put USDG into Gloam&apos;s vault.
+              What stays private is which payments it made from there. Use a wallet of its own for Gloam if that matters.
+            </li>
+          </ul>
+          <Code code={"node try-every-route.mjs gloam-shield 0.05\nnode try-every-route.mjs gloam-balance\nnode try-every-route.mjs gloam"} lang="bash" />
+          <p>
+            Deposit, check the balance shows as unspent, then pay. The payment takes a minute or two while Gloam builds
+            its proofs on your machine. On Blockscout, Gloam&apos;s vault pays the API, sent by Gloam&apos;s relayer:
+            your wallet isn&apos;t in the transaction.
+          </p>
+          <p>
+            If it says <code>paid_not_served</code>, Gloam has paid but the API hadn&apos;t answered yet.{" "}
+            <b>Don&apos;t run <code>gloam</code> again</b>, which would pay a second time. Pass the payment header it
+            printed instead:
+          </p>
+          <Code code="node try-every-route.mjs gloam-retry <paymentHeader>" lang="bash" />
+        </Step>
+        <Step n={4} title="Borrow and pay: borro">
+          <p>Before you start:</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              A credit line, opened from an <b>owner wallet</b> as in{" "}
+              <Link href="/docs/borro#open-a-credit-line">Open a credit line</Link>: buy a little CREDIT on Uniswap with
+              USDG, post it as collateral on Borro with nothing borrowed, set the <b>agent wallet</b>, and tick{" "}
+              <b>Let the agent pay its x402 bills</b>. It needs room to borrow 0.01 USDG today, under the line&apos;s
+              ceiling and daily limit.
+            </li>
+            <li>
+              <code>AUTONOMO_WALLET_KEY</code> is the <b>agent wallet set on the line</b>, not the line&apos;s owner, and{" "}
+              <code>BORRO_CREDIT_LINE</code> is the line&apos;s address.
+            </li>
+            <li>
+              The agent wallet must be <b>short of USDG</b>. With 0.01 USDG or more it just pays, and the receipt says{" "}
+              <code>usdg</code>, not <code>borro</code>. A second wallet, with no USDG left over from step 2, is simplest.
+            </li>
+            <li>It needs a little ETH for the borrow transaction&apos;s gas: about 0.00003 ETH.</li>
+          </ul>
+          <Code code={TRY_BORRO} lang="bash" />
+          <p>
+            It prints two transactions. The borrow: the credit line lends what the wallet is short (all 0.01 when it holds
+            none) to the agent wallet. Then the payment from that wallet to the API, a few seconds later. The line now owes
+            what was borrowed, plus a little interest, until you repay it on Borro.
+          </p>
+        </Step>
+        <Code code={exampleFile("typescript", "try-every-route.mjs")} lang="try-every-route.mjs" />
       </Section>
 
       <Section title="Limits">

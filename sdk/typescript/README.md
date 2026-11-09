@@ -69,7 +69,8 @@ See the [SDK guide](https://autonomo.fun/docs/sdk) for the setup and a full exam
 const autonomo = new Autonomo({
   gloam: {
     fetchPaid: async (args) => {
-      const out = await gloam.callTool({ name: "gloam_fetch_paid", arguments: args }); // an MCP client for @gloamtrade/mcp
+      // gloam: an MCP client for @gloamtrade/mcp. A private payment can take a few minutes, so wait up to 5.
+      const out = await gloam.callTool({ name: "gloam_fetch_paid", arguments: args }, undefined, { timeout: 300_000 });
       return JSON.parse((out.content as Array<{ text: string }>)[0].text);
     },
   },
@@ -78,7 +79,7 @@ await autonomo.call("newest launches", { private: true });
 ```
 
 A private call only ever pays through Gloam. If the API doesn't offer it, or Gloam isn't set up, it's refused, never
-sent as a public payment. The price includes Gloam's 0.5% cash-out fee.
+sent as a public payment. The price includes Gloam's cash-out fee (about 0.0105 USDG for a 0.01 call).
 
 ## Borrowing with Borro
 

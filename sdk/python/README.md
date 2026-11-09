@@ -66,7 +66,8 @@ See the [SDK guide](https://autonomo.fun/docs/sdk) for the setup and a full exam
 
 ```python
 def fetch_paid(args):   # runs gloam_fetch_paid on an MCP session with @gloamtrade/mcp
-    out = asyncio.run_coroutine_threadsafe(gloam.call_tool("gloam_fetch_paid", args), loop).result()
+    call = gloam.call_tool("gloam_fetch_paid", args, read_timeout_seconds=timedelta(minutes=5))  # can take minutes
+    out = asyncio.run_coroutine_threadsafe(call, loop).result()
     return json.loads(out.content[0].text)
 
 autonomo = Autonomo(gloam_fetch_paid=fetch_paid)
@@ -74,7 +75,7 @@ autonomo.call("newest launches", private=True)
 ```
 
 A private call only ever pays through Gloam. If the API doesn't offer it, or Gloam isn't set up, it's refused, never
-sent as a public payment. The price includes Gloam's 0.5% cash-out fee.
+sent as a public payment. The price includes Gloam's cash-out fee (about 0.0105 USDG for a 0.01 call).
 
 ## Borrowing with Borro
 

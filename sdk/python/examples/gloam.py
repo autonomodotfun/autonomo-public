@@ -2,6 +2,7 @@
 It reads its key and limits from ~/.gloam/agent.env (GLOAM_NETWORK=robinhood-mainnet). Needs `pip install mcp`."""
 import asyncio
 import json
+from datetime import timedelta
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -16,7 +17,9 @@ async def main():
         loop = asyncio.get_running_loop()
 
         def fetch_paid(args):
-            out = asyncio.run_coroutine_threadsafe(gloam.call_tool("gloam_fetch_paid", args), loop).result()
+            # A private payment builds its proofs on this machine and can take a few minutes: wait up to 5.
+            call = gloam.call_tool("gloam_fetch_paid", args, read_timeout_seconds=timedelta(minutes=5))
+            out = asyncio.run_coroutine_threadsafe(call, loop).result()
             return json.loads(out.content[0].text)
 
         autonomo = Autonomo(gloam_fetch_paid=fetch_paid)

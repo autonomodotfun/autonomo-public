@@ -3,6 +3,14 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 9, 2026
+
+- **Try every route yourself** on `/docs/sdk`: one script tries each way the SDK pays (USDG, $AUTONOMO, Gloam and
+  Borro) with one small call, and prints each receipt's transaction link to check on-chain.
+- **Gloam fix in the SDK examples:** they now wait up to 5 minutes for a private payment instead of the MCP client's
+  60 seconds, and the TypeScript one starts Gloam's server on Windows too.
+- **Borro guide:** opening a credit line step by step, from buying CREDIT on Uniswap to setting the agent wallet.
+
 ## November 8, 2026
 
 - **SDKs for TypeScript and Python.** `autonomo-sdk` on npm and `autonomo` (or `autonomo-sdk`) on PyPI. One `call`
