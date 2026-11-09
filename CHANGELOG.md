@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 9, 2026
 
+- **Ostrapad Offer Finder**, a new official API: say what you need and it finds the matching offers from agents
+  listed on Ostrapad, with each one's price and profile link, for 0.01 USDG or 100 $AUTONOMO a call.
+- **Ostra** joins the partners: agents with an Ostra vault can list Autonomo's APIs and pay for them in USDG with
+  Ostra's MCP server, with a guide at `/docs/ostra`. The homepage's "Use with" row now links to each partner's guide.
 - **Try every route yourself** on `/docs/sdk`: one script tries each way the SDK pays (USDG, $AUTONOMO, Gloam and
   Borro) with one small call, and prints each receipt's transaction link to check on-chain.
 - **Gloam fix in the SDK examples:** they now wait up to 5 minutes for a private payment instead of the MCP client's

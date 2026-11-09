@@ -24,11 +24,11 @@ export default function PartnersPage() {
               </a>
             </h2>
             <p className="mt-2 text-sm text-muted">{p.about}</p>
-            {p.guide && (
-              <Link href={p.guide.href} className="mt-3 inline-block text-sm">
-                {p.guide.label} →
+            {p.guides?.map((g) => (
+              <Link key={g.href} href={g.href} className="mt-3 mr-4 inline-block text-sm">
+                {g.label} →
               </Link>
-            )}
+            ))}
           </div>
         ))}
       </div>
