@@ -127,6 +127,7 @@ const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
     const url = q.match(HTTPS_URL)?.[0]?.replace(/[).,!?]+$/, "");
     return url ? `/page?url=${encodeURIComponent(url)}` : null;
   },
+  "ostrapad-offer-finder": (q) => `/offers?q=${encodeURIComponent(q.trim().slice(0, 200))}`,
 };
 
 // The path to call after /x/<slug>, shown to outside agents (MCP server, /api/v1/gateways).
@@ -138,6 +139,7 @@ export const GATEWAY_USAGE: Record<string, string> = {
   "tx-explainer": "/tx/<transaction hash>",
   "wallet-portfolio": "/portfolio/<wallet address>",
   "page-reader": "/page?url=<url-encoded https:// link>",
+  "ostrapad-offer-finder": "/offers?q=<what you need done>",
 };
 
 // What each gateway needs when the question doesn't include it.
@@ -158,6 +160,7 @@ const EXAMPLE_QUESTIONS: Record<string, string> = {
   "tx-explainer": "Explain transaction 0x7bd85b4da40a3cf8f5445faa3affac958661f33e4f3790abe288161af6615f07",
   "wallet-portfolio": "What does wallet 0xde87838695ba7151ae93ca24c96b2f5334f4988b hold?",
   "page-reader": "Read this page: https://autonomo.fun/docs",
+  "ostrapad-offer-finder": "Find an Ostrapad agent that writes a protocol risk report",
 };
 
 export function exampleQuestion(slug: string, name: string) {
@@ -175,6 +178,7 @@ export function intentKeywords(question: string) {
   const hasAddress = ADDRESS.test(question.replace(TX_HASH, " "));
   if (TX_HASH.test(question)) extra.push("transaction", "explain", "explainer");
   if (HTTPS_URL.test(question)) extra.push("page", "read", "reader", "text");
+  if (/\b(ostrapad|hire|freelancers?)\b/i.test(question)) extra.push("ostrapad", "offer", "finder");
   if (/\b(safe|rug|risk|scam|legit)\b/i.test(question)) extra.push("risk", "rug");
   else if (hasAddress && /\b(wallet|portfolio|holdings?|holds?|balances?|owns?)\b/i.test(question)) extra.push("wallet", "portfolio");
   else if (hasAddress) extra.push("token", "price", "lookup");
@@ -200,6 +204,13 @@ export function answerFrom(data: unknown): string {
       ].filter(Boolean).join(" · ");
       return [`${name} rug risk: ${d.risk.level.toUpperCase()} (score ${d.risk.score})`, ...flags, facts, "Heuristic from on-chain data, not financial advice."]
         .filter(Boolean).join("\n");
+    }
+    if (Array.isArray(d.offers) && typeof d.listedAgents === "number") {
+      const lines = d.offers.slice(0, 5).map((m: Record<string, any>, i: number) => {
+        const o = m.offer ?? {};
+        return `${i + 1}. ${o.title} by ${m.agent?.name ?? `agent ${m.agent?.agentId}`} · ${o.priceUsdg} USDG · ${o.delivers ?? ""}\n   ${m.record?.summary ?? ""}\n   ${m.ostrapad ?? ""}`;
+      });
+      return [`${d.matches} matching offer${d.matches === 1 ? "" : "s"} on Ostrapad:`, ...lines, "Order from an Ostra vault with Ostra's MCP (pad_order); the budget waits in escrow and comes back if the work is rejected."].join("\n");
     }
     if (Array.isArray(d.launches)) {
       if (!d.launches.length) return "No new launches found right now.";

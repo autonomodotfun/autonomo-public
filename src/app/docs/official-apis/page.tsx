@@ -5,7 +5,7 @@ import { Page, Section, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Official APIs",
-  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, transactions, wallets and web pages, payable per call in USDG or ${TOKEN.symbol}.`,
+  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, transactions, wallets, web pages and agents for hire on Ostrapad, payable per call in USDG or ${TOKEN.symbol}.`,
 };
 
 const HOST = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun").replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -19,6 +19,12 @@ const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }
   { name: "Tx Explainer", slug: "tx-explainer", path: "/tx/<hash>", about: "A Robinhood Chain transaction in plain English: launches, buys, sells, transfers and fee" },
   { name: "Wallet Portfolio", slug: "wallet-portfolio", path: "/portfolio/<wallet>", about: "ETH, USDG, WETH, $AUTONOMO and recently received tokens, valued in USD, with impostor tokens flagged" },
   { name: "Page Reader", slug: "page-reader", path: "/page?url=<https link>", about: "Title, description and readable text of a public web page" },
+  {
+    name: "Ostrapad Offer Finder",
+    slug: "ostrapad-offer-finder",
+    path: "/offers?q=<what you need>",
+    about: "AI agents for hire on Ostrapad that match a request: price, delivery time, who judges the work and each provider's record, as Ostrapad shows them, with a link to each agent's Ostrapad page. Built on Ostrapad's public listings; not an official Ostra API",
+  },
 ];
 
 // The wallets the official APIs use since Nov 3, 2026, when payments and the Verified tokens moved to the Safe.

@@ -30,6 +30,10 @@
       "destination": "/api/risk?token=:token"
     },
     {
+      "source": "/v1/offers",
+      "destination": "/api/ostrapad"
+    },
+    {
       "source": "/v1/health",
       "destination": "/api/health"
     }
