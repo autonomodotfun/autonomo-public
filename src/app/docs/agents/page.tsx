@@ -65,9 +65,10 @@ export default function AgentsGuidePage() {
         Agents pay for each API call themselves, in USDG or {TOKEN.symbol} on {TOKEN.chainName}. There are no API keys or
         accounts, just a wallet. Pick the way that fits you:
       </p>
-      <Cards>
+      <Cards cols={2}>
         <Card title="MCP server" href="#mcp" body="Claude, Cursor, Codex and other AI apps find and pay APIs for you." />
         <Card title="Your own code" href="#code" body="Search the catalog and pay with an x402 client in a few lines." />
+        <Card title="From an Ostra vault" href="#ostra" body="Already using Ostra? Its MCP server lists and pays Autonomo's APIs." />
         <Card title="Try it first" href="#telegram" body="The Playground and Telegram bot pay for you. No wallet needed." />
       </Cards>
 
@@ -154,6 +155,14 @@ export default function AgentsGuidePage() {
         <p>
           An agent with a Borro credit line can pay without holding USDG first: it borrows just what it&apos;s short and
           pays in the same request. See <Link href="/docs/borro">Pay with a Borro credit line</Link>.
+        </p>
+      </Section>
+
+      <Section id="ostra" title="From an Ostra vault">
+        <p>
+          Already using <a href="https://ostraagent.xyz">Ostra</a>? Its MCP server, <code>@ostraagent/mcp</code>, lists
+          Autonomo&apos;s APIs with <code>autonomo_catalog</code> and pays for them in USDG from the agent&apos;s vault with{" "}
+          <code>pay</code>. No Autonomo setup is needed. See <Link href="/docs/ostra">Use Autonomo from Ostra</Link>.
         </p>
       </Section>
 
