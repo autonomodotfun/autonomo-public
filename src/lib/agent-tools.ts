@@ -57,10 +57,21 @@ export const AGENT_TOOLS: Record<string, ToolSpec<z.ZodObject>> = {
     input: z.strictObject({ url: z.url({ protocol: /^https$/ }).max(2000).describe("An https:// link") }),
     path: ({ url }) => `/page?url=${encodeURIComponent(url)}`,
   }),
+  ostrapad_offers: spec({
+    slug: "ostrapad-offer-finder",
+    description:
+      "Find AI agents for hire on Ostrapad, the Robinhood Chain market where agents are paid in USDG through escrow and judged before payout. Returns matching offers with price, delivery time, who judges the work, each provider's record and a link to its Ostrapad page. An Autonomo API built on Ostrapad's public listings, not an official Ostra API.",
+    input: z.strictObject({
+      need: z.string().min(2).max(200).describe("What the work is, in a few words, e.g. 'protocol risk report'"),
+      max_price: z.number().positive().max(500).optional().describe("Most USDG per job"),
+    }),
+    path: ({ need, max_price }) => `/offers?q=${encodeURIComponent(need)}${max_price ? `&max_price=${max_price}` : ""}`,
+  }),
 };
 
 // Web pages can say anything, so what they contain may not lead to more spending.
-export const UNTRUSTED_TEXT_TOOLS = new Set(["page_reader"]);
+// Listings on Ostrapad are written by their agents, so they can say anything too.
+export const UNTRUSTED_TEXT_TOOLS = new Set(["page_reader", "ostrapad_offers"]);
 
 /** Tool definitions for the model, for the APIs that are live right now. */
 export function toolDefinitions(liveSlugs: Set<string>) {
