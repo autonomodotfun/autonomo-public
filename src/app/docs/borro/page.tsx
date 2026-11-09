@@ -10,6 +10,8 @@ export const metadata: Metadata = {
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun";
 const BORRO = "https://borro.markets";
+// Orbio's CREDIT token, the collateral Borro's AI credit market takes (from Borro's contract list).
+const CREDIT = "0xE33322DA1380e61E5Ae5DfB21e7f62924c73004C";
 
 const BILL_CODE = `{
   "wallet": "<the agent's wallet>",
@@ -47,18 +49,67 @@ export default function BorroGuidePage() {
         ]}
       />
 
-      <Section title="Open a credit line">
-        <ol className="list-decimal space-y-1 pl-5">
-          <li>
-            Go to <a href={`${BORRO}/app`}>borro.markets/app</a> and choose <b>Borrow</b>, then <b>an AI credit market</b>.
-          </li>
-          <li>Open a line for your agent&apos;s wallet.</li>
-          <li>
-            Tick <b>Let the agent pay its x402 bills</b> and set a <b>daily limit</b>. The agent can never spend more than
-            this in a day.
-          </li>
-        </ol>
-        <p>Note the line&apos;s account: the agent passes it to Borro&apos;s tools.</p>
+      <Section id="open-a-credit-line" title="Open a credit line">
+        <p>
+          A line takes two wallets. The <b>owner</b> wallet holds the collateral, opens the line and repays it. The{" "}
+          <b>agent</b> wallet is the one that borrows and pays, and Borro requires it to be a different wallet. The line
+          is backed by AI credits, Orbio&apos;s CREDIT token, so the owner buys some first.
+        </p>
+        <Step n={1} title="Buy CREDIT on Uniswap, from the owner wallet">
+          <p>
+            CREDIT isn&apos;t sold in Borro&apos;s app. It trades against USDG in a Uniswap v3 pool on {TOKEN.chainName},
+            the pool Borro prices it from.
+          </p>
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>
+              Go to <a href="https://app.uniswap.org">app.uniswap.org</a>, connect the owner wallet and pick{" "}
+              {TOKEN.chainName}.
+            </li>
+            <li>Swap from USDG to CREDIT. Paste the token&apos;s address, since it isn&apos;t on Uniswap&apos;s default list:</li>
+          </ol>
+          <Code code={CREDIT} lang="Orbio Credit (CREDIT)" />
+          <p>
+            Check the address ends in <code>…004C</code> before importing it: tokens with the same name exist. About 1
+            USDG of CREDIT is plenty for testing. The swap needs a USDG approval, then the swap itself, and a little ETH
+            for gas. The pool&apos;s fee is 1%. CREDIT is a third-party token and its price moves.
+          </p>
+        </Step>
+        <Step n={2} title="Open the line on Borro">
+          <ol className="list-decimal space-y-1 pl-5">
+            <li>
+              Go to <a href={`${BORRO}/app`}>borro.markets/app</a> with the owner wallet, choose <b>Borrow</b>, then the{" "}
+              <b>AI credit market</b> (CREDIT).
+            </li>
+            <li>
+              Post the CREDIT as collateral, and set the amount to borrow now to <b>0</b>. Anything borrowed while opening
+              goes to the owner wallet and uses up the line&apos;s room.
+            </li>
+            <li>Set <b>Agent</b> to the agent wallet&apos;s address.</li>
+            <li>
+              Tick <b>Let the agent pay its x402 bills</b>. This lets the agent borrow into its own wallet to pay. Leave
+              the other addresses alone: every address on that list can receive borrowed USDG.
+            </li>
+            <li>
+              Set a small <b>ceiling</b> (the most the line can owe) and <b>daily limit</b>. Keep Borro&apos;s default
+              target LTV and its keeper protection on, which guards the line if CREDIT&apos;s price falls.
+            </li>
+            <li>
+              <b>Let the agent borrow its own gas</b> is optional: it lets the agent turn borrowed USDG into ETH. Sending
+              the agent a little ETH is simpler.
+            </li>
+          </ol>
+          <p>Confirm and sign. Note the line&apos;s address, which Borro calls its account: the agent passes it to Borro&apos;s tools.</p>
+        </Step>
+        <Step n={3} title="Give the agent wallet gas">
+          <p>
+            Send it a little ETH, about 0.0002, for the borrow transactions. A borrow costs about 0.00002 ETH on{" "}
+            {TOKEN.chainName}. The payment itself costs it nothing: Autonomo pays that gas.
+          </p>
+        </Step>
+        <p>
+          When you&apos;re done, repay the line from the owner wallet on Borro and close it to get the CREDIT back. It can
+          be swapped back to USDG in the same pool.
+        </p>
       </Section>
 
       <Section title="How it works">
