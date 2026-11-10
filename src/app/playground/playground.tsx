@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { MAX_PAID_CALLS, plainAnswer, type AgentEvent, type AgentReceipt } from "@/lib/agent-events";
+import { ResearchPanel, type ResearchPrice } from "./research";
 
 /** A listed Autonomo gateway the agent can pay in $AUTONOMO, with a question that uses it. */
 export type AvailableApi = {
@@ -58,7 +59,40 @@ const amountOf = (r: AgentReceipt) => Number(r.amount.replace(/,/g, ""));
 const paidIn = (t: Turn) => (t.state === "working" ? t.calls.flatMap((c) => (c.receipt ? [c.receipt] : [])) : t.receipts);
 const shortTx = (tx: string) => `tx ${tx.slice(0, 6)}…${tx.slice(-4)}`;
 
-export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi[]; freeDaily: number; paymentsOn: boolean }) {
+export type PlaygroundMode = "ask" | "research";
+
+/**
+ * Research mode's setup: free reports a day, whether reports can run, and what each one pays. `sample` is set only in
+ * local development: sample reports are on `always`, or when the address has ?sample=1.
+ */
+export type ResearchSetup = {
+  freeDaily: number;
+  live: boolean;
+  prices: ResearchPrice[];
+  sample: { always: boolean; prices: ResearchPrice[] } | null;
+};
+
+export function Playground({
+  apis,
+  freeDaily,
+  paymentsOn,
+  research,
+}: {
+  apis: AvailableApi[];
+  freeDaily: number;
+  paymentsOn: boolean;
+  research: ResearchSetup;
+}) {
+  const [mode, setMode] = useState<PlaygroundMode>("ask");
+  const [sampleAsked, setSampleAsked] = useState(false);
+  const sample = research.sample !== null && (research.sample.always || sampleAsked);
+
+  // The page is the same for every visitor, so the tab and sample mode come from the address once it's in the browser.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "research") setMode("research");
+    if (params.get("sample") === "1") setSampleAsked(true);
+  }, []);
   const [draft, setDraft] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -121,6 +155,25 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
     }
   }
 
+  // Both modes stay mounted, so switching keeps the conversation and the report.
+  function switchMode(next: PlaygroundMode) {
+    setMode(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "research") url.searchParams.set("mode", "research");
+      else url.searchParams.delete("mode");
+      window.history.replaceState(null, "", url);
+    } catch {
+      // The address bar is a convenience only.
+    }
+  }
+
+  function askAbout(question: string) {
+    switchMode("ask");
+    if (!busy) setDraft(question.slice(0, MAX_QUESTION_CHARS));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function startOver() {
     conversationId.current = null;
     setTurns([]);
@@ -143,8 +196,43 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
     </div>
   );
 
+  const tabs = (
+    <div role="tablist" aria-label="Playground mode" className="mb-6 inline-flex rounded-lg border border-line bg-surface p-1">
+      {(
+        [
+          ["ask", "Ask the agent"],
+          ["research", "Research a token"],
+        ] as const
+      ).map(([m, label]) => (
+        <button
+          key={m}
+          type="button"
+          role="tab"
+          aria-selected={mode === m}
+          onClick={() => switchMode(m)}
+          className={`min-h-10 rounded-md px-4 text-sm font-medium ${mode === m ? "bg-brand text-on-brand" : "text-muted hover:text-ink"}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div className={`mx-auto max-w-7xl px-4 sm:px-8 ${started ? "pt-6 lg:pt-8" : "pt-10 lg:pt-14"}`}>
+    <div className={`mx-auto max-w-7xl px-4 sm:px-8 ${started && mode === "ask" ? "pt-6 lg:pt-8" : "pt-10 lg:pt-14"}`}>
+      {!started && <p className="mb-3 font-mono text-xs tracking-[0.14em] text-accent uppercase">Agent Playground</p>}
+      {tabs}
+      <div hidden={mode !== "research"}>
+        <ResearchPanel
+          freeDaily={research.freeDaily}
+          live={sample || research.live}
+          sample={sample}
+          prices={sample && research.sample ? research.sample.prices : research.prices}
+          onAsk={askAbout}
+        />
+        {notes}
+      </div>
+      <div hidden={mode !== "ask"}>
       {started && (
         <div className="-mx-4 mb-5 flex items-center justify-between gap-3 border-y border-line bg-surface px-4 py-2.5 font-mono text-xs sm:-mx-8 sm:px-8 lg:hidden">
           <span>
@@ -158,8 +246,7 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
         <section className="min-w-0">
           {!started && (
             <>
-              <p className="font-mono text-xs tracking-[0.14em] text-accent uppercase">Agent Playground</p>
-              <h1 className="heading mt-3 text-5xl leading-[0.95] sm:text-8xl lg:text-7xl xl:text-8xl">
+              <h1 className="heading text-5xl leading-[0.95] sm:text-8xl lg:text-7xl xl:text-8xl">
                 You ask.
                 <br />
                 The agent pays.
@@ -297,6 +384,7 @@ export function Playground({ apis, freeDaily, paymentsOn }: { apis: AvailableApi
             </div>
           </aside>
         )}
+      </div>
       </div>
     </div>
   );

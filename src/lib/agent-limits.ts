@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac } from "node:crypto";
-import { lt, sql } from "drizzle-orm";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { AgentReceipt, AgentUsage } from "@/lib/agent-events";
 import { freeDaily } from "@/lib/telegram";
@@ -13,8 +13,15 @@ import { freeDaily } from "@/lib/telegram";
 //   SESSION_SECRET       Keys the hash of visitor ids. Without it the agent takes no questions.
 //   AGENT_FREE_DAILY     Optional: free questions per website visitor per day (default 5).
 //   AGENT_SITE_DAILY     Optional: questions per day for everyone together, the ceiling on model costs (default 500).
+//   RESEARCH_FREE_DAILY  Optional: free token reports per website visitor per day in the Playground's Research mode
+//                        (default 3). Top holder checks have their own count of the same size.
+//   RESEARCH_SITE_DAILY  Optional: free reports and holder checks per day for everyone together (default 300).
 
 export type AgentSurface = "web" | "telegram";
+type CountedSurface = AgentSurface | "research" | "research-holder";
+
+/** What a visitor spends in Research mode: a report, or a check of one of its top holders. */
+export type ResearchKind = "report" | "holder";
 
 const KEEP_COUNTERS_DAYS = 7;
 
@@ -41,7 +48,7 @@ export function webVisitorId(headers: Headers) {
 }
 
 /** A stable pseudonym, so we can count returning visitors without storing who they are. */
-function subjectFor(surface: AgentSurface, visitorId: string) {
+function subjectFor(surface: CountedSurface, visitorId: string) {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error("SESSION_SECRET is not set");
   return createHmac("sha256", secret).update(`agent:${surface}:${visitorId}`).digest("base64url").slice(0, 32);
@@ -85,6 +92,40 @@ export async function reserveQuestion(surface: AgentSurface, visitorId: string):
       .catch((e) => console.error("couldn't clear old agent counters", e));
   }
   return { ok: true, subject, left: limit - used };
+}
+
+export const researchFreeDaily = () => envLimit("RESEARCH_FREE_DAILY", 3);
+
+const researchSurface = (kind: ResearchKind): CountedSurface => (kind === "report" ? "research" : "research-holder");
+
+/** Counts one free report or holder check against the visitor's limit and the site-wide one. Neither runs the model. */
+export async function reserveReport(visitorId: string, kind: ResearchKind = "report"): Promise<Allowance> {
+  const surface = researchSurface(kind);
+  const subject = subjectFor(surface, visitorId);
+  const day = utcDay();
+  const limit = researchFreeDaily();
+  const what = kind === "report" ? "reports" : "holder checks";
+
+  const used = await take(`${surface}:${subject}:${day}`, day, limit);
+  if (used === null) return { ok: false, detail: `You've used today's ${limit} free ${what}. Come back tomorrow.` };
+  const siteCount = await take(`research-site:${day}`, day, envLimit("RESEARCH_SITE_DAILY", 300));
+  if (siteCount === null) {
+    await giveBack(`${surface}:${subject}:${day}`);
+    return { ok: false, detail: `Today's free ${what} have all been used. Come back tomorrow.` };
+  }
+  return { ok: true, subject, left: limit - used };
+}
+
+/** Hands back a free report or check that wasn't paid for, such as a token Token Risk doesn't cover. */
+export async function returnReport(subject: string, kind: ResearchKind = "report") {
+  const day = utcDay();
+  await Promise.all([giveBack(`${researchSurface(kind)}:${subject}:${day}`), giveBack(`research-site:${day}`)]);
+}
+
+async function giveBack(key: string) {
+  const db = await getDb();
+  const t = schema.agentLimits;
+  await db.update(t).set({ count: sql`${t.count} - 1` }).where(and(eq(t.key, key), gt(t.count, 0)));
 }
 
 export async function recordQuestion(q: { surface: AgentSurface; subject: string; outcome: "answer" | "fail"; usage: AgentUsage | null; receipts: AgentReceipt[] }) {

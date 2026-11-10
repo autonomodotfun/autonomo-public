@@ -175,6 +175,11 @@ export default function AgentsGuidePage() {
           questions a day.
         </p>
         <p>
+          Its <Link href="/playground?mode=research">Research a token</Link> tab is the research agent: paste a token and it pays Token
+          Risk, Tx Explainer and Wallet Portfolio one after another, then writes one report on the token, its launch, its creator and
+          its largest holder.
+        </p>
+        <p>
           <b>The Autonomo agent bot</b> does the same in Telegram. Message{" "}
           <a href="https://t.me/autonomoagentbot">@autonomoagentbot</a> directly or mention it in a group. Each user gets a
           few free paid answers a day.
