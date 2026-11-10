@@ -4,12 +4,19 @@ import { notFound } from "next/navigation";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { TOKEN } from "@/lib/constants";
 import { formatUsd, isTestnet, networkLabel } from "@/lib/networks";
+import { retrySoon } from "@/lib/prerender";
 import { getProject, getTrackRecords, getVerifiedGateways } from "@/lib/queries";
 import { VerifiedBadge } from "@/components/verified";
 import { Avatar, compact, NetworkChips } from "@/components/project-row";
 import { TrackRecordBlock } from "@/components/track-record";
 
 type Props = { params: Promise<{ slug: string }> };
+
+// None of the ~4,700 listings is built ahead of time: each page is rendered on its first visit, then served from
+// the cache and rebuilt in the background when its data changes.
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await getProject((await params).slug);
@@ -162,6 +169,7 @@ async function trackRecordsOrNone() {
     return await getTrackRecords();
   } catch (e) {
     console.error("track records failed", e);
+    await retrySoon();
     return {};
   }
 }
