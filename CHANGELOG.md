@@ -8,6 +8,10 @@ repo gets a copy of each release.
 - **LangChain tools for Python and TypeScript.** `langchain-autonomo` on PyPI and npm gives a LangChain or LangGraph
   agent three tools: find an Autonomo API, check its price and pay for a call. The model picks the API and pays
   itself, within the SDK's per-call and daily limits and a cap on paid calls per run. Guide at `/docs/langchain`.
+- **Research agent in the Agent Playground.** A new "Research a token" tab: paste a Robinhood Chain token and the
+  agent pays Token Risk, Tx Explainer for the launch transaction, and Wallet Portfolio for the creator and the
+  largest holder, then writes up what it found. Each step shows live with its on-chain receipt, and any other top
+  holder can be checked with one more call. Three free reports a day.
 
 ## November 9, 2026
 
