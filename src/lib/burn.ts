@@ -1,6 +1,6 @@
 import "server-only";
 import { desc, sql } from "drizzle-orm";
-import { connection } from "next/server";
+import { untilLocalDbIsFree } from "@/lib/prerender";
 import { revalidateTag, unstable_cache } from "next/cache";
 import {
   createPublicClient,
@@ -321,6 +321,6 @@ const readBurns = unstable_cache(
 
 /** Totals per kind of burn and the latest receipts, for the /burn page. */
 export async function getBurns() {
-  await connection();
+  await untilLocalDbIsFree();
   return readBurns();
 }

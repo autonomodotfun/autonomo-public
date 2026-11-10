@@ -1,11 +1,11 @@
 import "server-only";
 import { and, asc, desc, eq, gte, ilike, or, sql, type SQL } from "drizzle-orm";
 import { revalidateTag, unstable_cache } from "next/cache";
-import { connection } from "next/server";
 import { cache } from "react";
 import { getDb, schema } from "@/db";
 import { CATEGORIES, type Category } from "@/db/schema";
 import { TOKEN } from "@/lib/constants";
+import { retrySoon, untilLocalDbIsFree } from "@/lib/prerender";
 import { holdsMinimum } from "@/lib/verified";
 import { summarize, TRACK_RECORD_DAYS, type TrackRecord } from "@/lib/track-record";
 
@@ -344,6 +344,9 @@ async function trackRecordsFresh() {
 // Every page view and API call used to query the database, which kept it awake around the clock. These reads are
 // cached (shared across server instances), so most requests never reach it. Admin changes and the directory refresh
 // (every 3 days) clear the tags (see revalidateCatalog), so directory reads can live a day; gateway lists refresh sooner.
+//
+// A page that only uses these reads is cached whole as well: it takes on their tags and the shortest of their cache
+// times, so clearing a tag rebuilds the pages that showed that data (see prerender.ts).
 
 const DAY = 24 * 3600;
 
@@ -352,7 +355,7 @@ export const CATALOG_TAGS = { directory: "directory", gateways: "gateways" } as 
 function cachedRead<A extends unknown[], R>(fn: (...args: A) => Promise<R>, key: string, seconds: number, tag: string) {
   const read = unstable_cache(fn, [key], { revalidate: seconds, tags: [tag] });
   return async (...args: A) => {
-    await connection();
+    await untilLocalDbIsFree();
     return read(...args);
   };
 }
@@ -373,6 +376,7 @@ export const getVerifiedGateways = cache(async () => {
     return await verifiedGatewaysCached();
   } catch (e) {
     console.error("verified gateways failed", e);
+    await retrySoon();
     return { slugs: [] as string[], projectSlugs: [] as string[] };
   }
 });

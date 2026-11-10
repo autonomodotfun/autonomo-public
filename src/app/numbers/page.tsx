@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { connection } from "next/server";
+import { retrySoon } from "@/lib/prerender";
 import { getTrackRecords } from "@/lib/queries";
 import { OFFICIAL_OWNER, TRACK_RECORD_DAYS } from "@/lib/track-record";
 
@@ -14,12 +14,12 @@ const speed = (ms: number | null) => (ms === null ? "—" : ms < 1000 ? `${ms} m
 const pct = (r: number | null) => (r === null ? "—" : `${Math.floor(r * 1000) / 10}%`);
 
 export default async function NumbersPage() {
-  await connection();
   let records: Awaited<ReturnType<typeof getTrackRecords>> | null = null;
   try {
     records = await getTrackRecords();
   } catch (e) {
     console.error("track records failed", e);
+    await retrySoon();
   }
   const rows = Object.values(records ?? {})
     .filter((r) => r.owner === OFFICIAL_OWNER)
