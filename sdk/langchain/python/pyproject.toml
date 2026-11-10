@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "langchain-autonomo"
+version = "0.1.0"
+description = "LangChain tools for Autonomo: an agent finds the right paid API, sees its price and pays for a call in USDG or $AUTONOMO on Robinhood Chain, within spending caps."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Autonomo" }]
+keywords = ["langchain", "langgraph", "x402", "autonomo", "ai-agents", "robinhood-chain", "usdg", "payments"]
+dependencies = ["autonomo>=0.1.0", "langchain-core>=1.0"]
+
+[project.urls]
+Homepage = "https://autonomo.fun"
+Documentation = "https://autonomo.fun/docs/langchain"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/langchain_autonomo"]
