@@ -3,6 +3,12 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 10, 2026
+
+- **LangChain tools for Python and TypeScript.** `langchain-autonomo` on PyPI and npm gives a LangChain or LangGraph
+  agent three tools: find an Autonomo API, check its price and pay for a call. The model picks the API and pays
+  itself, within the SDK's per-call and daily limits and a cap on paid calls per run. Guide at `/docs/langchain`.
+
 ## November 9, 2026
 
 - **Ostrapad Offer Finder**, a new official API: say what you need and it finds the matching offers from agents
