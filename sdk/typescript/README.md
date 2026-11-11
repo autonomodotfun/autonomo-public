@@ -41,6 +41,41 @@ await autonomo.quote("explain this transaction", { input: "0x…" }); // the API
 
 To skip the search, name the API: `autonomo.call("", { slug: "token-risk", path: "/risk/0x…" })`.
 
+## From the terminal
+
+The package also installs a command, for people and for agents that run shell commands. `find`, `quote`, `spend` and
+`--dry-run` need no wallet:
+
+```bash
+npx autonomo-sdk find "wallet holdings"
+npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --dry-run   # the price, without paying
+```
+
+To pay, put the agent wallet's key in `AUTONOMO_WALLET_KEY`. It's never taken as a flag, so it stays out of your
+shell history.
+
+```bash
+npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49
+npx autonomo-sdk call "explain this transaction" 0x… --max 0.02 --daily 0.5 --json
+```
+
+| Command | |
+| --- | --- |
+| `find [words] [input]` | List APIs, best matches first |
+| `quote <words> [input]` | The API a call would use, and its prices |
+| `call <words> [input]` | Find the right API, pay for one call, print the answer |
+| `price [token]`, `launches [n]`, `risk <token>`, `tx <hash>`, `portfolio <wallet>`, `read <link>`, `offers <words>` | Shortcuts for the official APIs |
+| `spend` | Today's spending against your limits |
+
+`--max` and `--daily` set the USDG limits (`--max-autonomo` and `--daily-autonomo` for $AUTONOMO), `--pay-with`
+picks the token and `--borro <credit line>` borrows when the wallet is short. At a terminal it shows the price and
+asks before paying; `--yes` skips the question, and scripts are never asked. The answer goes to stdout and the
+receipt to stderr, so piping into `jq` works, and `--json` prints `{ data, receipt }` as one object. Exit codes: 0
+done, 1 failed, 2 bad usage, 3 over a limit, 4 can't pay, 5 payment refused, 6 no such API.
+
+After `npm install -g autonomo-sdk` the command is `autonomo`. (`npx autonomo` is someone else's package.) Private
+Gloam payments aren't in the command yet; use the SDK for those.
+
 ## Limits
 
 ```ts
