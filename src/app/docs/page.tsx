@@ -129,7 +129,7 @@ export default async function DocsPage() {
         </Cards>
         <p>
           Just curious? Ask the <Link href="/playground">Agent Playground</Link> a question and watch an agent pay for the
-          answer. No wallet needed.
+          answer. No wallet needed. Or try it from <Link href="/docs/cli">your terminal</Link> with one command.
         </p>
       </Section>
 

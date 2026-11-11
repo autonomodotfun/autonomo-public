@@ -115,7 +115,8 @@ export default function AgentsGuidePage() {
           The quickest way is the <Link href="/docs/sdk">SDK for TypeScript and Python</Link>: one call finds the API,
           pays within your limits, privately with Gloam or on Borro credit if you want, and returns a receipt. Building
           with LangChain or LangGraph? <Link href="/docs/langchain">Its tools</Link> let the agent pick and pay for APIs
-          itself. To build it yourself, here are the two steps.
+          itself. To build it yourself, here are the two steps. No code at all? The same call is one command in{" "}
+          <Link href="/docs/cli">your terminal</Link>.
         </p>
         <Step n={1} title="Find APIs to pay for">
           <p>

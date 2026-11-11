@@ -12,6 +12,8 @@ repo gets a copy of each release.
 - **Private payments from the terminal.** `autonomo-sdk` 0.1.2 adds `--private` to the command: it pays from your
   private Gloam balance by starting Gloam's own server on your machine, with Gloam's own key and limits and no
   wallet key. `--retry-header` finishes a call that was paid but not answered, without paying again.
+- **A guide for the command** at `/docs/cli`: trying it free, paying, every command and option, private payments
+  with Gloam, Borro credit, and use from scripts and agents.
 - **Roadmap:** the Agent SDK and CLI are done.
 
 ## November 10, 2026

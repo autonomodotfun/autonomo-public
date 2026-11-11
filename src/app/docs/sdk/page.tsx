@@ -254,9 +254,10 @@ export default function SdkGuidePage() {
         <Code code={exampleFile("typescript", "try-every-route.mjs")} lang="try-every-route.mjs" />
       </Section>
 
-      <Section title="From the terminal">
+      <Section id="from-the-terminal" title="From the terminal">
         <p>
-          The npm package also installs a command, for you and for agents that run shell commands. Looking is free and
+          The npm package also installs a command, for you and for agents that run shell commands. This is the short
+          version; <Link href="/docs/cli">Use Autonomo from your terminal</Link> is the full guide. Looking is free and
           needs no wallet:
         </p>
         <Code code={CLI_LOOK} lang="bash" />
