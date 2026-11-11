@@ -29,6 +29,9 @@ npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --dry-run`;
 const CLI_PAY = `npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49
 npx autonomo-sdk call "explain this transaction" 0x… --max 0.02 --daily 0.5 --json`;
 
+const CLI_PRIVATE = `npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --private --dry-run
+npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --private`;
+
 const TRY_BORRO = `# macOS and Linux
 export AUTONOMO_WALLET_KEY=0x…   # the agent wallet set on the credit line
 export BORRO_CREDIT_LINE=0x…     # the credit line
@@ -271,6 +274,7 @@ export default function SdkGuidePage() {
             ["price, launches, risk, tx, portfolio, read, offers", "Shortcuts for the official APIs"],
             ["spend", "Today's spending against your limits"],
             ["--max, --daily", "The USDG limits for this call. --max-autonomo and --daily-autonomo for $AUTONOMO"],
+            ["--private", "Pay from your private Gloam balance, with no wallet key"],
             ["--dry-run", "Show the price instead of paying"],
             ["--json", "One object on stdout: the answer and the receipt"],
           ]}
@@ -278,9 +282,37 @@ export default function SdkGuidePage() {
         <p>
           At a terminal it shows the price and asks before paying; <code>--yes</code> skips the question, and scripts are
           never asked. The answer goes to stdout and the receipt to stderr, so piping works. Run{" "}
-          <code>npx autonomo-sdk --help</code> for every option and the exit codes. Private Gloam payments aren&apos;t in
-          the command yet; use the SDK for those.
+          <code>npx autonomo-sdk --help</code> for every option and the exit codes.
         </p>
+        <h3 className="pt-2 font-medium">Paying privately from the terminal</h3>
+        <p>
+          Add <code>--private</code> and the command pays from your private Gloam balance instead of a wallet, so the
+          payment doesn&apos;t link back to you. It starts Gloam&apos;s own server, <code>@gloamtrade/mcp</code>, on your
+          machine for that one payment and stops it afterwards.
+        </p>
+        <Code code={CLI_PRIVATE} lang="bash" />
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <b>Your own Gloam key.</b> Set Gloam up once as in{" "}
+            <a href="#pay-privately-with-gloam">Pay privately with Gloam</a>: its key and limits go in{" "}
+            <code>~/.gloam/agent.env</code>, and USDG goes into its private balance. The command never reads that key,
+            and Gloam&apos;s server is never given <code>AUTONOMO_WALLET_KEY</code>.
+          </li>
+          <li>
+            <b>No wallet key needed.</b> <code>AUTONOMO_WALLET_KEY</code> can stay unset for private calls.
+          </li>
+          <li>
+            <b>The price includes Gloam&apos;s fee</b> and counts against <code>--max</code> and <code>--daily</code>.{" "}
+            <code>--dry-run</code> shows it first.
+          </li>
+          <li>
+            <b>It can take a few minutes,</b> because Gloam builds the payment&apos;s proofs on your machine.
+          </li>
+          <li>
+            <b>Paid but no answer?</b> The error prints a payment header. Run the same command again with{" "}
+            <code>--retry-header &lt;header&gt;</code> to get the answer without paying twice.
+          </li>
+        </ul>
       </Section>
 
       <Section title="Limits">

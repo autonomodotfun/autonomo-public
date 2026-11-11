@@ -29,7 +29,7 @@ import {
 } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 
-export const VERSION = "0.1.1";
+export const VERSION = "0.1.2";
 
 const NETWORK = "eip155:4663";
 const CHAIN_ID = 4663;

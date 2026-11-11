@@ -9,6 +9,9 @@ repo gets a copy of each release.
   0x…` pays for a Risk Checker call and prints the answer, with shortcuts for every official API and `call "…"` for
   the rest. The per-call and daily spend limits apply (`--max`, `--daily`), `--dry-run` shows the price without
   paying, and `--json` gives agents one object with the answer and the receipt.
+- **Private payments from the terminal.** `autonomo-sdk` 0.1.2 adds `--private` to the command: it pays from your
+  private Gloam balance by starting Gloam's own server on your machine, with Gloam's own key and limits and no
+  wallet key. `--retry-header` finishes a call that was paid but not answered, without paying again.
 - **Roadmap:** the Agent SDK and CLI are done.
 
 ## November 10, 2026

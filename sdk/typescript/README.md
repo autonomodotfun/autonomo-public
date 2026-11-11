@@ -73,8 +73,27 @@ asks before paying; `--yes` skips the question, and scripts are never asked. The
 receipt to stderr, so piping into `jq` works, and `--json` prints `{ data, receipt }` as one object. Exit codes: 0
 done, 1 failed, 2 bad usage, 3 over a limit, 4 can't pay, 5 payment refused, 6 no such API.
 
-After `npm install -g autonomo-sdk` the command is `autonomo`. (`npx autonomo` is someone else's package.) Private
-Gloam payments aren't in the command yet; use the SDK for those.
+After `npm install -g autonomo-sdk` the command is `autonomo`. (`npx autonomo` is someone else's package.)
+
+### Paying privately from the terminal
+
+```bash
+npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --private --dry-run   # the private price
+npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --private             # pay from Gloam
+```
+
+`--private` pays from your private Gloam balance, so the payment doesn't link to a wallet. The command starts Gloam's
+own server (`npx -y @gloamtrade/mcp`) on your machine for that one payment and stops it afterwards.
+
+- Set Gloam up once: its key and limits go in `~/.gloam/agent.env` and USDG goes into its private balance (see
+  [Pay privately with Gloam](https://autonomo.fun/docs/sdk#pay-privately-with-gloam)). The command never reads
+  Gloam's key, and Gloam's server is never given `AUTONOMO_WALLET_KEY`.
+- No `AUTONOMO_WALLET_KEY` is needed for private calls.
+- The price includes Gloam's fee and counts against `--max` and `--daily`. It can't be combined with `--pay-with`
+  or `--borro`.
+- Paying can take a few minutes, since Gloam builds the payment's proofs on your machine.
+- If Gloam paid but the API didn't answer, the error prints a payment header: run the same command again with
+  `--retry-header <header>` to get the answer without paying twice.
 
 ## Limits
 

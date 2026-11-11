@@ -22,7 +22,7 @@ const APIS = [
 ].map((a) => ({ ...a, verified: true, price: { usdg: 0.01, autonomo: 100 }, trackRecord: { successRate: 1, paidCalls: 5 } }));
 
 // A fake Autonomo: the gateway list, and a 402 price list (0.01 USDG unless told otherwise) for every /x/ URL.
-function cli({ amount = "10000", env = {}, interactive = false, answer = true, store = memoryStore() } = {}) {
+function cli({ amount = "10000", env = {}, interactive = false, answer = true, store = memoryStore(), gloamOffer = null, startGloam } = {}) {
   const out = [];
   const err = [];
   const calls = [];
@@ -31,9 +31,11 @@ function cli({ amount = "10000", env = {}, interactive = false, answer = true, s
     calls.push({ url: String(url), headers: init.headers ?? {} });
     if (new URL(String(url)).pathname === "/api/v1/gateways") return Response.json({ data: APIS });
     const accepts = [{ scheme: "exact", network: "eip155:4663", asset: USDG, amount, payTo: PAY_TO, maxTimeoutSeconds: 300, extra: { name: "Global Dollar", version: "1" } }];
+    // The private option: the same price plus Gloam's fee, in USDG's 6 decimals.
+    if (gloamOffer) accepts.push({ scheme: "gloam-cashout", network: "eip155:4663", asset: USDG, amount: gloamOffer, payTo: PAY_TO, maxTimeoutSeconds: 300 });
     return new Response("{}", { status: 402, headers: { "payment-required": Buffer.from(JSON.stringify({ x402Version: 2, accepts })).toString("base64") } });
   };
-  const io = { env, out: (t) => out.push(t), err: (t) => err.push(t), interactive, confirm: async (q) => (asked.push(q), answer), fetch, spendStore: store };
+  const io = { env, out: (t) => out.push(t), err: (t) => err.push(t), interactive, confirm: async (q) => (asked.push(q), answer), fetch, spendStore: store, startGloam };
   return { out, err, calls, asked, store, run: (...argv) => run(argv, io), paid: () => calls.some((c) => c.headers["PAYMENT-SIGNATURE"]) };
 }
 const priced = (c) => c.calls.filter((x) => x.url.includes("/x/")).map((x) => x.url.replace("https://autonomo.fun", ""));
@@ -166,4 +168,116 @@ test("spend shows today's total against the limits", async () => {
   assert.equal(await t.run("spend"), EXIT.ok);
   assert.match(t.out.join("\n"), /USDG {6}0\.02 of 1 spent, up to 0\.05 a call[\s\S]*none set/);
   assert.equal(t.calls.length, 0);
+});
+
+// ---------- --private: paying through Gloam ----------
+
+// A stand-in for a running Gloam server: records what it was asked and answers as told.
+function fakeGloam(answer = { status: "ok", hash: TX, body: JSON.stringify({ risk: "low" }), httpStatus: 200 }) {
+  const state = { started: 0, closed: 0, asked: [] };
+  const start = async () => {
+    state.started++;
+    return { fetchPaid: async (args) => (state.asked.push(args), answer), close: async () => void state.closed++ };
+  };
+  return { state, start };
+}
+const spentToday = async (c) => (await c.store.get(new Date().toISOString().slice(0, 10))).usdg ?? 0n;
+
+test("--private pays through Gloam with no wallet key, counts it, and stops Gloam's server", async () => {
+  const g = fakeGloam();
+  const c = cli({ gloamOffer: "10928", startGloam: g.start });
+  assert.equal(await c.run("risk", ADDR, "--private"), EXIT.ok);
+  assert.deepEqual(g.state.asked, [{ url: `https://autonomo.fun/x/token-risk/risk/${ADDR}`, maxAmount: 0.011928, prefer: "gloam-cashout" }]);
+  assert.deepEqual(JSON.parse(c.out[0]), { risk: "low" });
+  assert.match(c.err.join("\n"), /Paying privately through Gloam/);
+  assert.match(c.err.join("\n"), /Paid 0\.010928 USDG privately through Gloam to Risk Checker\. Today: 0\.010928 of 1 USDG\./);
+  assert.match(c.err.join("\n"), new RegExp(`/tx/${TX}`));
+  assert.equal(c.paid(), false); // The wallet signed nothing.
+  assert.equal(await spentToday(c), 10928n);
+  assert.deepEqual([g.state.started, g.state.closed], [1, 1]);
+});
+
+test("--private --json prints one object and keeps stderr quiet", async () => {
+  const g = fakeGloam();
+  const c = cli({ gloamOffer: "10928", startGloam: g.start });
+  assert.equal(await c.run("risk", ADDR, "--private", "--json"), EXIT.ok);
+  const { data, receipt } = JSON.parse(c.out[0]);
+  assert.deepEqual(data, { risk: "low" });
+  assert.equal(receipt.route, "gloam");
+  assert.equal(receipt.payer, "private (Gloam)");
+  assert.deepEqual(c.err, []);
+});
+
+test("--private asks first at a terminal, with the private price, and a no starts nothing", async () => {
+  const g = fakeGloam();
+  const c = cli({ gloamOffer: "10928", startGloam: g.start, interactive: true, answer: false });
+  assert.equal(await c.run("risk", ADDR, "--private"), EXIT.ok);
+  assert.match(c.asked[0], /Risk Checker costs 0\.010928 USDG privately through Gloam, its fee included\. Pay from your Gloam balance\?/);
+  assert.equal(g.state.started, 0);
+  assert.match(c.err.join("\n"), /Not paid/);
+});
+
+test("--private never starts Gloam when the API has no private option or the price is over a limit", async () => {
+  const none = fakeGloam();
+  const a = cli({ startGloam: none.start });
+  assert.equal(await a.run("risk", ADDR, "--private"), EXIT.cannotPay);
+  assert.match(a.err.join("\n"), /doesn't offer private payment/);
+  assert.equal(none.state.started, 0);
+
+  const over = fakeGloam();
+  const b = cli({ gloamOffer: "10928", startGloam: over.start });
+  assert.equal(await b.run("risk", ADDR, "--private", "--max", "0.01"), EXIT.overLimit);
+  assert.equal(over.state.started, 0);
+});
+
+test("--private reports a Gloam that won't start, one that refuses, and one that paid without an answer", async () => {
+  const a = cli({ gloamOffer: "10928", startGloam: async () => Promise.reject(new Error("Gloam's server stopped (exit 1): GLOAM_AGENT_PRIVATE_KEY is not set")) });
+  assert.equal(await a.run("risk", ADDR, "--private"), EXIT.cannotPay);
+  assert.match(a.err.join("\n"), /GLOAM_AGENT_PRIVATE_KEY is not set .*~\/\.gloam\/agent\.env/);
+
+  const refused = fakeGloam({ status: "error", message: "No private balance" });
+  const b = cli({ gloamOffer: "10928", startGloam: refused.start });
+  assert.equal(await b.run("risk", ADDR, "--private"), EXIT.refused);
+  assert.match(b.err.join("\n"), /Gloam didn't pay: No private balance/);
+  assert.equal(await spentToday(b), 0n);
+  assert.equal(refused.state.closed, 1);
+
+  const half = fakeGloam({ status: "paid_not_served", message: "The API timed out.", paymentHeader: "HDR123" });
+  const d = cli({ gloamOffer: "10928", startGloam: half.start });
+  assert.equal(await d.run("risk", ADDR, "--private"), EXIT.refused);
+  assert.match(d.err.join("\n"), /HDR123/);
+  assert.equal(await spentToday(d), 10928n); // It was paid, so it counts.
+});
+
+test("--retry-header presents the earlier payment instead of paying again", async () => {
+  const g = fakeGloam();
+  const c = cli({ gloamOffer: "10928", startGloam: g.start });
+  assert.equal(await c.run("risk", ADDR, "--private", "--retry-header", "HDR123"), EXIT.ok);
+  assert.deepEqual(g.state.asked, [{ url: `https://autonomo.fun/x/token-risk/risk/${ADDR}`, paymentHeader: "HDR123", prefer: "gloam-cashout" }]);
+  assert.deepEqual(JSON.parse(c.out[0]), { risk: "low" });
+  assert.match(c.err.join("\n"), /Nothing more was paid/);
+  assert.equal(await spentToday(c), 0n);
+
+  const still = fakeGloam({ status: "paid_not_served", message: "Still timing out." });
+  const d = cli({ gloamOffer: "10928", startGloam: still.start });
+  assert.equal(await d.run("risk", ADDR, "--private", "--retry-header", "HDR123"), EXIT.refused);
+  assert.match(d.err.join("\n"), /Not answered yet: Still timing out/);
+});
+
+test("--private can't be mixed with other ways to pay, and --retry-header needs it", async () => {
+  for (const extra of [["--pay-with", "autonomo"], ["--borro", PAY_TO]]) {
+    const c = cli({ gloamOffer: "10928", startGloam: fakeGloam().start });
+    assert.equal(await c.run("risk", ADDR, "--private", ...extra), EXIT.usage);
+  }
+  const c = cli();
+  assert.equal(await c.run("risk", ADDR, "--retry-header", "HDR123"), EXIT.usage);
+  assert.equal(c.calls.length, 0);
+});
+
+test("--private --dry-run only shows the prices", async () => {
+  const g = fakeGloam();
+  const c = cli({ gloamOffer: "10928", startGloam: g.start });
+  assert.equal(await c.run("risk", ADDR, "--private", "--dry-run"), EXIT.ok);
+  assert.match(c.out.join("\n"), /0\.010928 USDG {2}private, through Gloam/);
+  assert.equal(g.state.started, 0);
 });
