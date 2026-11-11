@@ -3,6 +3,14 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 11, 2026
+
+- **A command for the terminal.** `autonomo-sdk` 0.1.1 on npm adds a CLI on top of the SDK: `npx autonomo-sdk risk
+  0x…` pays for a Risk Checker call and prints the answer, with shortcuts for every official API and `call "…"` for
+  the rest. The per-call and daily spend limits apply (`--max`, `--daily`), `--dry-run` shows the price without
+  paying, and `--json` gives agents one object with the answer and the receipt.
+- **Roadmap:** the Agent SDK and CLI are done.
+
 ## November 10, 2026
 
 - **LangChain tools for Python and TypeScript.** `langchain-autonomo` on PyPI and npm gives a LangChain or LangGraph

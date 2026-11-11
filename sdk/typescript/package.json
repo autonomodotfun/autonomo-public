@@ -1,6 +1,6 @@
 {
   "name": "autonomo-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One call for AI agents: find the right paid API on Autonomo, pay in USDG or $AUTONOMO (privately through Gloam, or on Borro credit), within spending caps, and get a receipt.",
   "homepage": "https://autonomo.fun",
   "author": "Autonomo (https://autonomo.fun)",
@@ -43,5 +43,8 @@
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@types/node": "26.6.5",
     "typescript": "7.0.2"
+  },
+  "bin": {
+    "autonomo": "dist/cli.js"
   }
 }

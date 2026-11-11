@@ -23,6 +23,12 @@ export AUTONOMO_WALLET_KEY=0x…
 
 # Windows PowerShell
 $env:AUTONOMO_WALLET_KEY = "0x…"`;
+const CLI_LOOK = `npx autonomo-sdk find "wallet holdings"
+npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --dry-run`;
+
+const CLI_PAY = `npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49
+npx autonomo-sdk call "explain this transaction" 0x… --max 0.02 --daily 0.5 --json`;
+
 const TRY_BORRO = `# macOS and Linux
 export AUTONOMO_WALLET_KEY=0x…   # the agent wallet set on the credit line
 export BORRO_CREDIT_LINE=0x…     # the credit line
@@ -243,6 +249,38 @@ export default function SdkGuidePage() {
           </p>
         </Step>
         <Code code={exampleFile("typescript", "try-every-route.mjs")} lang="try-every-route.mjs" />
+      </Section>
+
+      <Section title="From the terminal">
+        <p>
+          The npm package also installs a command, for you and for agents that run shell commands. Looking is free and
+          needs no wallet:
+        </p>
+        <Code code={CLI_LOOK} lang="bash" />
+        <p>
+          To pay, put the agent wallet&apos;s key in <code>AUTONOMO_WALLET_KEY</code>. It&apos;s never taken as a flag,
+          so it stays out of your shell history.
+        </p>
+        <Code code={CLI_PAY} lang="bash" />
+        <Table
+          mono
+          rows={[
+            ["find [words] [input]", "List APIs, best matches first"],
+            ["quote <words> [input]", "The API a call would use, and its prices"],
+            ["call <words> [input]", "Find the right API, pay for one call, print the answer"],
+            ["price, launches, risk, tx, portfolio, read, offers", "Shortcuts for the official APIs"],
+            ["spend", "Today's spending against your limits"],
+            ["--max, --daily", "The USDG limits for this call. --max-autonomo and --daily-autonomo for $AUTONOMO"],
+            ["--dry-run", "Show the price instead of paying"],
+            ["--json", "One object on stdout: the answer and the receipt"],
+          ]}
+        />
+        <p>
+          At a terminal it shows the price and asks before paying; <code>--yes</code> skips the question, and scripts are
+          never asked. The answer goes to stdout and the receipt to stderr, so piping works. Run{" "}
+          <code>npx autonomo-sdk --help</code> for every option and the exit codes. Private Gloam payments aren&apos;t in
+          the command yet; use the SDK for those.
+        </p>
       </Section>
 
       <Section title="Limits">

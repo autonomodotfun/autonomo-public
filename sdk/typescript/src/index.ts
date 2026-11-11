@@ -29,7 +29,7 @@ import {
 } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 const NETWORK = "eip155:4663";
 const CHAIN_ID = 4663;
@@ -44,7 +44,7 @@ export const TOKENS: Record<TokenName, Token> = {
   usdg: { name: "usdg", symbol: "USDG", address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", decimals: 6 },
   autonomo: { name: "autonomo", symbol: "AUTONOMO", address: "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96", decimals: 18 },
 };
-const DEFAULT_LIMITS = {
+export const DEFAULT_LIMITS = {
   perCall: { usdg: "0.05", autonomo: "5000" },
   daily: { usdg: "1", autonomo: "10000" },
 };
@@ -215,7 +215,7 @@ export function rankApis(apis: Api[], query: string, input?: string): Api[] {
 
 // ---------- Spending ----------
 
-function fileStore(file = join(homedir(), ".autonomo", "spend.json")): SpendStore {
+export function fileStore(file = join(homedir(), ".autonomo", "spend.json")): SpendStore {
   const read = (): { date?: string; [k: string]: string | undefined } => {
     try {
       return JSON.parse(readFileSync(file, "utf8"));

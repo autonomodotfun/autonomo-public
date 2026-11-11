@@ -14,6 +14,9 @@ caps, and return the answer with a receipt.
 `autonomo-sdk` on PyPI is a second name with no code of its own ([python-alias](python-alias)): it installs
 `autonomo`, so the install matches npm.
 
+The TypeScript package also installs a command, `autonomo` (`npx autonomo-sdk risk 0x…`), with the same limits:
+[typescript](typescript#from-the-terminal).
+
 Both build the x402 payment themselves (EIP-3009 for USDG, Permit2 for $AUTONOMO), so one call can switch between
 routes. Their payment headers match `@x402/core`'s field for field, and the two SDKs sign the same payment
 identically. Both keep today's spending in `~/.autonomo/spend.json`, so a budget holds across them.

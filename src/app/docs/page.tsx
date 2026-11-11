@@ -33,7 +33,7 @@ const ROADMAP: Phase[] = [
     name: "Phase 2",
     status: "building",
     summary:
-      "the Telegram bot, the Autonomo MCP server, Verified and private payments with Gloam are complete, more official APIs are in progress, and the Agent SDK and CLI are up next",
+      "the Telegram bot, the Autonomo MCP server, Verified, private payments with Gloam and the Agent SDK and CLI are complete, and more official APIs are in progress",
     items: [
       { title: "Autonomo agent bot for Telegram", note: "Live at t.me/autonomoagentbot: ask in a DM or a group, with free daily answers", done: true },
       {
@@ -48,7 +48,7 @@ const ROADMAP: Phase[] = [
       },
       { title: "Verified for API providers", note: "Launching stays free. Hold $AUTONOMO and your APIs show as Verified", done: true },
       { title: "Private payments with Gloam", note: "Every API that accepts USDG takes a cash-out from a private Gloam balance", done: true },
-      { title: "Agent SDK and CLI", note: "With spend limits built in" },
+      { title: "Agent SDK and CLI", note: "On npm and PyPI as autonomo-sdk, with spend limits built in", done: true },
       { title: "Webhooks and payout analytics", note: "For API owners" },
     ],
   },
