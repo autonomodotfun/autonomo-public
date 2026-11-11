@@ -71,6 +71,11 @@ textarea:focus-visible {
     @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-sm placeholder:text-faint;
   }
 
+  /* The header menu item for the page the visitor is on. */
+  .nav-link[aria-current="page"] {
+    @apply font-medium underline decoration-brand decoration-2 underline-offset-[6px];
+  }
+
   /* Signage headings: condensed, bold, uppercase. */
   .heading {
     @apply font-display font-bold tracking-wide uppercase;
