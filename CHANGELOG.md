@@ -15,6 +15,9 @@ repo gets a copy of each release.
 - **A guide for the command** at `/docs/cli`: trying it free, paying, every command and option, private payments
   with Gloam, Borro credit, and use from scripts and agents.
 - **Roadmap:** the Agent SDK and CLI are done.
+- **A roadmap page** at `/roadmap`, linked from the header: what has shipped, what comes next
+  and later. It replaces the roadmap section of `/docs`.
+- **The header shows where you are.** The menu item for the page you're on is highlighted.
 
 ## November 10, 2026
 

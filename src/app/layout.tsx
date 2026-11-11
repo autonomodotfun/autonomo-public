@@ -6,6 +6,7 @@ import { TOKEN } from "@/lib/constants";
 import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
 import { TokenBar } from "@/components/token-bar";
+import { SiteNav } from "@/components/site-nav";
 import { SOCIALS, Socials } from "@/components/socials";
 import "./globals.css";
 
@@ -21,15 +22,6 @@ export const metadata: Metadata = {
   twitter: { site: "@useautonomo", creator: "@useautonomo" },
 };
 
-const NAV = [
-  { href: "/projects", label: "Explore APIs" },
-  { href: "/projects?category=facilitator", label: "Facilitators" },
-  { href: "/projects?category=sdk", label: "SDKs" },
-  { href: "/playground", label: "Playground" },
-  { href: "/docs", label: "Docs" },
-  { href: "/dashboard", label: "Dashboard" },
-];
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${barlow.variable} ${barlowCondensed.variable} ${geistMono.variable}`}>
@@ -40,13 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="flex items-center gap-2.5" aria-label="Autonomo home">
               <Logo className="h-7 w-auto" />
             </Link>
-            <nav className="hidden gap-4 text-sm text-muted md:flex lg:gap-5">
-              {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="whitespace-nowrap hover:text-ink">
-                  {n.label}
-                </Link>
-              ))}
-            </nav>
+            <SiteNav />
             {/* From md the full menu shows, and only from lg is there room for the social icons too. */}
             <Socials className="ml-auto md:hidden lg:flex" />
             <Link
