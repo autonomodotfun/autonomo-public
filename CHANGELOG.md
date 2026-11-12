@@ -3,6 +3,13 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 12, 2026
+
+- **`/llms.txt` for AI agents.** A plain-text map of Autonomo in the llms.txt format: the chain and the official
+  $AUTONOMO address, how to find, call and pay for an API (with the 402 headers), the MCP server, SDK, CLI and
+  LangChain installs, every live API with its path and price, every docs page and the discovery API. It's built from
+  the site's own data, so prices, APIs and page descriptions stay current.
+
 ## November 11, 2026
 
 - **A command for the terminal.** `autonomo-sdk` 0.1.1 on npm adds a CLI on top of the SDK: `npx autonomo-sdk risk
