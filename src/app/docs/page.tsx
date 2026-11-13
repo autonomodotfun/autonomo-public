@@ -27,7 +27,7 @@ const FAQ: [string, React.ReactNode][] = [
   ],
   [
     "How much does it cost to launch?",
-    <>Nothing. Launching a gateway and getting listed are free, whether your API comes from a facilitator catalog, the dashboard or the launch form.</>,
+    <>Nothing. Launching a gateway and getting listed are free, whether your API comes from a facilitator catalog, the dashboard or the listing form.</>,
   ],
   [
     "Is the discovery API free?",
@@ -39,7 +39,7 @@ const FAQ: [string, React.ReactNode][] = [
   ],
   [
     "My listing is wrong or out of date. How do I fix it?",
-    <>Open your project page and use <b>Suggest an edit</b>, or send the details through the <Link href="/submit">launch form</Link>. Edits are reviewed by hand.</>,
+    <>Open your project page and use <b>Suggest an edit</b>, or send the details through the <Link href="/submit">listing form</Link>. Edits are reviewed by hand.</>,
   ],
   [
     "Which networks are supported?",

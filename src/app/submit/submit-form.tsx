@@ -75,7 +75,7 @@ export function SubmitForm({ claim }: { claim?: string }) {
         disabled={pending}
         className="btn-brand px-5 py-2.5 text-sm"
       >
-        {pending ? "Sending…" : "Request launch"}
+        {pending ? "Sending…" : "Request listing"}
       </button>
     </form>
   );
