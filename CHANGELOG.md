@@ -22,6 +22,16 @@ repo gets a copy of each release.
   where you get paid.
 - **The price step is laid out by chain.** USDG and $AUTONOMO sit under Robinhood Chain, and ticking $AUTONOMO
   starts the price at 100 a call.
+- **Official APIs grouped by what you are asking about.** The Explore page, the Official APIs docs page and
+  `/llms.txt` now sort Autonomo's own APIs into Tokens, Wallets and Transactions, each marked On-chain because it
+  reads Robinhood Chain directly, then Partner tools and Other tools.
+- **Wallet Portfolio sees every token a wallet holds.** It used to find only tokens received in the last few days.
+  It now starts from the full list of what the wallet holds, still reads each balance from the chain, so fake
+  airdrops that never really arrived are left out, and prices more tokens.
+- **Risk Checker and Token Lookup work on older tokens.** A launchpad token of any age can be checked and priced, not
+  only ones launched in the last 13 days or so.
+- **Tx Explainer names the contracts.** A summary now says "PoolManager" or "PonsV2LaunchAndBuy" next to the short
+  address, where the contract has a verified name.
 
 ## November 12, 2026
 

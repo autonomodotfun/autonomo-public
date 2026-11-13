@@ -3,7 +3,7 @@
 // transfers and ETH sent, with amounts, symbols and the fee.
 
 import { formatEther, formatUnits } from "viem";
-import { addr, authorized, BUY, ethUsd, EXPLORER, FACTORY, LAUNCHED, rh, SELL, sendJson, short, tokenMeta, TRANSFER, USDG, words } from "./_lib.js";
+import { addr, authorized, BUY, contractName, ethUsd, EXPLORER, FACTORY, LAUNCHED, rh, SELL, sendJson, short, tokenMeta, TRANSFER, USDG, words } from "./_lib.js";
 
 const KNOWN = {
   [FACTORY]: "the launchpad",
@@ -11,6 +11,7 @@ const KNOWN = {
   "0x402085c248eea27d92e8b30b2c58ed07f9e20001": "the x402 Permit2 proxy",
   "0x000000000022d473030f116ddee9f6b43ac78ba3": "Permit2",
 };
+const NAMES_LOOKED_UP = 6; // addresses in one transaction whose contract name is asked for
 const cache = new Map();
 
 export default async function handler(req, res) {
@@ -65,10 +66,23 @@ async function explain(tx, receipt) {
       }
     }
   }
+  // Contracts we don't already know get their verified name ("PoolManager"), so the summary reads better than a
+  // row of short addresses. Only a few are looked up, and a failed lookup just leaves the short address.
+  const unknown = new Set();
+  const consider = (a) => {
+    const k = a?.toLowerCase();
+    if (k && !KNOWN[k] && !curveToken.has(k) && k !== tx.from.toLowerCase() && !/^0x0{40}$/.test(k)) unknown.add(k);
+  };
+  consider(tx.to);
+  for (const l of logs) if (l.topics[0] === TRANSFER && l.topics.length === 3) for (const side of [addr(l.topics[1]), addr(l.topics[2])]) consider(side);
+  const lookedUp = [...unknown].slice(0, NAMES_LOOKED_UP);
+  const named = new Map((await Promise.all(lookedUp.map(async (a) => [a, await contractName(a)]))).filter(([, n]) => n));
+
   const label = (a) => {
     const k = a.toLowerCase();
     if (KNOWN[k]) return KNOWN[k];
     if (curveToken.has(k)) return `the ${sym(curveToken.get(k))} bonding curve`;
+    if (named.has(k)) return `${named.get(k)} (${short(k)})`;
     return short(k);
   };
 
@@ -111,16 +125,16 @@ async function explain(tx, receipt) {
   // Say it the way a person would: "<sender> bought … via a router".
   const router = tx.to?.toLowerCase();
   const sender = tx.from.toLowerCase();
-  const routed = actions.filter((a) => (a.type === "buy" || a.type === "sell") && router && a.text.startsWith(`${short(router)} `));
+  const routed = actions.filter((a) => (a.type === "buy" || a.type === "sell") && router && a.text.startsWith(`${label(router)} `));
   let routedTrade = false;
   for (const a of routed) {
-    a.text = a.text.replace(`${short(router)} `, `${label(sender)} `).replace(/\.$/, " via a router.");
+    a.text = a.text.replace(`${label(router)} `, `${label(sender)} `).replace(/\.$/, " via a router.");
     routedTrade = true;
   }
   if (routedTrade) {
     for (let i = actions.length - 1; i >= 0; i--) {
       const a = actions[i];
-      if (a.type === "transfer" && (a.text.startsWith(`${short(router)} sent`) && a.text.endsWith(`to ${label(sender)}.`))) actions.splice(i, 1);
+      if (a.type === "transfer" && (a.text.startsWith(`${label(router)} sent`) && a.text.endsWith(`to ${label(sender)}.`))) actions.splice(i, 1);
     }
   }
   if (tx.value > 0n && !routedTrade) actions.unshift({ type: "eth", text: `${label(tx.from)} sent ${fmt(formatEther(tx.value))} ETH (~$${usd(Number(formatEther(tx.value)) * eth)}) to ${tx.to ? label(tx.to) : "a new contract"}.` });
@@ -161,6 +175,7 @@ async function explain(tx, receipt) {
     time: new Date(Number(block.timestamp) * 1000).toISOString(),
     block: Number(receipt.blockNumber),
     transfers,
+    contracts: [...named].map(([address, name]) => ({ address, name })),
     explorer: `${EXPLORER}/tx/${tx.hash}`,
   };
 }

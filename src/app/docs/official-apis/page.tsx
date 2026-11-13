@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { shelve } from "@/lib/api-shelves";
 import { TOKEN } from "@/lib/constants";
 import { Page, Section, Table } from "../ui";
 
@@ -17,7 +18,7 @@ const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }
   { name: "New Launches", slug: "new-launches", path: "/launches?limit=10", about: "The newest launchpad tokens: age, buys, sells, market cap and curve progress" },
   { name: "Risk Checker", slug: "token-risk", path: "/risk/<token>", about: "A rug-risk score from holder concentration, the creator, launch-block buyers and bot volume" },
   { name: "Tx Explainer", slug: "tx-explainer", path: "/tx/<hash>", about: "A Robinhood Chain transaction in plain English: launches, buys, sells, transfers and fee" },
-  { name: "Wallet Portfolio", slug: "wallet-portfolio", path: "/portfolio/<wallet>", about: "ETH, USDG, WETH, $AUTONOMO and recently received tokens, valued in USD, with impostor tokens flagged" },
+  { name: "Wallet Portfolio", slug: "wallet-portfolio", path: "/portfolio/<wallet>", about: "ETH, USDG, WETH, $AUTONOMO and every other token the wallet holds, valued in USD, with impostor tokens flagged" },
   { name: "Page Reader", slug: "page-reader", path: "/page?url=<https link>", about: "Title, description and readable text of a public web page" },
   {
     name: "Ostrapad Offer Finder",
@@ -55,21 +56,34 @@ export default function OfficialApisPage() {
     <Page eyebrow="Docs" title="Official APIs">
       <p>
         Autonomo runs its own APIs for {TOKEN.chainName}, each behind a gateway and payable per call in USDG or{" "}
-        {TOKEN.symbol}. Call them at <code>{HOST}/x/&lt;slug&gt;&lt;path&gt;</code>. Everything is read from public
-        chains.
+        {TOKEN.symbol}. Call them at <code>{HOST}/x/&lt;slug&gt;&lt;path&gt;</code>. They are grouped by what you are
+        asking about: a token, a wallet or a transaction. Those three groups read {TOKEN.chainName} directly.
       </p>
-      <Table
-        rows={OFFICIAL_APIS.map((a) => [
-          <>
-            <span className="font-medium whitespace-nowrap text-ink">{a.name}</span>
-            <span className="block font-mono text-xs whitespace-nowrap text-faint">
-              /x/{a.slug}
-              {a.path}
-            </span>
-          </>,
-          a.about,
-        ])}
-      />
+      {shelve(OFFICIAL_APIS).map(({ shelf, apis }) => (
+        <div key={shelf.id}>
+          <h3 className="mt-6 flex flex-wrap items-center gap-2 font-medium text-ink">
+            {shelf.title}
+            {shelf.onchain && (
+              <span className="rounded-full border border-accent px-2 py-0.5 text-[11px] font-normal text-accent">
+                On-chain
+              </span>
+            )}
+            <span className="text-sm font-normal text-faint">{shelf.about}</span>
+          </h3>
+          <Table
+            rows={apis.map((a) => [
+              <>
+                <span className="font-medium whitespace-nowrap text-ink">{a.name}</span>
+                <span className="block font-mono text-xs whitespace-nowrap text-faint">
+                  /x/{a.slug}
+                  {a.path}
+                </span>
+              </>,
+              a.about,
+            ])}
+          />
+        </div>
+      ))}
       <p>
         Try any of them without a wallet in the <Link href="/playground">Agent Playground</Link>, or call them from your
         agent: see <Link href="/docs/agents">Use Autonomo from your agent</Link>. They also accept private payments from a
