@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { shelve } from "@/lib/api-shelves";
 import { BURN_BPS, burnFactory } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
 import { GATEWAY_USAGE } from "@/lib/playground";
@@ -74,14 +75,18 @@ async function officialApiLines() {
   try {
     const gateways = await listAutonomoGateways();
     if (gateways.length === 0) return [LIST_FALLBACK];
-    return gateways.map((g) => {
-      const prices = [
-        g.autonomoAmount === null ? null : `${amount(Number(g.autonomoAmount))} ${TOKEN.symbol}`,
-        g.acceptUsdg ? `${amount(Number(g.priceUsd))} USDG` : null,
-      ].filter(Boolean);
-      const usage = GATEWAY_USAGE[g.slug] ?? "/";
-      return `- [${g.name}](${SITE}/projects/${g.projectSlug}): ${sentence(g.description)} Call \`GET ${SITE}/x/${g.slug}${usage}\`. Price per call: ${prices.join(" or ")}.`;
-    });
+    // Grouped the way the site groups them: by what the caller is asking about.
+    return shelve(gateways).flatMap(({ shelf, apis }, i) => [
+      `${i ? "\n" : ""}### ${shelf.title}${shelf.onchain ? ` (on-chain, reads ${TOKEN.chainName})` : ""}\n`,
+      ...apis.map((g) => {
+        const prices = [
+          g.autonomoAmount === null ? null : `${amount(Number(g.autonomoAmount))} ${TOKEN.symbol}`,
+          g.acceptUsdg ? `${amount(Number(g.priceUsd))} USDG` : null,
+        ].filter(Boolean);
+        const usage = GATEWAY_USAGE[g.slug] ?? "/";
+        return `- [${g.name}](${SITE}/projects/${g.projectSlug}): ${sentence(g.description)} Call \`GET ${SITE}/x/${g.slug}${usage}\`. Price per call: ${prices.join(" or ")}.`;
+      }),
+    ]);
   } catch (e) {
     console.error("llms.txt gateway list failed", e);
     return [LIST_FALLBACK];

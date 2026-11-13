@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CATEGORIES } from "@/db/schema";
+import { shelve } from "@/lib/api-shelves";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { TOKEN } from "@/lib/constants";
 import { formatUsd, networkLabel } from "@/lib/networks";
@@ -119,28 +120,40 @@ export default async function ProjectsPage({ searchParams }: Props) {
           </div>
           <p className="mt-1 text-sm text-muted">
             Autonomo&apos;s own gateways on {TOKEN.chainName}: pay per call in USDG or {TOKEN.symbol}, no account or key.
+            The ones marked On-chain read {TOKEN.chainName} directly.
           </p>
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {autonomoApis.map((g) => (
-              <li key={g.slug}>
-                <Link
-                  href={`/projects/${g.projectSlug}`}
-                  className="flex h-full gap-3 rounded-md border border-line bg-bg p-3 hover:border-faint"
-                >
-                  <Avatar name={g.name} />
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{g.name}</span>
-                    <span className="mt-0.5 line-clamp-2 block text-xs text-muted">{g.description}</span>
-                    <span className="mt-1.5 block font-mono text-xs">
-                      {g.acceptUsdg ? `${formatUsd(g.priceUsd)} USDG` : ""}
-                      {g.acceptUsdg && g.autonomoAmount ? " · " : ""}
-                      {g.autonomoAmount ? `${Number(g.autonomoAmount).toLocaleString("en")} ${TOKEN.symbol}` : ""}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {shelve(autonomoApis).map(({ shelf, apis }) => (
+            <div key={shelf.id} className="mt-6 first:mt-4">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h3 className="font-mono text-xs tracking-wide text-ink uppercase">{shelf.title}</h3>
+                {shelf.onchain && (
+                  <span className="rounded-full border border-accent px-2 py-0.5 text-[11px] text-accent">On-chain</span>
+                )}
+                <span className="text-xs text-faint">{shelf.about}</span>
+              </div>
+              <ul className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {apis.map((g) => (
+                  <li key={g.slug}>
+                    <Link
+                      href={`/projects/${g.projectSlug}`}
+                      className="flex h-full gap-3 rounded-md border border-line bg-bg p-3 hover:border-faint"
+                    >
+                      <Avatar name={g.name} />
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{g.name}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-xs text-muted">{g.description}</span>
+                        <span className="mt-1.5 block font-mono text-xs">
+                          {g.acceptUsdg ? `${formatUsd(g.priceUsd)} USDG` : ""}
+                          {g.acceptUsdg && g.autonomoAmount ? " · " : ""}
+                          {g.autonomoAmount ? `${Number(g.autonomoAmount).toLocaleString("en")} ${TOKEN.symbol}` : ""}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
       )}
 

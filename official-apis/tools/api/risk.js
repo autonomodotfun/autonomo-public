@@ -13,7 +13,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { createPublicClient, defineChain, http, isAddress, parseAbi, toHex } from "viem";
 import { base } from "viem/chains";
-import { findPool, fullHistory, launchLog } from "./_lib.js";
+import { findPool, findsOldLaunches, launchLog } from "./_lib.js";
 
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const BUY = "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455"; // data: ethIn, tokensOut, fee, fee
@@ -113,7 +113,7 @@ async function check(token) {
   if (!launch) {
     return {
       status: 404,
-      body: { error: "not_found", message: fullHistory() ? "No launch found for this token on the Robinhood Chain launchpad." : "No launch found for this token on the Robinhood Chain launchpad in the last ~13 days." },
+      body: { error: "not_found", message: findsOldLaunches() ? "No launch found for this token on the Robinhood Chain launchpad." : "No launch found for this token on the Robinhood Chain launchpad in the last ~13 days." },
     };
   }
   const curve = addr(launch.topics[2]);

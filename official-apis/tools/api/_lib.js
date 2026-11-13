@@ -100,8 +100,11 @@ const MISS_MS = 60_000;
  * search at 10M blocks, so months of history become dozens of requests at once and get rate limited. */
 export const fullHistory = () => Boolean(process.env.ROBINHOOD_RPC_URL?.trim());
 
+/** Whether a launch of any age can be found: with an RPC of our own, or by asking Blockscout for the block. */
+export const findsOldLaunches = () => fullHistory() || hasBlockscout();
+
 /** The launchpad factory's launch log for a token, or null if it wasn't launched there (within ~13 days on the
- * public RPC). With `recentOnly`, always just ~13 days, for callers that look up many tokens in one answer. */
+ * public RPC when there's no Blockscout key either). With `recentOnly`, always just ~13 days, for callers that look up many tokens in one answer. */
 export async function launchLog(token, latest, { recentOnly = false } = {}) {
   const key = token.toLowerCase();
   if (launchLogs.has(key)) return launchLogs.get(key);
@@ -112,7 +115,15 @@ export async function launchLog(token, latest, { recentOnly = false } = {}) {
   const recent = latest > SEARCH_SPAN ? latest - SEARCH_SPAN : 0n;
   const from = whole ? LAUNCHPAD_START : recent > LAUNCHPAD_START ? recent : LAUNCHPAD_START;
   // Filtered by token, the search returns at most one log, so one request covers any range on a paid RPC.
-  const [hit] = await logsBetween({ address: FACTORY, topics: [LAUNCHED, pad(key)] }, from, latest);
+  let [hit] = await logsBetween({ address: FACTORY, topics: [LAUNCHED, pad(key)] }, from, latest);
+  // Older than the public RPC can search: Blockscout knows the block the token was created in, and the launch
+  // event sits in that same block, so the search shrinks to one block.
+  if (!hit && !whole && !recentOnly && hasBlockscout()) {
+    const block = await creationBlock(key).catch(() => null);
+    if (block !== null && block < from) {
+      [hit] = await logsBetween({ address: FACTORY, topics: [LAUNCHED, pad(key)] }, block, block);
+    }
+  }
 
   if (hit) launchLogs.set(key, hit);
   else {
@@ -205,6 +216,83 @@ export async function launchPrice(token, launch, latest) {
   }
   const last = await curvePrice(launch.curve, latest, launch.block);
   return last && { ...last, venue: "curve" };
+}
+
+// ---- Blockscout PRO API: a wallet's whole history, which the RPC can't give. Used by Dev Wallet Tracker and
+// Holders & Bundles. BLOCKSCOUT_KEY is its own key; BLOCKSCOUT_RPS is how many requests a second the plan allows
+// (the Builder plan takes 15, so the default leaves a little room).
+const BLOCKSCOUT = "https://api.blockscout.com/4663";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const GAP_MS = 1000 / Math.max(1, Number(process.env.BLOCKSCOUT_RPS) || 13);
+let queue = Promise.resolve();
+let lastSent = 0;
+/** Requests start one gap apart and then run side by side, so a burst never passes the plan's limit. */
+function turn() {
+  queue = queue.then(async () => {
+    const wait = lastSent + GAP_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastSent = Date.now();
+  });
+  return queue;
+}
+
+export const hasBlockscout = () => Boolean(process.env.BLOCKSCOUT_KEY?.trim());
+
+/** One Blockscout request; null for a 404. The key rides in the query, so errors never carry the URL. */
+export async function blockscout(path, params = {}) {
+  const url = new URL(BLOCKSCOUT + path);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+  url.searchParams.set("apikey", process.env.BLOCKSCOUT_KEY.trim());
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await turn();
+    let res;
+    try {
+      // Blockscout turns away some default client names, so this sends the one its docs are tested with.
+      res = await fetch(url, { headers: { "user-agent": "curl/8.5.0", accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
+    } catch {
+      continue;
+    }
+    if (res.status === 404) return null;
+    if (res.status === 429 || res.status >= 500) {
+      await sleep(300 * (attempt + 1));
+      continue;
+    }
+    if (!res.ok) throw new Error(`Blockscout answered ${res.status} for ${path}`);
+    return res.json();
+  }
+  throw new Error(`Blockscout didn't answer for ${path}`);
+}
+
+/** The block a contract was created in, or null when Blockscout doesn't know. */
+async function creationBlock(address) {
+  const about = await blockscout(`/api/v2/addresses/${address}`);
+  const hash = about?.creation_transaction_hash ?? about?.creation_tx_hash;
+  if (!hash) return null;
+  const tx = await blockscout(`/api/v2/transactions/${hash}`);
+  return tx?.block_number ? BigInt(tx.block_number) : null;
+}
+
+const names = new Map();
+/** The verified name of a contract ("PoolManager"), or null for a wallet or an unnamed contract. Never throws. */
+export async function contractName(address) {
+  const key = address.toLowerCase();
+  if (names.has(key)) return names.get(key);
+  if (!hasBlockscout()) return null;
+  try {
+    const about = await blockscout(`/api/v2/addresses/${key}`);
+    const name = about?.is_contract && about.name ? String(about.name).slice(0, 60) : null;
+    if (names.size > 20_000) names.clear();
+    names.set(key, name);
+    return name;
+  } catch {
+    return null;
+  }
+}
+
+/** An Etherscan-style list (tokentx, txlist, txlistinternal), oldest first. Empty comes back as a message, not a list. */
+export async function blockscoutList(action, params) {
+  const r = await blockscout("/api", { module: "account", action, sort: "asc", ...params });
+  return Array.isArray(r?.result) ? r.result : [];
 }
 
 export function sendJson(res, status, body) {

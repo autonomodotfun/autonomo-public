@@ -3,11 +3,13 @@
 // `days` days (1–7, default 2), with current balances and launchpad curve prices. Tokens that copy a known
 // symbol (a fake "USDG" airdrop, say) are flagged as likely impostors.
 //
-// Without an indexer, tokens are discovered from incoming transfers; ETH, USDG, WETH and $AUTONOMO are always
-// checked directly, so long-held core balances never go missing.
+// With a Blockscout key, the wallet's tokens come from Blockscout's list of everything it holds, however long ago
+// it got them. Without one, or if Blockscout doesn't answer, they are discovered from incoming transfers in the last
+// `days` days. ETH, USDG, WETH and $AUTONOMO are always checked directly, so core balances never go missing.
+// Balances are always read from the chain; Blockscout only says which tokens to look at.
 
 import { isAddress, pad, toHex } from "viem";
-import { AUTONOMO, authorized, BLOCKS_PER_DAY, erc20, ethUsd, EXPLORER, findLaunch, getLogs, launchPrice, rh, sendJson, tokenMeta, TRANSFER, USDG, WETH } from "./_lib.js";
+import { AUTONOMO, authorized, blockscout, BLOCKS_PER_DAY, erc20, hasBlockscout, ethUsd, EXPLORER, findLaunch, getLogs, launchPrice, rh, sendJson, tokenMeta, TRANSFER, USDG, WETH } from "./_lib.js";
 
 const SPAN = 29_000n; // log queries without an address filter may span 30,000 blocks
 const PARALLEL = 24;
@@ -59,9 +61,31 @@ async function receivedTokens(wallet, latest, days) {
   return { tokens: [...found], complete: scanned >= windows.length };
 }
 
+/** Every ERC-20 the wallet holds, as Blockscout lists them, with a market price where it has one. Null on failure. */
+async function heldTokens(wallet) {
+  if (!hasBlockscout()) return null;
+  try {
+    const list = await blockscout(`/api/v2/addresses/${wallet}/token-balances`);
+    if (!Array.isArray(list)) return null;
+    const market = new Map();
+    for (const row of list) {
+      const address = String(row.token?.address_hash ?? row.token?.address ?? "").toLowerCase();
+      if (row.token?.type !== "ERC-20" || !isAddress(address) || BigInt(row.value || 0) === 0n) continue;
+      const rate = Number(row.token.exchange_rate);
+      market.set(address, { priceUsd: rate > 0 ? rate : null, holders: Number(row.token.holders_count) || 0 });
+    }
+    // Scam airdrops reach many wallets but trade nowhere; priced tokens and widely held ones go first.
+    const tokens = [...market].sort((a, b) => (b[1].priceUsd ? 1 : 0) - (a[1].priceUsd ? 1 : 0) || b[1].holders - a[1].holders).map(([a]) => a);
+    return { tokens, market };
+  } catch {
+    return null;
+  }
+}
+
 async function portfolio(wallet, days) {
   const latest = await rh.getBlockNumber();
-  const [ethBalance, eth, received] = await Promise.all([rh.getBalance({ address: wallet }), ethUsd(), receivedTokens(wallet, latest, days)]);
+  const [ethBalance, eth, indexed] = await Promise.all([rh.getBalance({ address: wallet }), ethUsd(), heldTokens(wallet)]);
+  const received = indexed ? { tokens: indexed.tokens, complete: true } : await receivedTokens(wallet, latest, days);
   const candidates = [...new Set([USDG, WETH, AUTONOMO, ...received.tokens])].slice(0, 200);
 
   // Current balances; keep the non-zero ones.
@@ -88,6 +112,9 @@ async function portfolio(wallet, days) {
         const last = await Promise.race([lookup, new Promise((r) => setTimeout(() => r(null), 6_000))]);
         if (last?.priceEth != null) {
           [priceUsd, source] = [last.priceEth * 10 ** (meta.decimals - 18) * eth, last.venue === "curve" ? "launchpad curve" : "launchpad Uniswap v4 pool"];
+        } else if (indexed?.market.get(token)?.priceUsd) {
+          // Not a recent launch: fall back to the market price Blockscout shows for the token.
+          [priceUsd, source] = [indexed.market.get(token).priceUsd, "market price shown by Blockscout"];
         }
       }
       const copies = Object.entries(GENUINE).find(([s, a]) => meta.symbol?.toUpperCase().replace(/^\$/, "") === s && a !== token);
@@ -107,7 +134,9 @@ async function portfolio(wallet, days) {
     tokens: holdings,
     unpriced: holdings.filter((h) => h.priceUsd === null).length,
     warnings: holdings.filter((h) => h.warning).length,
-    coverage: `ETH, USDG, WETH and $AUTONOMO always; other tokens received in the last ${days} days${received.complete ? "" : " (partly scanned: the chain was slow)"}.`,
+    coverage: indexed
+      ? `Every token the wallet holds, as listed by Blockscout${held.length < balances.filter((b) => b.raw > 0n).length ? ` (the first ${MAX_TOKENS} shown)` : ""}.`
+      : `ETH, USDG, WETH and $AUTONOMO always; other tokens received in the last ${days} days${received.complete ? "" : " (partly scanned: the chain was slow)"}.`,
     ethUsd: eth,
     explorer: `${EXPLORER}/address/${wallet}`,
     updatedAt: new Date().toISOString(),

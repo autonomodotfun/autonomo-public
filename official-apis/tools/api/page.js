@@ -4,45 +4,11 @@
 // Safety: https only, no credentials in the URL, every hop (including redirects) must resolve to a public
 // address, at most 3 redirects, 2 MB, 10 s, and only HTML or plain-text responses.
 
-import { lookup } from "node:dns/promises";
-import { BlockList, isIP } from "node:net";
 import { authorized, sendJson } from "./_lib.js";
+import { publicUrl } from "./_net.js";
 
 const MAX_BYTES = 2_000_000;
 const MAX_CHARS = 20_000;
-const blocked = new BlockList();
-for (const [net, bits] of [["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.168.0.0", 16], ["198.18.0.0", 15], ["224.0.0.0", 4], ["240.0.0.0", 4]]) {
-  blocked.addSubnet(net, bits, "ipv4");
-}
-// (No ::ffff:0:0/96 rule: Node's BlockList would then match every IPv4 address. IPv4-mapped IPv6 is unwrapped below.)
-for (const [net, bits] of [["::", 128], ["::1", 128], ["fc00::", 7], ["fe80::", 10]]) blocked.addSubnet(net, bits, "ipv6");
-
-function isBlocked(address) {
-  const mapped = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i)?.[1];
-  if (mapped) return blocked.check(mapped, "ipv4");
-  return blocked.check(address, isIP(address) === 6 ? "ipv6" : "ipv4");
-}
-
-async function publicUrl(raw) {
-  let url;
-  try {
-    url = new URL(raw);
-  } catch {
-    return { error: "Pass a full URL, like https://example.com/page" };
-  }
-  if (url.protocol !== "https:") return { error: "Only https URLs are supported." };
-  if (url.username || url.password) return { error: "URLs with credentials aren't allowed." };
-  try {
-    const addrs = await lookup(url.hostname, { all: true, verbatim: true });
-    if (!addrs.length || addrs.some((a) => isBlocked(a.address))) {
-      return { error: "That host isn't a public address." };
-    }
-  } catch {
-    return { error: "That host doesn't resolve." };
-  }
-  return { url };
-}
-
 async function fetchPage(raw) {
   let target = raw;
   for (let hop = 0; hop <= 3; hop++) {
