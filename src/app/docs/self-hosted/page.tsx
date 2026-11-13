@@ -77,7 +77,7 @@ export default function SelfHostedPage() {
               and usage.
             </li>
             <li>
-              <b>Through the launch form.</b> <Link href="/submit">Request a launch</Link> with your website and a paid
+              <b>Through the listing form.</b> <Link href="/submit">Request a listing</Link> with your website and a paid
               endpoint URL. Every request is reviewed by hand, and APIs with a live <code>402</code> endpoint go fastest.
             </li>
           </ul>

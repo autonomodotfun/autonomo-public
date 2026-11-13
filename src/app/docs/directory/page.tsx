@@ -124,11 +124,11 @@ export default async function DirectoryGuidePage() {
           </li>
           <li>
             <b>You run x402 already:</b> register with a facilitator that supports Bazaar discovery and it&apos;s imported
-            automatically, or use the <Link href="/submit">launch form</Link>. See{" "}
+            automatically, or use the <Link href="/submit">listing form</Link>. See{" "}
             <Link href="/docs/self-hosted">Run x402 yourself</Link>.
           </li>
           <li>
-            <b>You build an SDK, facilitator, wallet or tool:</b> send it through the <Link href="/submit">launch form</Link>.
+            <b>You build an SDK, facilitator, wallet or tool:</b> send it through the <Link href="/submit">listing form</Link>.
           </li>
           <li>
             <b>Something&apos;s wrong or out of date:</b> open the project page and choose <b>Suggest an edit</b>. Edits are

@@ -21,42 +21,105 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   if (!owner) {
     return (
-      <div className="mx-auto max-w-xl px-4 pt-16 sm:px-6">
-        <p className="font-mono text-xs tracking-wide text-accent uppercase">Launch dashboard</p>
-        <h1 className="heading mt-2 text-4xl">Launch your API in minutes</h1>
-        <p className="mt-4 text-muted">
-          Put any existing API behind an Autonomo gateway, set a price per call, and AI agents pay you in USDG or
-          $AUTONOMO with every request. No code changes, and {burnPercent() ? `${100 - burnPercent()!}% of each payment reaches your wallet, with ${burnPercent()}% burned.` : "payments go straight to your wallet."}
-        </p>
-        <ol className="mt-6 list-decimal space-y-1.5 pl-5 text-sm text-muted">
-          <li>Sign in. Payments go to your wallet; if you don&apos;t have one, we create it for you.</li>
-          <li>Paste your API&apos;s URL and set a price.</li>
-          <li>Share your gateway URL with agents, or list it in the catalog.</li>
-        </ol>
-        <p className="mt-3 text-sm text-muted">
-          New to this? Follow the <Link href="/docs/launch" className="underline hover:text-ink">step-by-step launch guide</Link>.
-        </p>
-        <div className="mt-8">
-          {authEnabled() && privyEnabled() ? (
-            <>
-              <PrivySignIn />
-              <details className="mt-6 text-sm text-muted">
-                <summary className="cursor-pointer hover:text-ink">Or sign in directly with a browser wallet</summary>
-                <div className="mt-3">
-                  <ConnectWallet />
-                </div>
-              </details>
-            </>
-          ) : authEnabled() ? (
-            <ConnectWallet />
-          ) : (
-            <p className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted">
-              Wallet sign-in isn&apos;t enabled on this deployment yet.
+      <div className="mx-auto max-w-4xl px-4 pt-16 sm:px-6">
+        <p className="font-mono text-xs tracking-wide text-accent uppercase">For API creators</p>
+        <h1 className="heading mt-2 text-4xl">Get paid by AI agents for your API</h1>
+        <p className="mt-4 text-muted">There are two ways in. Pick the one that describes your API today.</p>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <section className="rounded-lg border border-accent p-5">
+            <p className="font-mono text-xs tracking-wide text-accent uppercase">Most creators start here</p>
+            <h2 className="heading mt-2 text-2xl">I have a normal API</h2>
+            <p className="mt-2 text-sm text-muted">
+              It works with an API key, or with no key at all. We give it a paid address, you set a price per call, and
+              agents pay you in USDG or $AUTONOMO. You don&apos;t change any code.
             </p>
-          )}
+            <Flow steps={["Agent", "Autonomo collects the payment", "Your API"]} highlight={1} />
+            <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-sm text-muted">
+              <li>Sign in. If you don&apos;t have a wallet, we create one for you.</li>
+              <li>Paste your API&apos;s address and set a price.</li>
+              <li>Share your paid address with agents, or ask to be listed.</li>
+            </ol>
+            <p className="mt-3 text-sm text-muted">
+              {burnPercent()
+                ? `You keep ${100 - burnPercent()!}% of every payment. The other ${burnPercent()}% is burned, and Autonomo keeps none of it.`
+                : "Payments go straight to your wallet. Autonomo takes no cut."}
+            </p>
+            <div className="mt-5">
+              {authEnabled() && privyEnabled() ? (
+                <>
+                  <PrivySignIn />
+                  <details className="mt-4 text-sm text-muted">
+                    <summary className="cursor-pointer hover:text-ink">Or sign in directly with a browser wallet</summary>
+                    <div className="mt-3">
+                      <ConnectWallet />
+                    </div>
+                  </details>
+                </>
+              ) : authEnabled() ? (
+                <ConnectWallet />
+              ) : (
+                <p className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted">
+                  Wallet sign-in isn&apos;t enabled on this deployment yet.
+                </p>
+              )}
+            </div>
+            <p className="mt-4 text-sm text-muted">
+              New to this? Follow the <Link href="/docs/launch" className="underline hover:text-ink">step-by-step launch guide</Link>.
+            </p>
+          </section>
+
+          <section className="rounded-lg border border-line p-5">
+            <p className="font-mono text-xs tracking-wide text-faint uppercase">Already taking payments</p>
+            <h2 className="heading mt-2 text-2xl">My API already takes x402 payments</h2>
+            <p className="mt-2 text-sm text-muted">
+              You run x402 yourself and want agents to find you. We add your API to the directory. Nothing changes in how
+              you get paid, and there&apos;s nothing to sign in to.
+            </p>
+            <Flow steps={["Agent", "Your API collects the payment"]} />
+            <p className="mt-4 text-sm text-muted">
+              Autonomo only shows your API to agents. The payment never passes through us, so there&apos;s no dashboard
+              and nothing to set up.
+            </p>
+            <p className="mt-3 text-sm text-muted">This is also where to send a tool, an SDK, a wallet or an agent.</p>
+            <Link href="/submit" className="mt-5 inline-block rounded-md border border-line px-5 py-2.5 text-sm font-medium hover:bg-surface">
+              List my project
+            </Link>
+          </section>
         </div>
-        <p className="mt-6 text-sm text-muted">
-          Already run x402 yourself? <Link href="/submit" className="underline hover:text-ink">List your endpoint</Link> instead.
+
+        <h2 className="heading mt-12 text-2xl">The difference, side by side</h2>
+        <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-line font-mono text-xs tracking-wide text-faint uppercase">
+              <tr>
+                <th className="p-3 font-normal" />
+                <th className="p-3 font-normal text-accent">Launch through us</th>
+                <th className="p-3 font-normal">List your project</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line text-muted">
+              {COMPARE.map(([label, launch, list]) => (
+                <tr key={label}>
+                  <th className="p-3 align-top font-medium text-ink">{label}</th>
+                  <td className="p-3 align-top">{launch}</td>
+                  <td className="p-3 align-top">{list}</td>
+                </tr>
+              ))}
+              {burnPercent() && (
+                <tr>
+                  <th className="p-3 align-top font-medium text-ink">$AUTONOMO burned</th>
+                  <td className="p-3 align-top">{burnPercent()}% of every payment</td>
+                  <td className="p-3 align-top">None</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-4 text-sm text-muted">
+          Both end up in the same <Link href="/projects" className="underline hover:text-ink">directory</Link> that agents
+          search. An API launched through us starts hidden, so only people with its address can call it. You ask to be
+          listed from your dashboard once it works.
         </p>
       </div>
     );
@@ -119,6 +182,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {rows.length > 0 && burnPercent() && <p className="mt-2 text-xs text-faint">Earnings are your share after the {burnPercent()}% burn.</p>}
 
       {rows.length > 0 && <PayoutWallet owner={owner} payee={payeeOf(rows[0].gateway)} draft={params.payTo} note={params.payToNote} />}
+    </div>
+  );
+}
+
+// The two ways in, row by row: [what, launching through a gateway, listing only].
+const COMPARE: [string, string, string][] = [
+  ["Who it's for", "An API that doesn't take crypto payments yet", "An API that already takes x402 payments, or a tool, SDK, wallet or agent"],
+  ["What we do", "Run a paid address for your API", "Add your project to the directory"],
+  ["Who collects the payment", "Autonomo, then it's sent on to your wallet", "You, on your own server"],
+  ["Sign-in", "Yes", "No, a short form we review by hand"],
+  ["What you get", "A dashboard with paid calls, earnings and settings", "A page in the directory"],
+];
+
+/** Who the agent's money passes through, as a row of boxes joined by arrows. */
+function Flow({ steps, highlight }: { steps: string[]; highlight?: number }) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs" aria-label={steps.join(", then ")}>
+      {steps.map((step, i) => (
+        <span key={step} className="flex items-center gap-2">
+          {i > 0 && <span aria-hidden className="text-faint">→</span>}
+          <span className={`rounded-md border px-2 py-1 ${i === highlight ? "border-accent text-accent" : "border-line text-muted"}`}>{step}</span>
+        </span>
+      ))}
     </div>
   );
 }

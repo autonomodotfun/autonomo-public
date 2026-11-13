@@ -3,6 +3,13 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 13, 2026
+
+- **A clearer front door for API creators.** The launch page now opens on two choices: "I have a normal API", which
+  Autonomo puts behind a paid address, and "My API already takes x402 payments", which is only added to the
+  directory. Each shows who collects the payment, and a side-by-side table sets out the rest. The second form is
+  renamed from "Launch your API" to "List your project", and the docs call it the listing form.
+
 ## November 12, 2026
 
 - **`/llms.txt` for AI agents.** A plain-text map of Autonomo in the llms.txt format: the chain and the official

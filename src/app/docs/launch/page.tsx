@@ -271,7 +271,7 @@ const FAQ: [string, React.ReactNode][] = [
   [
     "I already run x402 on my own server. Is this for me?",
     <>
-      You don&apos;t need a gateway. Request a listing through the <Link href="/submit">launch form</Link> instead.
+      You don&apos;t need a gateway. Request a listing through the <Link href="/submit">listing form</Link> instead.
     </>,
   ],
   [
