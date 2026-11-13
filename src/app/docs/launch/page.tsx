@@ -89,7 +89,12 @@ export default function LaunchGuidePage() {
                 the key. The key is encrypted, added to every forwarded call and never shown again, so agents never see it.
               </li>
             </ul>
-            <p>When you launch, Autonomo checks the address starts with https and can be reached from the internet.</p>
+            <p>
+              Then choose <b>Test my API</b>. Autonomo makes one free call to your API, the way a paid call would reach it,
+              and shows you what came back. Add a path your API serves, such as <code>/forecast?city=Lisbon</code>, to see
+              a real answer. Your API has to answer before you can move on: if it refuses the call, check the key, and
+              if it doesn&apos;t answer at all, check that it&apos;s running and that the address starts with https.
+            </p>
           </Step>
           <Step n={5} title="Step 2: set the price per call">
             <ul className="list-disc space-y-1 pl-5">

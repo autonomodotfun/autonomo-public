@@ -168,6 +168,60 @@ export async function forward(g: Gateway, request: Request, path: string): Promi
   return new Response(data as BodyInit, { status: upstream.status, headers: out });
 }
 
+// ---------- test call ----------
+
+const TEST_TIMEOUT_MS = 10_000;
+const TEST_PREVIEW_CHARS = 600;
+
+export type UpstreamTest =
+  | { ok: true; status: number; ms: number; contentType: string | null; preview: string }
+  | { ok: false; error: string };
+
+/**
+ * One GET to a creator's API before it is launched, sent the way forward() would send a paid call: same address
+ * rules, same path containment, no redirects. Returns the status and the start of the answer.
+ */
+export async function testUpstream(baseUrl: string, path: string, auth?: { header: string; secret: string }): Promise<UpstreamTest> {
+  const check = await checkUpstream(baseUrl);
+  if (!check.ok) return { ok: false, error: check.error };
+
+  const base = check.url.href.replace(/\/+$/, "");
+  const extra = path.trim();
+  let target: URL;
+  try {
+    target = new URL(base + (extra && !extra.startsWith("/") ? `/${extra}` : extra));
+  } catch {
+    return { ok: false, error: "That path isn't valid. Try something like /forecast?city=Lisbon" };
+  }
+  const basePath = check.url.pathname.replace(/\/+$/, "");
+  if (target.host !== check.url.host || (basePath && target.pathname !== basePath && !target.pathname.startsWith(`${basePath}/`))) {
+    return { ok: false, error: "That path is outside your API's address." };
+  }
+
+  const headers = new Headers({ accept: "application/json, text/plain;q=0.9, */*;q=0.5", "user-agent": "Autonomo-Gateway-Test" });
+  if (auth?.header && auth.secret) headers.set(auth.header, auth.secret);
+
+  const started = Date.now();
+  let res: Response;
+  try {
+    res = await fetch(target, { method: "GET", headers, redirect: "manual", signal: AbortSignal.timeout(TEST_TIMEOUT_MS), cache: "no-store" });
+  } catch (e) {
+    const timeout = e instanceof Error && e.name === "TimeoutError";
+    return { ok: false, error: timeout ? "Your API didn't answer within 10 seconds." : "Your API couldn't be reached. Check that it's running." };
+  }
+  const ms = Date.now() - started;
+  if (res.status >= 300 && res.status < 400) {
+    return { ok: false, error: `Your API answered with a redirect (${res.status}). Paid calls don't follow redirects, so use the address it redirects to.` };
+  }
+  const contentType = res.headers.get("content-type");
+  const data = await readCapped(res.body, 64_000).catch(() => null);
+  let preview = "";
+  if (!data) preview = "(The answer is larger than this preview can show.)";
+  else if (contentType && !/json|text|xml|javascript/i.test(contentType)) preview = `(${data.length} bytes of ${contentType.split(";")[0]})`;
+  else preview = new TextDecoder().decode(data).slice(0, TEST_PREVIEW_CHARS);
+  return { ok: true, status: res.status, ms, contentType, preview };
+}
+
 // ---------- queries ----------
 
 /** The wallet a gateway pays, which is also the one that holds for Verified. */

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAddress, isHex, verifyMessage, type Hex } from "viem";
 import { getDb, schema } from "@/db";
-import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo } from "@/lib/gateway";
+import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo, testUpstream, type UpstreamTest } from "@/lib/gateway";
 import { applyPayTo, firstSafeMessage } from "@/lib/pay-to";
 import { currentOwner, seal, unseal } from "@/lib/session";
 import { revalidateCatalog } from "@/lib/queries";
@@ -32,6 +32,50 @@ async function requireOwner() {
 
 function str(form: FormData, k: string, max = 500) {
   return String(form.get(k) ?? "").trim().slice(0, max);
+}
+
+/**
+ * Step 1 of the launch form, checked before the creator moves on: the paid address is free and the API's address can
+ * be reached. saveGateway checks both again on launch.
+ */
+export async function checkLaunchStep(slug: string, upstreamUrl: string): Promise<{ slug?: string; upstreamUrl?: string }> {
+  await requireOwner();
+  const errors: { slug?: string; upstreamUrl?: string } = {};
+  const wanted = String(slug).trim().toLowerCase().slice(0, 40);
+  if (RESERVED_SLUGS.has(wanted)) {
+    errors.slug = "That name is reserved.";
+  } else {
+    const db = await getDb();
+    const [taken] = await db.select({ id: gateways.id }).from(gateways).where(eq(gateways.slug, wanted)).limit(1);
+    if (taken) errors.slug = "That paid address is taken.";
+  }
+  const upstream = await checkUpstream(String(upstreamUrl).trim().slice(0, 500));
+  if (!upstream.ok) errors.upstreamUrl = upstream.error;
+  return errors;
+}
+
+// Test calls per signed-in owner. Kept in memory: it only has to stop one browser hammering the button.
+const TESTS_PER_MINUTE = 10;
+const recentTests = new Map<string, number[]>();
+
+/** "Test my API" on the launch form: one free GET to the creator's API, with their key if they typed one. */
+export async function testApi(input: { upstreamUrl: string; path: string; authHeader: string; authSecret: string }): Promise<UpstreamTest> {
+  const owner = await requireOwner();
+  const now = Date.now();
+  const recent = (recentTests.get(owner) ?? []).filter((t) => now - t < 60_000);
+  if (recent.length >= TESTS_PER_MINUTE) return { ok: false, error: "That's a lot of tests. Wait a minute and try again." };
+  recentTests.set(owner, [...recent, now]);
+
+  const header = String(input.authHeader ?? "").trim().slice(0, 64);
+  const secret = String(input.authSecret ?? "").slice(0, 2000);
+  if (header && (!/^[A-Za-z0-9-]{1,64}$/.test(header) || FORBIDDEN_HEADERS.has(header.toLowerCase()))) {
+    return { ok: false, error: "Use a plain header name for your key, like Authorization or X-API-Key." };
+  }
+  return testUpstream(
+    String(input.upstreamUrl ?? "").trim().slice(0, 500),
+    String(input.path ?? "").slice(0, 500),
+    header && secret ? { header, secret } : undefined,
+  );
 }
 
 /** Creates a gateway, or updates one when the form carries an id. */
