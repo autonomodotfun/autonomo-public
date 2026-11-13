@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { saveGateway, type GatewayFormState } from "./actions";
+import type { UpstreamTest } from "@/lib/gateway";
+import { checkLaunchStep, saveGateway, testApi, type GatewayFormState } from "./actions";
 
 export type GatewayDefaults = {
   id?: number;
@@ -44,6 +45,19 @@ const STEP_OF: Record<string, number> = {
 
 type Errors = Record<string, string | undefined>;
 
+// What each field is called on the form, for the list of problems shown on the review.
+const FIELD_LABEL: Record<string, string> = {
+  name: "API name",
+  slug: "Your paid address",
+  description: "What does it do?",
+  upstreamUrl: "Your API's address",
+  authHeader: "Your API key",
+  authSecret: "Your API key",
+  priceUsd: "Price per call",
+  autonomoAmount: "Price per call",
+  acceptUsdg: "Price per call",
+};
+
 // The same rules the server applies on save, checked early so a mistake shows on the step it was made.
 function checkStep(step: number, f: FormData): Errors {
   const get = (k: string) => String(f.get(k) ?? "").trim();
@@ -71,6 +85,22 @@ function checkStep(step: number, f: FormData): Errors {
   return e;
 }
 
+/**
+ * What a test call means for launching. An answer of any kind passes unless the API refused the call (401, 403) or
+ * failed on its own side (5xx): those would fail the same way for a paying agent.
+ */
+function verdict(t: UpstreamTest): { pass: boolean; text: string } {
+  if (!t.ok) return { pass: false, text: t.error };
+  if (t.status === 401 || t.status === 403) {
+    return { pass: false, text: `Your API answered ${t.status}, which means it refused the call. It probably needs a key: check the header name and key above.` };
+  }
+  if (t.status >= 500) return { pass: false, text: `Your API answered ${t.status}, which is an error on its side. Fix that first, then test again.` };
+  if (t.status >= 400) {
+    return { pass: true, text: `Your API answered ${t.status} in ${t.ms} ms. That's fine if this path isn't a real one. Add a path your API serves to see a real answer.` };
+  }
+  return { pass: true, text: `Your API answered ${t.status} in ${t.ms} ms.` };
+}
+
 /** A number without trailing zeros, to 6 decimals: 0.0095, not 0.009500. */
 const trim = (n: number) => String(Number(n.toFixed(6)));
 
@@ -94,7 +124,14 @@ export function GatewayForm({
   const [step, setStep] = useState(0);
   const [stepErrors, setStepErrors] = useState<Errors>({});
   const [review, setReview] = useState<Record<string, string>>({});
-  const err: Errors = { ...(state.errors ?? {}), ...stepErrors };
+  // What the server refused on the last launch. Cleared once the creator gets past the step again.
+  const [launchErrors, setLaunchErrors] = useState<Errors>({});
+  const [checking, setChecking] = useState(false);
+  // The last test call, and exactly what it was run against, so a changed address or key is tested again.
+  const [testPath, setTestPath] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [tested, setTested] = useState<{ sig: string; result: UpstreamTest } | null>(null);
+  const err: Errors = { ...(wizard ? launchErrors : (state.errors ?? {})), ...stepErrors };
   const [slug, setSlug] = useState(v?.slug ?? defaults.slug);
   const [slugTouched, setSlugTouched] = useState(Boolean(defaults.slug));
   const [acceptAutonomo, setAcceptAutonomo] = useState(v ? v.acceptAutonomo === "on" : Boolean(defaults.autonomoAmount));
@@ -105,16 +142,52 @@ export function GatewayForm({
   const [autonomoAmount, setAutonomoAmount] = useState(v?.autonomoAmount ?? defaults.autonomoAmount);
   const [secret, setSecret] = useState("");
 
-  // The server found a problem on launch: open the first step that has one.
+  // The server refused the launch: stay on the review and say why there, with a way back to the step to fix.
   useEffect(() => {
-    if (!wizard || !state.errors) return;
-    const steps = Object.keys(state.errors).map((k) => STEP_OF[k] ?? 0);
-    if (steps.length) setStep(Math.min(...steps));
+    if (wizard) setLaunchErrors(state.errors ?? {});
   }, [state, wizard]);
+  const launchProblems = Object.entries(launchErrors).filter(([, message]) => message);
+  const firstProblemStep = Math.min(...launchProblems.map(([k]) => STEP_OF[k] ?? 0));
 
-  function go(to: number) {
+  async function runTest(data: FormData) {
+    const input = {
+      upstreamUrl: String(data.get("upstreamUrl") ?? "").trim(),
+      path: testPath.trim(),
+      authHeader: String(data.get("authHeader") ?? "").trim(),
+      authSecret: String(data.get("authSecret") ?? ""),
+    };
+    const sig = JSON.stringify(input);
+    if (tested?.sig === sig) return tested.result;
+    setTesting(true);
+    let result: UpstreamTest;
+    try {
+      result = await testApi(input);
+    } catch {
+      result = { ok: false, error: "The test couldn't run. Try again in a moment." };
+    } finally {
+      setTesting(false);
+    }
+    setTested({ sig, result });
+    return result;
+  }
+
+  async function testNow() {
     const form = formRef.current;
-    if (!form) return;
+    if (!form || testing || checking) return;
+    const data = new FormData(form);
+    const errors = checkStep(0, data);
+    // Only the address and the key matter for a test; the name can still be empty.
+    if (errors.upstreamUrl || errors.authHeader) {
+      setStepErrors({ upstreamUrl: errors.upstreamUrl, authHeader: errors.authHeader });
+      return;
+    }
+    setStepErrors({});
+    await runTest(data);
+  }
+
+  async function go(to: number) {
+    const form = formRef.current;
+    if (!form || checking || testing) return;
     if (to > step) {
       const data = new FormData(form);
       // Every step before the one being opened has to pass.
@@ -125,7 +198,33 @@ export function GatewayForm({
           setStep(s);
           return;
         }
+        // Leaving step 1: ask the server now whether the paid address is free and the API's address can be reached,
+        // so the creator hears about it here and not after the review.
+        if (s === 0) {
+          setChecking(true);
+          let found: Errors = {};
+          try {
+            found = await checkLaunchStep(String(data.get("slug") ?? ""), String(data.get("upstreamUrl") ?? ""));
+          } catch {
+            // The check couldn't run. Launching checks the same things again.
+          } finally {
+            setChecking(false);
+          }
+          if (Object.keys(found).length) {
+            setStepErrors(found);
+            setStep(0);
+            return;
+          }
+          // Then one real call, unless this exact address and key were already tested.
+          const result = await runTest(data);
+          if (!verdict(result).pass) {
+            setStepErrors({ test: "Your API has to answer a test call before you can go on." });
+            setStep(0);
+            return;
+          }
+        }
       }
+      setLaunchErrors({});
       // The key itself is never copied into the review, only whether one was typed.
       if (to === 2) setReview(Object.fromEntries([...data.entries()].map(([k, val]) => [k, k === "authSecret" ? (val ? "set" : "") : String(val).trim()])));
     }
@@ -251,6 +350,46 @@ export function GatewayForm({
             </label>
           )}
         </fieldset>
+
+        {wizard && (
+          <fieldset className="space-y-4 rounded-lg border border-line p-4">
+            <legend className="px-1 text-sm font-medium">Test your API</legend>
+            <p className="text-sm text-muted">
+              We make one free call to your API, the way a paid call would reach it, and show you what comes back. Your
+              API has to answer before you can go on.
+            </p>
+            <div>
+              <label htmlFor="testPath" className="mb-1.5 block text-sm font-medium">
+                A path to try <span className="font-normal text-faint">(optional)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {/* No name: this is only for the test and isn't saved with the API. */}
+                <input
+                  id="testPath"
+                  value={testPath}
+                  onChange={(e) => setTestPath(e.target.value)}
+                  placeholder="/forecast?city=Lisbon"
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="field min-w-0 flex-1 font-mono"
+                />
+                <button type="button" onClick={testNow} disabled={testing || checking} aria-busy={testing} className="rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-surface">
+                  {testing ? "Calling your API…" : tested ? "Test again" : "Test my API"}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-faint">Added to your API&apos;s address. Leave it empty to call the address as it is.</p>
+            </div>
+            {tested && !testing && (
+              <div className={`rounded-md border p-3 text-sm ${verdict(tested.result).pass ? "border-accent bg-accent-soft" : "border-warn"}`} role="status">
+                <p className={`font-medium ${verdict(tested.result).pass ? "text-accent" : "text-warn"}`}>{verdict(tested.result).text}</p>
+                {tested.result.ok && tested.result.preview && (
+                  <pre className="mt-2 max-h-48 overflow-auto font-mono text-xs break-all whitespace-pre-wrap text-muted">{tested.result.preview}</pre>
+                )}
+              </div>
+            )}
+            {err.test && <p className="text-sm text-warn" role="alert">{err.test}</p>}
+          </fieldset>
+        )}
       </div>
 
       <div className={shown(1)}>
@@ -312,6 +451,21 @@ export function GatewayForm({
 
       {wizard && (
         <div className={shown(2)}>
+          {!pending && launchProblems.length > 0 && (
+            <div className="rounded-lg border border-warn p-4 text-sm" role="alert">
+              <p className="font-medium text-warn">Not launched yet. {launchProblems.length === 1 ? "One thing needs fixing:" : "A few things need fixing:"}</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
+                {launchProblems.map(([field, message]) => (
+                  <li key={field}>
+                    <span className="text-ink">{FIELD_LABEL[field] ?? field}:</span> {message}
+                  </li>
+                ))}
+              </ul>
+              <button type="button" onClick={() => go(firstProblemStep)} className="mt-3 rounded-md border border-line px-3 py-1.5 hover:bg-surface">
+                Go back and fix {launchProblems.length === 1 ? "it" : "them"}
+              </button>
+            </div>
+          )}
           <dl className="divide-y divide-line rounded-lg border border-line text-sm">
             <Row label="API name" value={review.name} />
             <Row label="Your paid address" value={paidAddress} mono />
@@ -327,6 +481,7 @@ export function GatewayForm({
                 .filter(Boolean)
                 .join(", or ")}
             />
+            {tested && <Row label="Test call" value={verdict(tested.result).text} />}
             {review.acceptUsdg === "on" && burnPercent ? (
               <Row
                 label="What you keep"
@@ -349,8 +504,8 @@ export function GatewayForm({
           </button>
         )}
         {wizard && step < 2 ? (
-          <button type="button" onClick={() => go(step + 1)} className="btn-brand px-5 py-2.5 text-sm">
-            {step === 0 ? "Next: your price" : "Next: review"}
+          <button type="button" onClick={() => go(step + 1)} disabled={checking || testing} aria-busy={checking || testing} className="btn-brand px-5 py-2.5 text-sm">
+            {checking ? "Checking your API's address…" : testing ? "Calling your API…" : step === 0 ? "Next: your price" : "Next: review"}
           </button>
         ) : (
           <button disabled={pending} aria-busy={pending} className="btn-brand inline-flex items-center gap-2 px-5 py-2.5 text-sm">
@@ -371,7 +526,7 @@ export function GatewayForm({
           <SavedNotice />
         )}
       </div>
-      {!pending && Object.keys(err).length > 0 && (
+      {!pending && Object.keys(err).length > 0 && !(wizard && step === 2) && (
         <p className="text-sm text-warn" role="alert">
           {wizard ? "Fix the highlighted fields above to continue." : "Not saved yet. Fix the highlighted fields above and try again."}
         </p>

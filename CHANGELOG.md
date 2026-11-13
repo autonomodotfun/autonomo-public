@@ -13,6 +13,10 @@ repo gets a copy of each release.
   have plainer names: "Your paid address" for the gateway URL, "Your API's address" for the upstream URL, and "Your API
   key, if it needs one" for the auth header and secret. A mistake shows on the step where it was made, and the review
   works out what you keep from each call after the burn.
+- **Test your API before you launch it.** Step 1 of the launch form has a "Test my API" button. Autonomo makes one
+  free call to your API, the way a paid call would reach it, and shows the status, the time it took and the start of
+  the answer. An API that doesn't answer, refuses the call or fails on its own side can't be launched until it's
+  fixed. A problem found at launch now shows on the review, with a button back to the step that needs fixing.
 
 ## November 12, 2026
 
