@@ -9,6 +9,10 @@ repo gets a copy of each release.
   Autonomo puts behind a paid address, and "My API already takes x402 payments", which is only added to the
   directory. Each shows who collects the payment, and a side-by-side table sets out the rest. The second form is
   renamed from "Launch your API" to "List your project", and the docs call it the listing form.
+- **Launching an API in three short steps.** The launch form is now Your API, Your price, then a review. The fields
+  have plainer names: "Your paid address" for the gateway URL, "Your API's address" for the upstream URL, and "Your API
+  key, if it needs one" for the auth header and secret. A mistake shows on the step where it was made, and the review
+  works out what you keep from each call after the burn.
 
 ## November 12, 2026
 

@@ -60,16 +60,16 @@ export default function LaunchGuidePage() {
           </Step>
           <Step n={2} title="Choose Launch an API">
             <p>
-              Choose <b>Launch an API</b> at the top of the dashboard. The form has three parts: about your API, your
-              existing API, and the price per call.
+              Choose <b>Launch an API</b> at the top of the dashboard. The form has three short steps: your API, your
+              price, then a review before you launch.
             </p>
             <Shot src="/docs/launch/2-dashboard.png" width={1100} height={612} alt="The dashboard listing your APIs, with a Launch an API button" caption="Your dashboard. Launch an API is at the top right; your APIs are listed below." />
           </Step>
-          <Step n={3} title="Name it and pick its gateway URL">
+          <Step n={3} title="Step 1: name it and pick its paid address">
             <ul className="list-disc space-y-1 pl-5">
               <li><b>API name:</b> what people and agents see, for example <i>Weather Forecasts</i>.</li>
               <li>
-                <b>Gateway URL:</b> filled in from the name, and you can change it: 3 to 40 lowercase letters, numbers or
+                <b>Your paid address:</b> filled in from the name, and you can change it: 3 to 40 lowercase letters, numbers or
                 dashes. Agents call <code>{HOST}/x/your-api/…</code>, and it can&apos;t be one that&apos;s already taken.
               </li>
               <li>
@@ -78,20 +78,20 @@ export default function LaunchGuidePage() {
               </li>
             </ul>
           </Step>
-          <Step n={4} title="Connect your existing API">
+          <Step n={4} title="Still step 1: connect your API">
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                <b>Upstream base URL:</b> where paid requests go. A call to <code>/x/your-api/forecast?city=Lisbon</code>{" "}
-                is forwarded to <code>&lt;your base URL&gt;/forecast?city=Lisbon</code>, with the same method and body.
+                <b>Your API&apos;s address:</b> where your API lives today, and where paid requests go. A call to <code>/x/your-api/forecast?city=Lisbon</code>{" "}
+                is forwarded to <code>&lt;your API&apos;s address&gt;/forecast?city=Lisbon</code>, with the same method and body.
               </li>
               <li>
-                <b>Auth header</b> and <b>Auth secret</b> (optional): if your API needs a key, enter the header name and
+                <b>Your API key, if it needs one</b> (optional): enter the header name your API reads the key from, and
                 the key. The key is encrypted, added to every forwarded call and never shown again, so agents never see it.
               </li>
             </ul>
-            <p>When you save, Autonomo checks the URL is https and reaches a public address.</p>
+            <p>When you launch, Autonomo checks the address starts with https and can be reached from the internet.</p>
           </Step>
-          <Step n={5} title="Set the price per call">
+          <Step n={5} title="Step 2: set the price per call">
             <ul className="list-disc space-y-1 pl-5">
               <li><b>USDG:</b> a price in dollars, from $0.000001 to $100 per call. USDG payments are one signature for the agent. With a USDG price, your API also accepts <Link href="/docs/gloam">private payments through Gloam</Link>, with nothing to set up.</li>
               <li>
@@ -107,7 +107,7 @@ export default function LaunchGuidePage() {
             </p>
             <Shot src="/docs/launch/3-launch-form.png" width={656} height={976} narrow alt="The launch form filled in for an example Weather Forecasts API priced at $0.005 USDG or 50 $AUTONOMO per call" caption="The launch form, filled in for an example API." />
           </Step>
-          <Step n={6} title="Choose Launch API">
+          <Step n={6} title="Step 3: review and choose Launch API">
             <p>
               It takes a few seconds while the URL is checked. Then you land on your API&apos;s page with &ldquo;Your API is
               live&rdquo; and its gateway URL, ready to copy. If something needs fixing, the form says what next to the field.
@@ -221,8 +221,8 @@ export default function LaunchGuidePage() {
         <Section title="Managing your API">
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <b>Edit:</b> change the name, description, upstream, key or price under <b>Settings</b> on your API&apos;s page.
-              Changes apply to the very next call. Leave the secret blank to keep the saved one.
+              <b>Edit:</b> change the name, description, your API&apos;s address, key or price under <b>Settings</b> on your API&apos;s page.
+              Changes apply to the very next call. Leave the key blank to keep the saved one.
             </li>
             <li>
               <b>Pause:</b> choose <b>Pause</b> and the gateway answers <code>503</code> without charging anyone, until you
