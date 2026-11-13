@@ -32,6 +32,9 @@ repo gets a copy of each release.
   only ones launched in the last 13 days or so.
 - **Tx Explainer names the contracts.** A summary now says "PoolManager" or "PonsV2LaunchAndBuy" next to the short
   address, where the contract has a verified name.
+- **Launch several APIs at once.** For APIs that live at one address: enter the address and key once, list the APIs
+  by typing or pasting, and check and launch them together. Each is tested the same way as a single launch, nothing
+  launches unless all pass, and one tick asks for all of them to be listed.
 
 ## November 12, 2026
 
