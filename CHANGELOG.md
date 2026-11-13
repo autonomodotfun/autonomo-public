@@ -17,6 +17,11 @@ repo gets a copy of each release.
   free call to your API, the way a paid call would reach it, and shows the status, the time it took and the start of
   the answer. An API that doesn't answer, refuses the call or fails on its own side can't be launched until it's
   fixed. A problem found at launch now shows on the review, with a button back to the step that needs fixing.
+- **A clearer "Your API is live" page.** Right after launching, the page shows your paid address, what you earn from
+  each call after the burn, and the three things to do next: see what an agent sees, ask to be listed, and choose
+  where you get paid.
+- **The price step is laid out by chain.** USDG and $AUTONOMO sit under Robinhood Chain, and ticking $AUTONOMO
+  starts the price at 100 a call.
 
 ## November 12, 2026
 

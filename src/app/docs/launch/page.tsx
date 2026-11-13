@@ -105,7 +105,8 @@ export default function LaunchGuidePage() {
               </li>
             </ul>
             <p>
-              Accept one or both. Accepting both lets more agents pay you.
+              Accept one or both. Accepting both lets more agents pay you. Both are on Robinhood Chain. Ticking
+              $AUTONOMO starts the price at 100 a call, which you can change.
               {burn
                 ? ` ${burn}% of each payment is burned and you get the other ${100 - burn}%. Autonomo keeps none of it.`
                 : " Payments go straight to your wallet, and Autonomo takes no cut."}
@@ -115,7 +116,8 @@ export default function LaunchGuidePage() {
           <Step n={6} title="Step 3: review and choose Launch API">
             <p>
               It takes a few seconds while the URL is checked. Then you land on your API&apos;s page with &ldquo;Your API is
-              live&rdquo; and its gateway URL, ready to copy. If something needs fixing, the form says what next to the field.
+              live&rdquo;, your paid address ready to copy, what you earn from each call, and the three things to do next:
+              see what an agent sees, ask to be listed, and choose where you get paid. If something needs fixing, the form says what next to the field.
             </p>
             <Shot src="/docs/launch/4-live.png" width={1008} height={447} alt="The API page after launch, showing Your API is live, the gateway URL and earnings" caption="Right after launch: the gateway URL to share, and your earnings so far." />
           </Step>

@@ -45,12 +45,71 @@ export default async function GatewayDashboard({
   return (
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6">
       <Link href="/dashboard" className="text-sm text-muted hover:text-ink">← Your APIs</Link>
-      {(flags.launched === "1" || flags.saved === "1") && (
+      {flags.saved === "1" && (
         <div role="status" className="mt-4 rounded-lg border border-accent bg-accent-soft px-4 py-3 text-sm font-medium text-accent">
-          {flags.launched === "1"
-            ? "🚀 Your API is live. Share the gateway URL below with agents."
-            : "✓ Changes saved. They apply to the very next call."}
+          ✓ Changes saved. They apply to the very next call.
         </div>
+      )}
+      {flags.launched === "1" && (
+        <section role="status" aria-label="Your API is live" className="mt-4 rounded-lg border border-accent p-5">
+          <p className="font-mono text-xs tracking-wide text-accent uppercase">Launched</p>
+          <h2 className="heading mt-1 text-3xl">Your API is live</h2>
+          <p className="mt-2 text-sm text-muted">
+            Agents can pay for it right now at your paid address. It&apos;s hidden for now, so only people you give the
+            address to can find it.
+          </p>
+
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3">
+            <code className="min-w-0 flex-1 overflow-x-auto font-mono text-sm whitespace-nowrap select-all">{url}</code>
+            <CopyButton text={url} label="Copy paid address" className="btn-brand shrink-0 px-3 py-1.5 text-xs" />
+          </div>
+          {live.length > 0 && (
+            <p className="mt-3 text-sm">
+              <span className="text-muted">What you earn: </span>
+              {live.map((o) => earns(o, burnPercent())).join(", or ")}.
+              {burnPercent() ? <span className="text-muted"> The other {burnPercent()}% is burned, and Autonomo keeps none of it.</span> : null}
+            </p>
+          )}
+
+          <h3 className="mt-6 font-medium">Three things to do next</h3>
+          <ol className="mt-3 grid gap-3 md:grid-cols-3">
+            <li className="rounded-lg border border-line p-4">
+              <p className="font-mono text-xs text-accent">1</p>
+              <p className="mt-1 font-medium">See what an agent sees</p>
+              <p className="mt-1 text-sm text-muted">
+                Call your paid address without paying. It answers with the price, which is how an agent learns what a
+                call costs.
+              </p>
+              <a href="#try" className="mt-3 inline-block text-sm underline hover:text-ink">Show me the command</a>
+            </li>
+            <li className="rounded-lg border border-line p-4">
+              <p className="font-mono text-xs text-accent">2</p>
+              <p className="mt-1 font-medium">Ask to be listed</p>
+              <p className="mt-1 text-sm text-muted">
+                {g.listing === "pending"
+                  ? "You've asked. We review each API by hand, and it appears in the directory once approved."
+                  : g.listing === "listed"
+                    ? "Your API is in the directory, where agents search for APIs to pay for."
+                    : "Put your API in the directory, where agents search for APIs to pay for. We review each one by hand."}
+              </p>
+              {(g.listing === "unlisted" || g.listing === "rejected") && (
+                <form action={requestListing} className="mt-3">
+                  <input type="hidden" name="id" value={g.id} />
+                  <button className="btn-brand px-3 py-1.5 text-xs">Ask to be listed</button>
+                </form>
+              )}
+            </li>
+            <li className="rounded-lg border border-line p-4">
+              <p className="font-mono text-xs text-accent">3</p>
+              <p className="mt-1 font-medium">Choose where you get paid</p>
+              <p className="mt-1 text-sm text-muted">
+                Payments go to <span className="font-mono">{shortAddr(payeeOf(g))}</span>. For real earnings, get paid at a
+                Safe, a wallet that needs more than one signature to move money.
+              </p>
+              <Link href="/docs/safe" className="mt-3 inline-block text-sm underline hover:text-ink">How to get paid at a Safe</Link>
+            </li>
+          </ol>
+        </section>
       )}
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -158,7 +217,7 @@ export default async function GatewayDashboard({
         )}
       </section>
 
-      <section className="mt-10">
+      <section id="try" className="mt-10 scroll-mt-24">
         <h2 className="heading text-xl">Try it</h2>
         <p className="mt-2 text-sm text-muted">
           Without payment, the gateway answers <code>402 Payment Required</code> with the price. An x402 client (see the{" "}
@@ -230,6 +289,19 @@ export default async function GatewayDashboard({
       </section>
     </div>
   );
+}
+
+/** What the creator keeps from one call in a given coin: "$0.0095 of each $0.01 call in USDG". */
+function earns(o: { kind: string; priceUsd?: string | number | null; amount?: string | number | null }, burn?: number) {
+  const keep = (100 - (burn ?? 0)) / 100;
+  const tidy = (n: number) => String(Number(n.toFixed(6)));
+  if (o.kind === "autonomo") {
+    const amount = Number(o.amount);
+    return burn ? `${tidy(amount * keep)} of each ${tidy(amount)} $AUTONOMO call` : `${tidy(amount)} $AUTONOMO a call`;
+  }
+  const price = Number(o.priceUsd);
+  const coin = o.kind.toUpperCase();
+  return burn ? `$${tidy(price * keep)} of each $${tidy(price)} call in ${coin}` : `$${tidy(price)} a call in ${coin}`;
 }
 
 function Card({ label, value, hint }: { label: string; value: string; hint?: string }) {

@@ -28,6 +28,9 @@ const EMPTY: GatewayDefaults = {
   autonomoAmount: "",
 };
 
+// What ticking $AUTONOMO starts at, per call. The official APIs charge the same.
+const DEFAULT_AUTONOMO = "100";
+
 // A new API is launched in three steps. Editing one shows every field at once.
 const STEPS = ["Your API", "Your price", "Review and launch"];
 // Which step each field is on, so an error from the server opens the step it belongs to.
@@ -139,7 +142,7 @@ export function GatewayForm({
   // server never sends the secret back.
   const [acceptUsdg, setAcceptUsdg] = useState(v ? v.acceptUsdg === "on" : defaults.acceptUsdg);
   const [priceUsd, setPriceUsd] = useState(v?.priceUsd ?? defaults.priceUsd);
-  const [autonomoAmount, setAutonomoAmount] = useState(v?.autonomoAmount ?? defaults.autonomoAmount);
+  const [autonomoAmount, setAutonomoAmount] = useState(v?.autonomoAmount || defaults.autonomoAmount || DEFAULT_AUTONOMO);
   const [secret, setSecret] = useState("");
 
   // The server refused the launch: stay on the review and say why there, with a way back to the step to fix.
@@ -401,11 +404,13 @@ export function GatewayForm({
               ? `${burnPercent}% of each payment is burned and your wallet gets the other ${keep}%, usually within a day. Autonomo keeps none of it.`
               : "Payments go straight to the wallet you signed in with. Autonomo takes no cut."}
           </p>
-          {/* Labels wrap only the checkbox and its title, so clicking near a price never toggles the option. */}
+          {/* One box per chain. Labels wrap only the checkbox and its title, so clicking near a price never toggles the option. */}
+          <div className="space-y-4 rounded-md border border-line p-4">
+          <ChainHead name="Robinhood Chain" />
           <div>
             <label className="flex items-center gap-3">
               <input type="checkbox" name="acceptUsdg" checked={acceptUsdg} onChange={(e) => setAcceptUsdg(e.target.checked)} />
-              <span className="text-sm font-medium">USDG on Robinhood Chain</span>
+              <span className="text-sm font-medium">USDG</span>
               <span className="text-xs text-faint">a dollar stablecoin</span>
             </label>
             <div className="mt-2 ml-7 flex items-center gap-2">
@@ -426,7 +431,7 @@ export function GatewayForm({
           <div>
             <label className="flex items-center gap-3">
               <input type="checkbox" name="acceptAutonomo" checked={acceptAutonomo} onChange={(e) => setAcceptAutonomo(e.target.checked)} />
-              <span className="text-sm font-medium">$AUTONOMO on Robinhood Chain</span>
+              <span className="text-sm font-medium">$AUTONOMO</span>
               <span className="text-xs text-faint">our token</span>
             </label>
             {acceptAutonomo && (
@@ -436,7 +441,7 @@ export function GatewayForm({
                   value={autonomoAmount}
                   onChange={(e) => setAutonomoAmount(e.target.value)}
                   inputMode="decimal"
-                  placeholder="1000"
+                  placeholder={DEFAULT_AUTONOMO}
                   className="field w-32"
                   aria-label="Price in AUTONOMO"
                 />
@@ -446,6 +451,8 @@ export function GatewayForm({
             {err.autonomoAmount && <p className="mt-1 ml-7 text-sm text-warn" role="alert">{err.autonomoAmount}</p>}
           </div>
           {err.acceptUsdg && <p className="text-sm text-warn" role="alert">{err.acceptUsdg}</p>}
+          </div>
+
         </fieldset>
       </div>
 
@@ -477,9 +484,9 @@ export function GatewayForm({
             />
             <Row
               label="Price per call"
-              value={[review.acceptUsdg === "on" && `$${review.priceUsd} in USDG`, review.acceptAutonomo === "on" && `${review.autonomoAmount} $AUTONOMO`]
+              value={`${[review.acceptUsdg === "on" && `$${review.priceUsd} in USDG`, review.acceptAutonomo === "on" && `${review.autonomoAmount} $AUTONOMO`]
                 .filter(Boolean)
-                .join(", or ")}
+                .join(", or ")}, on Robinhood Chain`}
             />
             {tested && <Row label="Test call" value={verdict(tested.result).text} />}
             {review.acceptUsdg === "on" && burnPercent ? (
@@ -533,6 +540,11 @@ export function GatewayForm({
       )}
     </form>
   );
+}
+
+/** A chain's name over its payment options. Each chain gets its own box, so another can be added below. */
+function ChainHead({ name }: { name: string }) {
+  return <p className="font-mono text-xs tracking-wide text-ink uppercase">{name}</p>;
 }
 
 function Row({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
