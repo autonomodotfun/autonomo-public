@@ -139,9 +139,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {shortAddr(owner)} · {privyEnabled() ? <PrivySignOut /> : <SignOut />}
           </p>
         </div>
-        <Link href="/dashboard/new" className="btn-brand px-4 py-2 text-sm">
-          Launch an API
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link href="/dashboard/bulk" className="text-sm text-muted underline hover:text-ink">
+            Launch several at once
+          </Link>
+          <Link href="/dashboard/new" className="btn-brand px-4 py-2 text-sm">
+            Launch an API
+          </Link>
+        </div>
       </div>
 
       {!platform.robinhood && (

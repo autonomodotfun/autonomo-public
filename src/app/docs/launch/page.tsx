@@ -121,6 +121,12 @@ export default function LaunchGuidePage() {
             </p>
             <Shot src="/docs/launch/4-live.png" width={1008} height={447} alt="The API page after launch, showing Your API is live, the gateway URL and earnings" caption="Right after launch: the gateway URL to share, and your earnings so far." />
           </Step>
+          <p>
+            <strong>Several APIs at one address?</strong> Use <Link href="/dashboard/bulk">Launch several at once</Link>.
+            You enter the address and key once, then list the APIs, each with its own paid address and price: type them
+            in, or paste a list. &ldquo;Check all&rdquo; applies the same rules as above and makes one free test call to
+            each. Nothing launches unless all of them pass, and you can ask for all of them to be listed in the same go.
+          </p>
         </Section>
 
         <Section title="Check that it works">

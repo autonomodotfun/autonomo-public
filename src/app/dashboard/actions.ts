@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isAddress, isHex, verifyMessage, type Hex } from "viem";
 import { getDb, schema } from "@/db";
 import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo, testUpstream, type UpstreamTest } from "@/lib/gateway";
+import { autonomoAmountValid, headerNameValid, slugError, usdPriceValid } from "@/lib/gateway-rules";
 import { applyPayTo, firstSafeMessage } from "@/lib/pay-to";
 import { currentOwner, seal, unseal } from "@/lib/session";
 import { revalidateCatalog } from "@/lib/queries";
@@ -21,8 +22,6 @@ export type GatewayFormState = {
   errors?: Partial<Record<string, string>>;
   values?: Record<string, string>;
 };
-
-const FORBIDDEN_HEADERS = new Set(["host", "content-length", "cookie", "connection", "transfer-encoding", "payment-signature"]);
 
 async function requireOwner() {
   const owner = await currentOwner();
@@ -68,7 +67,7 @@ export async function testApi(input: { upstreamUrl: string; path: string; authHe
 
   const header = String(input.authHeader ?? "").trim().slice(0, 64);
   const secret = String(input.authSecret ?? "").slice(0, 2000);
-  if (header && (!/^[A-Za-z0-9-]{1,64}$/.test(header) || FORBIDDEN_HEADERS.has(header.toLowerCase()))) {
+  if (header && !headerNameValid(header)) {
     return { ok: false, error: "Use a plain header name for your key, like Authorization or X-API-Key." };
   }
   return testUpstream(
@@ -98,25 +97,21 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
   const errors: Record<string, string> = {};
 
   if (!values.name) errors.name = "Give your API a name.";
-  if (!/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/.test(values.slug)) {
-    errors.slug = "3–40 lowercase letters, numbers or dashes.";
-  } else if (RESERVED_SLUGS.has(values.slug)) {
-    errors.slug = "That name is reserved.";
-  }
+  const badSlug = slugError(values.slug, RESERVED_SLUGS);
+  if (badSlug) errors.slug = badSlug;
   const upstream = await checkUpstream(values.upstreamUrl);
   if (!upstream.ok) errors.upstreamUrl = upstream.error;
 
   const acceptUsdg = values.acceptUsdg === "on";
   const acceptAutonomo = values.acceptAutonomo === "on";
-  const price = Number(values.priceUsd);
-  const priceValid = /^\d+(\.\d{1,6})?$/.test(values.priceUsd) && price > 0 && price <= 100;
+  const priceValid = usdPriceValid(values.priceUsd);
   if (acceptUsdg && !priceValid) errors.priceUsd = "A USD price between 0.000001 and 100, up to 6 decimals.";
-  if (acceptAutonomo && (!/^\d+(\.\d{1,18})?$/.test(values.autonomoAmount) || !(Number(values.autonomoAmount) > 0))) {
+  if (acceptAutonomo && !autonomoAmountValid(values.autonomoAmount)) {
     errors.autonomoAmount = "How many $AUTONOMO per call.";
   }
   if (!acceptUsdg && !acceptAutonomo) errors.acceptUsdg = "Accept at least one payment option.";
 
-  if (values.authHeader && (!/^[A-Za-z0-9-]{1,64}$/.test(values.authHeader) || FORBIDDEN_HEADERS.has(values.authHeader.toLowerCase()))) {
+  if (values.authHeader && !headerNameValid(values.authHeader)) {
     errors.authHeader = "Use a plain header name, like Authorization or X-API-Key.";
   }
   if (secret && !values.authHeader) errors.authHeader = "Say which header your API reads the key from.";
