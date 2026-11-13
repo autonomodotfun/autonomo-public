@@ -64,21 +64,21 @@ export async function checkUpstream(raw: string): Promise<{ ok: true; url: URL }
   try {
     url = new URL(raw);
   } catch {
-    return { ok: false, error: "Enter a full URL, like https://api.example.com" };
+    return { ok: false, error: "Enter a full address, like https://api.example.com" };
   }
-  if (url.username || url.password) return { ok: false, error: "Don't put credentials in the URL; use the auth header." };
+  if (url.username || url.password) return { ok: false, error: "Don't put a key in the address. Use the API key boxes instead." };
   if (url.protocol !== "https:" && !(allowPrivate && url.protocol === "http:")) {
-    return { ok: false, error: "The upstream must use https." };
+    return { ok: false, error: "Your API's address has to start with https." };
   }
-  if (url.search || url.hash) return { ok: false, error: "Use a base URL without a query string." };
+  if (url.search || url.hash) return { ok: false, error: "Leave off anything after a ? or #." };
   if (!allowPrivate) {
     try {
       const addrs = await lookup(url.hostname, { all: true, verbatim: true });
       if (!addrs.length || addrs.some((a) => isPrivate(a.address))) {
-        return { ok: false, error: "That host resolves to a private address." };
+        return { ok: false, error: "That address points to a private network, so we can't reach it." };
       }
     } catch {
-      return { ok: false, error: "That host doesn't resolve." };
+      return { ok: false, error: "We couldn't find that address. Check the spelling." };
     }
   }
   return { ok: true, url };

@@ -17,13 +17,16 @@ export default async function NewGatewayPage() {
       <Link href="/dashboard" className="text-sm text-muted hover:text-ink">← Your APIs</Link>
       <h1 className="heading mt-3 text-4xl">Launch an API</h1>
       <p className="mt-2 text-muted">
-        Autonomo puts your API behind an x402 paywall. Agents pay per call, then the request is forwarded to your API.{" "}
+        Three short steps. We give your API a paid address: an agent pays for a call there, and we pass the call on to
+        your API. Nothing changes on your side.{" "}
         <Link href="/docs/launch" className="underline hover:text-ink">Read the launch guide</Link>.
       </p>
-      <VerifiedPanel owner={(await ownerPayTo(owner)) ?? owner} className="mt-6" />
       <div className="mt-8">
         <GatewayForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} burnPercent={burnPercent()} />
       </div>
+      {/* Optional, so it sits after the form: nobody needs it to launch. */}
+      <VerifiedPanel owner={(await ownerPayTo(owner)) ?? owner} className="mt-12" />
+
     </div>
   );
 }

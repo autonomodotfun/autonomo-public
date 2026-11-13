@@ -75,8 +75,8 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
   if (values.authHeader && (!/^[A-Za-z0-9-]{1,64}$/.test(values.authHeader) || FORBIDDEN_HEADERS.has(values.authHeader.toLowerCase()))) {
     errors.authHeader = "Use a plain header name, like Authorization or X-API-Key.";
   }
-  if (secret && !values.authHeader) errors.authHeader = "Name the header the secret goes in.";
-  if (secret && !secretsEnabled()) errors.authSecret = "Storing upstream secrets isn't enabled on this deployment.";
+  if (secret && !values.authHeader) errors.authHeader = "Say which header your API reads the key from.";
+  if (secret && !secretsEnabled()) errors.authSecret = "Saving an API key isn't enabled on this deployment.";
 
   const db = await getDb();
   const existing = id
@@ -89,7 +89,7 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
       .from(gateways)
       .where(id ? and(eq(gateways.slug, values.slug), ne(gateways.id, id)) : eq(gateways.slug, values.slug))
       .limit(1);
-    if (taken) errors.slug = "That URL is taken.";
+    if (taken) errors.slug = "That paid address is taken.";
   }
   if (Object.keys(errors).length) return { ok: false, errors, values };
 
