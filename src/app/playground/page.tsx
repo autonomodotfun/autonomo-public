@@ -17,6 +17,8 @@ export const metadata: Metadata = {
 /** What one research report pays for, in order (see src/lib/research.ts). */
 const REPORT_CALLS: { step: ResearchPrice["step"]; slug: string }[] = [
   { step: "risk", slug: "token-risk" },
+  { step: "dev", slug: "dev-wallet" },
+  { step: "holders", slug: "holders-bundles" },
   { step: "launch", slug: "tx-explainer" },
   { step: "creator", slug: "wallet-portfolio" },
   { step: "holder", slug: "wallet-portfolio" },

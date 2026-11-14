@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 14, 2026
 
+- **Research reports read the creator and the holders.** A report now also pays Dev Wallet Tracker (what the
+  creator sold, burned, locked and claimed, who funded them, their other launches) and Holders & Bundles (wallets linked
+  by one funder, snipers and what they still hold, same-block buys), with a card for each, and the summary connects
+  them. A report makes six calls, 600 $AUTONOMO, and still finishes in time when a check is slow.
 - **Six new official APIs are live.** Dev Wallet Tracker (what a token's creator did with their tokens and ETH),
   Holders & Bundles (who really holds a token, with linked wallets and snipers), Payment Check (did an x402 payment
   settle, and does it match a receipt), Gas Now (what common actions cost right now), Endpoint Health (is an x402 API
