@@ -42,7 +42,16 @@ export const listColumns = {
 };
 export type ProjectListItem = {
   [K in keyof typeof listColumns]: (typeof listColumns)[K]["_"]["data"];
+} & {
+  /** Set by searchProjects: the project has a live, listed Autonomo gateway (the ones on the Autonomo tab). */
+  autonomo?: boolean;
 };
+
+// Same rule as listAutonomoGateways, so the rows tagged "Autonomo" are exactly the APIs on the Autonomo tab.
+const hasAutonomoGateway = sql<boolean>`exists (
+  select 1 from ${schema.gateways} g
+  where g.project_id = ${projects.id} and g.listing = 'listed' and g.status = 'active' and g.autonomo_amount is not null
+)`;
 
 export function parseProjectQuery(params: Record<string, string | string[] | undefined>): ProjectQuery {
   const one = (k: string) => {
@@ -100,7 +109,7 @@ async function searchProjectsFresh(query: ProjectQuery) {
 
   const [rows, [{ count }]] = await Promise.all([
     db
-      .select(listColumns)
+      .select({ ...listColumns, autonomo: hasAutonomoGateway })
       .from(projects)
       .where(and(...where))
       .orderBy(...order)

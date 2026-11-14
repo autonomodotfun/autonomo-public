@@ -5,6 +5,11 @@ repo gets a copy of each release.
 
 ## November 14, 2026
 
+- **Explore leads with the whole directory.** The top of `/projects` now shows the directory's size in four tiles
+  (projects, paid endpoints, chains, paid calls in 30 days), then one row of Autonomo's most-paid APIs with a link to
+  all of them, then the full list under "All x402 APIs", which now starts on the first screen. Autonomo's APIs have
+  their own **Autonomo** tab, grouped by shelf as before, and carry an "Autonomo" tag in the list. The
+  `/api/v1/projects` results gain an `autonomo` field that says the same.
 - **A reason when a listing isn't approved.** If your request to be listed is turned down, your API's dashboard page
   now says why, so you know what to change before asking again.
 - **Listings are reviewed with live checks.** Before an API is listed, we now see whether it answers and whether its
