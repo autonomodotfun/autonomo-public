@@ -87,6 +87,11 @@ When the wallet can't afford a call, the SDK asks Borro's MCP server to prepare 
 sends it from the wallet (this needs a little ETH for gas), waits for the USDG and pays. The line needs x402 bills
 turned on; see [Pay with a Borro credit line](https://autonomo.fun/docs/borro). Borro's own daily limit still applies.
 
+Borro's answer is checked before anything is signed. The SDK sends only one transaction: a `borrow` on your own credit
+line, into this wallet, with no ETH attached, of no more than the call's price. Anything else in the answer, such as a
+transfer, an approval or a second transaction, is refused with `borro_unsafe` and nothing is sent. The call's price is
+still checked against your caps first.
+
 ## The receipt
 
 | Field | |

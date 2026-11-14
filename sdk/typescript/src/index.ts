@@ -19,6 +19,7 @@ import {
   createWalletClient,
   defineChain,
   erc20Abi,
+  formatEther,
   formatUnits,
   getAddress,
   http,
@@ -29,7 +30,7 @@ import {
 } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 
-export const VERSION = "0.1.2";
+export const VERSION = "0.1.3";
 
 const NETWORK = "eip155:4663";
 const CHAIN_ID = 4663;
@@ -565,22 +566,20 @@ export class Autonomo {
       payment_required: raw,
       max_usdg: formatUnits(this.perCall.usdg, 6),
     });
-    const txs = findTransactions(result);
-    const wallet = createWalletClient({ account, chain: this.chain, transport: http(this.rpc) });
-    const hashes: Hex[] = [];
-    for (const t of txs) {
-      const hash = await wallet.sendTransaction({ to: getAddress(t.to), data: t.data as Hex, value: t.value ? BigInt(t.value) : 0n });
-      const r = await pub.waitForTransactionReceipt({ hash });
-      if (r.status !== "success") fail("borrow_failed", `Borro's borrow transaction failed: ${EXPLORER}/tx/${hash}`);
-      hashes.push(hash);
-    }
     const need = BigInt(offer.amount);
+    // Borro's answer is checked before anything is signed: it may only borrow, on this line, into this wallet, at most the price.
+    const tx = checkBorrow(findTransactions(result), { line: borro.account, wallet: account.address, most: need });
+    const wallet = createWalletClient({ account, chain: this.chain, transport: http(this.rpc) });
+    const hash = await wallet.sendTransaction({ to: tx.to, data: tx.data, value: 0n });
+    const link = `${EXPLORER}/tx/${hash}`;
+    const r = await pub.waitForTransactionReceipt({ hash });
+    if (r.status !== "success") fail("borrow_failed", `The borrow on your Borro line failed, so nothing was borrowed and the API isn't paid: ${link}`);
     for (let i = 0; i < 20; i++) {
       const bal = await pub.readContract({ address: TOKENS.usdg.address, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
-      if (bal >= need) return hashes;
+      if (bal >= need) return [hash];
       await sleep(1000);
     }
-    return fail("borrow_failed", "The borrowed USDG hasn't reached the wallet yet. Nothing was paid; try again shortly.");
+    return fail("borrow_failed", `Borrowed ${formatUnits(tx.amount, 6)} USDG on your Borro line (${link}), but it hasn't reached the wallet yet. The API isn't paid; try again shortly.`);
   }
 }
 
@@ -683,6 +682,45 @@ async function mcpCall(f: typeof fetch, url: string, name: string, args: Record<
   } catch {
     return out;
   }
+}
+
+/** borrow(uint256 amount, address to) on a Borro credit line. */
+const BORROW_SELECTOR = "0x4b3fd148";
+
+/**
+ * The one transaction an honest Borro `credit_bill` answer holds: "one unsigned borrow of just what it is short, from the
+ * line to the wallet itself". Anything else is refused before it is signed: another target, ETH value, another function,
+ * another recipient, more than the call's price, or more than one transaction. A borrow's USDG lands in the agent's own
+ * wallet, so the caps on the call still bound what can be spent.
+ */
+export function checkBorrow(
+  txs: Array<{ to: string; data: string; value?: string }>,
+  opts: { line: string; wallet: string; most: bigint },
+): { to: Hex; data: Hex; amount: bigint } {
+  const refuse = (why: string): never =>
+    fail("borro_unsafe", `Borro's answer wasn't a plain borrow from your line into this wallet (${why}), so nothing was signed or sent.`);
+  if (txs.length === 0) refuse("it held no borrow transaction");
+  if (txs.length > 1) refuse(`it held ${txs.length} transactions, and a borrow is one`);
+  const [t] = txs;
+  if (!sameAddr(t.to, opts.line)) refuse(`it goes to ${t.to}, not your credit line ${opts.line}`);
+  let value: bigint;
+  try {
+    value = t.value === undefined || t.value === "" ? 0n : BigInt(t.value);
+  } catch {
+    return refuse(`its value "${t.value}" isn't a number`);
+  }
+  if (value !== 0n) refuse(`it sends ${formatEther(value)} ETH`);
+  const data = t.data.toLowerCase();
+  if (!data.startsWith(BORROW_SELECTOR)) refuse(`it calls ${data.slice(0, 10)}, not borrow`);
+  if (data.length !== 10 + 128) refuse("its borrow arguments aren't an amount and a recipient");
+  const amount = BigInt(`0x${data.slice(10, 74)}`);
+  const word = data.slice(74);
+  if (!/^0{24}/.test(word)) refuse("its recipient isn't an address");
+  const to = `0x${word.slice(24)}`;
+  if (!sameAddr(to, opts.wallet)) refuse(`it borrows into ${getAddress(to)}, not this wallet`);
+  if (amount === 0n) refuse("it borrows nothing");
+  if (amount > opts.most) refuse(`it borrows ${formatUnits(amount, 6)} USDG, more than the call's ${formatUnits(opts.most, 6)}`);
+  return { to: getAddress(t.to), data: data as Hex, amount };
 }
 
 /** Every transaction ({ to, data }) inside a tool result, in order. */
