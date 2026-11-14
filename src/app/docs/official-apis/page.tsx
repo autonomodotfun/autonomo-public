@@ -6,7 +6,7 @@ import { Page, Section, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Official APIs",
-  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, transactions, wallets, web pages and agents for hire on Ostrapad, payable per call in USDG or ${TOKEN.symbol}.`,
+  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, creators and holders, transactions and payments, wallets, gas, website and endpoint checks, web pages and agents for hire on Ostrapad, payable per call in USDG or ${TOKEN.symbol}.`,
 };
 
 const HOST = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun").replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -19,6 +19,12 @@ const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }
   { name: "Risk Checker", slug: "token-risk", path: "/risk/<token>", about: "A rug-risk score from holder concentration, the creator, launch-block buyers and bot volume" },
   { name: "Tx Explainer", slug: "tx-explainer", path: "/tx/<hash>", about: "A Robinhood Chain transaction in plain English: launches, buys, sells, transfers and fee" },
   { name: "Wallet Portfolio", slug: "wallet-portfolio", path: "/portfolio/<wallet>", about: "ETH, USDG, WETH, $AUTONOMO and every other token the wallet holds, valued in USD, with impostor tokens flagged" },
+  { name: "Dev Wallet Tracker", slug: "dev-wallet", path: "/dev/<token>", about: "What a token's creator did: tokens bought, burned, locked, sold and still held, creator fees claimed and waiting, where their ETH went, who funded the wallet and other tokens they launched" },
+  { name: "Holders & Bundles", slug: "holders-bundles", path: "/holders/<token>", about: "Who really holds a token: top holders with the pool and burns set apart, wallets linked by a shared funder, snipers in the first 15 seconds and what they still hold, same-block buyers and repeat snipers" },
+  { name: "Payment Check", slug: "payment-check", path: "/payment/<hash>", about: "Did an x402 payment settle? Who paid whom, how much in USDG or $AUTONOMO, and who paid the gas. Add ?to=, amount= or asset= for a yes or no match on a receipt" },
+  { name: "Gas Now", slug: "gas-now", path: "/gas", about: "The current gas price and what it costs in ETH and USD to send ETH, send USDG, buy on a launchpad curve or launch a token, measured from recent transactions" },
+  { name: "Endpoint Health", slug: "endpoint-health", path: "/endpoint?url=<https link>", about: "Is an x402 API up and payable right now? One unpaid call reports the answer time and whether its payment request is complete: scheme, network, asset, amount and payee" },
+  { name: "Website Check", slug: "website-check", path: "/site?url=<link or domain>", about: "A trust check for a website: domain age and registrar, certificate, where it redirects and whether the name imitates a well-known one, with a caution level" },
   { name: "Page Reader", slug: "page-reader", path: "/page?url=<https link>", about: "Title, description and readable text of a public web page" },
   {
     name: "Ostrapad Offer Finder",

@@ -72,13 +72,19 @@ export type ResearchSetup = {
   sample: { always: boolean; prices: ResearchPrice[] } | null;
 };
 
+/** A shelf of APIs for the start screen's price list, grouped as on the Explore page. */
+export type ApiShelf = { id: string; title: string; onchain: boolean; apis: AvailableApi[] };
+
 export function Playground({
-  apis,
+  shelves,
+  examples,
   freeDaily,
   paymentsOn,
   research,
 }: {
-  apis: AvailableApi[];
+  shelves: ApiShelf[];
+  /** One example question per shelf. */
+  examples: string[];
   freeDaily: number;
   paymentsOn: boolean;
   research: ResearchSetup;
@@ -252,7 +258,8 @@ export function Playground({
                 The agent pays.
               </h1>
               <p className="mt-5 max-w-2xl text-lg text-muted">
-                Ask about tokens, wallets and transactions on Robinhood Chain. The agent picks the APIs it needs and pays in $AUTONOMO, and
+                Ask about tokens, creators, holders, wallets, payments and gas on Robinhood Chain, or check a website or an x402
+                endpoint. The agent picks the APIs it needs and pays in $AUTONOMO, and
                 every paid answer comes with an on-chain receipt. No wallet, no signup.
               </p>
             </>
@@ -292,18 +299,18 @@ export function Playground({
           {!started && (
             <>
               <p className="mt-2.5 font-mono text-xs text-muted">{freeDaily} free questions a day, paid for by the agent&apos;s wallet</p>
-              {apis.length > 0 && (
+              {examples.length > 0 && (
                 <>
                   <p className="mt-9 font-mono text-xs tracking-[0.14em] text-muted uppercase">Try one</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {apis.map((a) => (
+                    {examples.map((question) => (
                       <button
-                        key={a.slug}
+                        key={question}
                         type="button"
-                        onClick={() => ask(a.question)}
+                        onClick={() => ask(question)}
                         className="min-h-14 rounded-md border border-line bg-surface px-3.5 py-2.5 text-left text-sm [overflow-wrap:anywhere] hover:border-accent hover:text-accent"
                       >
-                        {a.question}
+                        {question}
                       </button>
                     ))}
                   </div>
@@ -321,25 +328,33 @@ export function Playground({
         </section>
 
         {!started ? (
-          apis.length > 0 && (
+          shelves.length > 0 && (
             <aside className="min-w-0 rounded-lg border border-line bg-surface">
               <div className="border-b border-line px-4 py-4">
                 <h2 className="heading text-2xl">What it can pay for</h2>
                 <p className="mt-1 text-sm text-muted">Each call is one x402 payment on Robinhood Chain.</p>
               </div>
-              <ul className="divide-y divide-line">
-                {apis.map((a) => (
-                  <li key={a.slug} className="flex justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0">
-                      <Link href={`/projects/${a.projectSlug}`} className="font-semibold hover:text-accent">
-                        {a.name}
-                      </Link>
-                      {a.description && <p className="line-clamp-2 text-sm text-muted">{a.description}</p>}
-                    </div>
-                    <span className="font-mono text-xs whitespace-nowrap text-accent">{a.autonomo}</span>
-                  </li>
-                ))}
-              </ul>
+              {shelves.map((shelf) => (
+                <div key={shelf.id} className="border-b border-line last:border-b-0">
+                  <h3 className="flex items-center gap-2 px-4 pt-3 font-mono text-xs tracking-wide text-muted uppercase">
+                    {shelf.title}
+                    {shelf.onchain && <span className="rounded-full border border-accent px-2 py-px text-[10px] text-accent normal-case">On-chain</span>}
+                  </h3>
+                  <ul className="divide-y divide-line">
+                    {shelf.apis.map((a) => (
+                      <li key={a.slug} className="flex justify-between gap-3 px-4 py-3">
+                        <div className="min-w-0">
+                          <Link href={`/projects/${a.projectSlug}`} className="font-semibold hover:text-accent">
+                            {a.name}
+                          </Link>
+                          {a.description && <p className="line-clamp-2 text-sm text-muted">{a.description}</p>}
+                        </div>
+                        <span className="font-mono text-xs whitespace-nowrap text-accent">{a.autonomo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
               <p className="border-t border-line px-4 py-3 font-mono text-xs text-muted">Prices in $AUTONOMO, per call</p>
             </aside>
           )
