@@ -31,9 +31,11 @@ const QUESTION_TIMEOUT_MS = 100_000;
 // Haiku has no server-side fallback, so asking for one would be rejected.
 const HAS_FALLBACK = (model: string) => !model.startsWith("claude-haiku");
 
-const SYSTEM = `You are the Autonomo agent. You answer questions about tokens, wallets, transactions and launches on Robinhood Chain, and read public web pages, by calling paid APIs. Each call costs real money from your wallet, so use the fewest calls that answer the question.
+const SYSTEM = `You are the Autonomo agent. You answer questions about tokens, wallets, transactions, payments, gas and launches on Robinhood Chain, check whether a website can be trusted or an x402 endpoint is up and payable, and read public web pages, by calling paid APIs. Each call costs real money from your wallet, so use the fewest calls that answer the question.
 
 $AUTONOMO's contract address is ${TOKEN.address}.
+
+Three tools take a token address; pick the one that fits the question. token_risk answers "is it safe?" with a rug-risk score. dev_wallet answers what the creator did: what they sold, burned, locked and still hold, and the fees they claimed. holders_bundles answers who holds it: the top holders, wallets linked by a shared funder, and snipers. A transaction hash goes to tx_explainer to say what happened, or to payment_check when the question is whether a payment settled or matches a receipt. A link goes to page_reader to read it, website_check to judge whether the site can be trusted, or endpoint_health to see whether an x402 API answers with a valid payment request.
 
 Call the tools first and write your answer once, after the last result, so the reader sees a single answer. Keep it short and in plain text, with no markdown. The page shows the payment receipts, so don't list prices or transaction hashes for your own payments.
 
@@ -186,7 +188,7 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
     receipts.push(receipt);
     send({ type: "call", id: block.id, api: name, state: "done", detail: paid.tx ? "Settled on Robinhood Chain" : "Paid", receipt });
 
-    const result = { content: resultText(paid.data), isError: false };
+    const result = { content: resultText(tool.forModel ? tool.forModel(paid.data) : paid.data), isError: false };
     seen.set(key, result);
     return result;
   }

@@ -98,13 +98,59 @@ const TX_HASH = /0x[0-9a-fA-F]{64}(?![0-9a-fA-F])/;
 const ADDRESS = /0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/;
 const HTTPS_URL = /https:\/\/[^\s<>"']+/i;
 
+// $AUTONOMO by name, but not the autonomo.fun website.
+const AUTONOMO_NAME = /\$?autonomo\b(?!\.)/i;
+
 /** A contract or wallet address in the question (not part of a tx hash), or $AUTONOMO's when it's named. */
 function addressIn(q: string, allowAutonomo = true) {
   const cleaned = q.replace(TX_HASH, " ").replace(HTTPS_URL, " ");
-  return cleaned.match(ADDRESS)?.[0]?.toLowerCase() ?? (allowAutonomo && /\$?autonomo\b/i.test(cleaned) ? TOKEN.address : null);
+  return cleaned.match(ADDRESS)?.[0]?.toLowerCase() ?? (allowAutonomo && AUTONOMO_NAME.test(cleaned) ? TOKEN.address : null);
 }
 
+// Words that tell two APIs with the same input apart: a token address can go to the risk check, the creator's
+// record or the holder list, a hash to the explainer or the payment check, a link to the reader or one of the checks.
+const DEV_WORDS = /\b(devs?|developers?|creators?|deployers?)\b/i;
+const HOLDER_WORDS = /\b(holders?|bundles?|bundled|snipers?|sniped|clusters?)\b/i;
+const PAYMENT_WORDS = /\b(paid|pay|payments?|settled?|settlement|receipt|x402)\b/i;
+const ENDPOINT_WORDS = /\b(endpoints?|x402|402|payable|health|healthy|up|down)\b/i;
+const SITE_WORDS = /\b(websites?|site|domains?|phishing|scam|legit|trust|trusted|safe)\b/i;
+const DOMAIN = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/i;
+
+const linkIn = (q: string) => q.match(HTTPS_URL)?.[0]?.replace(/[).,!?]+$/, "") ?? null;
+
 const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
+  "dev-wallet": (q) => {
+    const address = addressIn(q);
+    return address && DEV_WORDS.test(q) ? `/dev/${address}` : null;
+  },
+  "holders-bundles": (q) => {
+    const address = addressIn(q);
+    return address && HOLDER_WORDS.test(q) ? `/holders/${address}` : null;
+  },
+  "payment-check": (q) => {
+    const hash = q.match(TX_HASH)?.[0];
+    if (!hash || !PAYMENT_WORDS.test(q)) return null;
+    // "…to 0x… for 0.01 USDG" turns the answer into a yes or no on that receipt.
+    const params = new URLSearchParams();
+    const to = addressIn(q, false);
+    const amount = q.replace(TX_HASH, " ").match(/(\d+(?:\.\d+)?)\s*(usdg|\$?autonomo)\b/i);
+    if (to) params.set("to", to);
+    if (amount) {
+      params.set("amount", amount[1]);
+      params.set("asset", amount[2].replace("$", "").toLowerCase());
+    }
+    const query = params.toString();
+    return `/payment/${hash.toLowerCase()}${query ? `?${query}` : ""}`;
+  },
+  "gas-now": (q) => (/\bgas\b/i.test(q) ? "/gas" : null),
+  "endpoint-health": (q) => {
+    const url = linkIn(q);
+    return url && ENDPOINT_WORDS.test(q) ? `/endpoint?url=${encodeURIComponent(url)}` : null;
+  },
+  "website-check": (q) => {
+    const target = linkIn(q) ?? q.replace(TX_HASH, " ").match(DOMAIN)?.[0] ?? null;
+    return target && SITE_WORDS.test(q) ? `/site?url=${encodeURIComponent(target)}` : null;
+  },
   "token-price": () => "/price/autonomo",
   "new-launches": () => "/launches?limit=10",
   "token-risk": (q) => {
@@ -140,10 +186,22 @@ export const GATEWAY_USAGE: Record<string, string> = {
   "wallet-portfolio": "/portfolio/<wallet address>",
   "page-reader": "/page?url=<url-encoded https:// link>",
   "ostrapad-offer-finder": "/offers?q=<what you need done>",
+  "dev-wallet": "/dev/<token contract address>",
+  "holders-bundles": "/holders/<token contract address>",
+  "payment-check": "/payment/<transaction hash> (optional: ?to=<address>&amount=<number>&asset=usdg|autonomo)",
+  "gas-now": "/gas",
+  "endpoint-health": "/endpoint?url=<url-encoded https:// link> (optional: &method=POST)",
+  "website-check": "/site?url=<website link or domain>",
 };
 
 // What each gateway needs when the question doesn't include it.
 export const MISSING_INPUT: Record<string, string> = {
+  "dev-wallet": "a token contract address, and the word creator or dev",
+  "holders-bundles": "a token contract address, and the word holders or bundles",
+  "payment-check": "a transaction hash, and the word payment",
+  "gas-now": "the word gas",
+  "endpoint-health": "an https:// link, and the word endpoint or x402",
+  "website-check": "a website link or domain, and a word like safe or legit",
   "token-risk": "a token contract address",
   "token-lookup": "a token contract address",
   "tx-explainer": "a transaction hash",
@@ -161,6 +219,12 @@ const EXAMPLE_QUESTIONS: Record<string, string> = {
   "wallet-portfolio": "What does wallet 0xde87838695ba7151ae93ca24c96b2f5334f4988b hold?",
   "page-reader": "Read this page: https://autonomo.fun/docs",
   "ostrapad-offer-finder": "Find an Ostrapad agent that writes a protocol risk report",
+  "dev-wallet": "What did the creator of $AUTONOMO do with their tokens?",
+  "holders-bundles": "Who holds $AUTONOMO? Check holders, bundles and snipers",
+  "payment-check": "Did this payment settle? 0x01295eba2c428270708417f658d9a4a2f0fb08bfecd1d1229e0b0752c7bfd612",
+  "gas-now": "What does gas cost on Robinhood Chain right now?",
+  "endpoint-health": "Is this x402 endpoint up and payable? https://autonomo.fun/x/token-price",
+  "website-check": "Is the website autonomo.fun safe?",
 };
 
 export function exampleQuestion(slug: string, name: string) {
@@ -176,10 +240,22 @@ export function gatewayPath(slug: string, question: string) {
 export function intentKeywords(question: string) {
   const extra: string[] = [];
   const hasAddress = ADDRESS.test(question.replace(TX_HASH, " "));
-  if (TX_HASH.test(question)) extra.push("transaction", "explain", "explainer");
-  if (HTTPS_URL.test(question)) extra.push("page", "read", "reader", "text");
+  const hasLink = HTTPS_URL.test(question);
+  // A link or a domain with a word like "safe" is a question about the website, not about a token.
+  const aboutSite = SITE_WORDS.test(question) && (hasLink || (!hasAddress && DOMAIN.test(question.replace(TX_HASH, " "))));
+  const aboutToken = hasAddress || AUTONOMO_NAME.test(question);
+  const aboutPayment = TX_HASH.test(question) && PAYMENT_WORDS.test(question);
+  if (TX_HASH.test(question)) extra.push(...(aboutPayment ? ["payment", "check", "settle"] : ["transaction", "explain", "explainer"]));
+  if (hasLink && ENDPOINT_WORDS.test(question)) extra.push("endpoint", "health", "payable");
+  else if (aboutSite) extra.push("website", "check", "domain", "phishing");
+  else if (hasLink) extra.push("page", "read", "reader", "text");
+  if (/\bgas\b/i.test(question)) extra.push("gas");
   if (/\b(ostrapad|hire|freelancers?)\b/i.test(question)) extra.push("ostrapad", "offer", "finder");
-  if (/\b(safe|rug|risk|scam|legit)\b/i.test(question)) extra.push("risk", "rug");
+  // These three are settled by now; an address beside them is a detail of the question, not a token to look up.
+  if (aboutPayment || aboutSite || (hasLink && ENDPOINT_WORDS.test(question))) return extra;
+  if (aboutToken && DEV_WORDS.test(question)) extra.push("dev", "wallet", "tracker", "creator");
+  else if (aboutToken && HOLDER_WORDS.test(question)) extra.push("holders", "bundles", "snipers");
+  else if (/\b(safe|rug|risk|scam|legit)\b/i.test(question)) extra.push("risk", "rug");
   else if (hasAddress && /\b(wallet|portfolio|holdings?|holds?|balances?|owns?)\b/i.test(question)) extra.push("wallet", "portfolio");
   else if (hasAddress) extra.push("token", "price", "lookup");
   return extra;
@@ -223,6 +299,42 @@ export function answerFrom(data: unknown): string {
       });
       return [`The ${lines.length} newest launches on ${d.chain ?? "Robinhood Chain"}:`, ...lines].join("\n");
     }
+    const flagLines = (max: number) =>
+      Array.isArray(d.flags) ? d.flags.slice(0, max).map((f: Record<string, any>) => `• ${f.text}`) : [];
+    const tokenName = d.token?.symbol ? `$${d.token.symbol}` : "This token";
+    // Dev wallet tracker: who the creator is, what they hold, then what stands out.
+    if (d.creator?.address && d.supply && typeof d.supply.holdsPercent === "number") {
+      return [
+        `${tokenName}'s creator is ${d.creator.address} and holds ${d.supply.holdsPercent.toFixed(2)}% of the supply.`,
+        ...flagLines(6),
+        "Read from on-chain data, not financial advice.",
+      ].join("\n");
+    }
+    // Holders and bundles: what stands out, then the headline shares.
+    if (Array.isArray(d.topHolders) && d.summary && typeof d.summary === "object") {
+      const s = d.summary;
+      const share = (label: string, v: unknown) => (typeof v === "number" ? `${label} ${v.toFixed(1)}%` : "");
+      const facts = [share("largest wallet", s.largestWalletPercent), share("top 10 wallets", s.top10WalletsPercent), share("pool, launch and burn", s.poolLaunchBurnPercent)]
+        .filter(Boolean).join(" · ");
+      return [`Who holds ${tokenName}${d.token?.holders ? ` (${Number(d.token.holders).toLocaleString("en-US")} holders)` : ""}:`, ...flagLines(6), facts, "Linked wallets are probable, never proven. Not financial advice."]
+        .filter(Boolean).join("\n");
+    }
+    // Gas now: the gas price, then what each common action costs.
+    if (typeof d.gasPriceGwei === "number" && Array.isArray(d.costs)) {
+      const rows = d.costs.map((c: Record<string, any>) => `• ${c.action}: ${typeof c.feeUsd === "number" ? `$${c.feeUsd < 0.01 ? c.feeUsd.toPrecision(2) : c.feeUsd.toFixed(2)}` : "no recent sample"}`);
+      return [`Gas on ${d.chain ?? "Robinhood Chain"} is ${d.gasPriceGwei.toPrecision(3)} gwei right now:`, ...rows, d.payingAnAutonomoApi ?? ""].filter(Boolean).join("\n");
+    }
+    // Endpoint health: its verdict, then anything wrong with the payment request.
+    if (typeof d.verdict === "string" && typeof d.summary === "string") {
+      const problems = Array.isArray(d.problems) ? d.problems.slice(0, 4).map((p: unknown) => `• ${p}`) : [];
+      return [`${d.summary}${typeof d.ms === "number" ? ` Answered in ${d.ms} ms.` : ""}`, ...problems].join("\n");
+    }
+    // Website check: the caution level, then what was found.
+    if (typeof d.caution === "string" && typeof d.summary === "string") {
+      return [`Caution ${d.caution}. ${d.summary}`, ...flagLines(5), "A screening from public records, not a guarantee."].join("\n");
+    }
+    // Payment check: its own sentence, which already says whether it matches what was asked.
+    if (typeof d.summary === "string" && Array.isArray(d.payments)) return d.summary;
     // Transaction explainer: its own plain-English summary.
     if (typeof d.summary === "string" && typeof d.hash === "string") {
       const fee = typeof d.feeUsd === "number" ? ` Fee: $${d.feeUsd < 0.01 ? d.feeUsd.toPrecision(2) : d.feeUsd.toFixed(2)}.` : "";

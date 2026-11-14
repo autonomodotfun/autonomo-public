@@ -11,15 +11,15 @@ $AUTONOMO or USDG, and the Agent Playground and the Telegram bot use them to ans
 | Token Lookup | `autonomo.fun/x/token-lookup` | `tools/` → `/v1/price/<token>` |
 | Tx Explainer | `autonomo.fun/x/tx-explainer` | `tools/` → `/v1/tx/<hash>` |
 | Wallet Portfolio | `autonomo.fun/x/wallet-portfolio` | `tools/` → `/v1/portfolio/<wallet>` |
-| Dev Wallet Tracker (not launched yet) | `autonomo.fun/x/dev-wallet` | `tools/` → `/v1/dev/<token>` |
-| Holders & Bundles (not launched yet) | `autonomo.fun/x/holders-bundles` | `tools/` → `/v1/holders/<token>` |
-| Payment Check (not launched yet) | `autonomo.fun/x/payment-check` | `tools/` → `/v1/payment/<hash>` |
-| Gas Now (not launched yet) | `autonomo.fun/x/gas-now` | `tools/` → `/v1/gas` |
-| Endpoint Health (not launched yet) | `autonomo.fun/x/endpoint-health` | `tools/` → `/v1/endpoint?url=…` |
-| Website Check (not launched yet) | `autonomo.fun/x/website-check` | `tools/` → `/v1/site?url=…` |
+| Dev Wallet Tracker | `autonomo.fun/x/dev-wallet` | `tools/` → `/v1/dev/<token>` |
+| Holders & Bundles | `autonomo.fun/x/holders-bundles` | `tools/` → `/v1/holders/<token>` |
+| Payment Check | `autonomo.fun/x/payment-check` | `tools/` → `/v1/payment/<hash>` |
+| Gas Now | `autonomo.fun/x/gas-now` | `tools/` → `/v1/gas` |
+| Endpoint Health | `autonomo.fun/x/endpoint-health` | `tools/` → `/v1/endpoint?url=…` |
+| Website Check | `autonomo.fun/x/website-check` | `tools/` → `/v1/site?url=…` |
 | Page Reader | `autonomo.fun/x/page-reader` | `tools/` → `/v1/page?url=…` |
 
-All seven are served by one Vercel project, [`tools/`](tools/) (tools.autonomo.fun). Details and safety limits are
+All thirteen are served by one Vercel project, [`tools/`](tools/) (tools.autonomo.fun). Details and safety limits are
 in its README.
 
 ## Adding a new official API

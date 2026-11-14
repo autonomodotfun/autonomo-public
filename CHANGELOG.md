@@ -5,6 +5,16 @@ repo gets a copy of each release.
 
 ## November 14, 2026
 
+- **Six new official APIs are live.** Dev Wallet Tracker (what a token's creator did with their tokens and ETH),
+  Holders & Bundles (who really holds a token, with linked wallets and snipers), Payment Check (did an x402 payment
+  settle, and does it match a receipt), Gas Now (what common actions cost right now), Endpoint Health (is an x402 API
+  up and payable) and Website Check (a trust check for a website or domain). Each is paid per call in USDG or
+  $AUTONOMO, from 0.005 USDG. The Playground, the AI agent, the MCP server and `llms.txt` all know how to call them,
+  and the [official APIs page](https://autonomo.fun/docs/official-apis) lists each path.
+- **The Playground agent answers more.** Ask it who holds a token, what its creator did, whether a payment
+  settled, what gas costs, or whether a website or an x402 endpoint can be trusted. It knows which of the three
+  token APIs fits the question, and the start screen shows one example per shelf with the price list grouped as on
+  Explore.
 - **Explore leads with the whole directory.** The top of `/projects` now shows the directory's size in four tiles
   (projects, paid endpoints, chains, paid calls in 30 days), then one row of Autonomo's most-paid APIs with a link to
   all of them, then the full list under "All x402 APIs", which now starts on the first screen. Autonomo's APIs have
