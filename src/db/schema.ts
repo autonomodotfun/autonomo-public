@@ -208,6 +208,24 @@ export const walletSwitches = pgTable("wallet_switches", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Every decision made from /admin: listings approved or rejected, APIs paused, projects hidden, payout changes.
+// Rows are only ever added. `subject` is what it was about, written the way the admin page shows it ("/x/slug", a
+// project's slug, a wallet). `note` is the reason typed with a rejection, which the creator sees on their dashboard.
+// `gatewayId` is a plain number, not a reference, so the history outlives an API that is later deleted.
+export const adminEvents = pgTable(
+  "admin_events",
+  {
+    id: serial("id").primaryKey(),
+    kind: text("kind").notNull(),
+    subject: text("subject").notNull(),
+    detail: text("detail"),
+    note: text("note"),
+    gatewayId: integer("gateway_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("admin_events_created_idx").on(t.createdAt), index("admin_events_gateway_idx").on(t.gatewayId)],
+);
+
 // Every burn, copied from the chain's events by the burn keeper for the public /burn page. See src/lib/burn.ts.
 export const burnReceipts = pgTable(
   "burn_receipts",

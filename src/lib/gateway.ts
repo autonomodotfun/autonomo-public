@@ -222,6 +222,19 @@ export async function testUpstream(baseUrl: string, path: string, auth?: { heade
   return { ok: true, status: res.status, ms, contentType, preview };
 }
 
+/** The same test call for an API that is already launched, sent with its saved key the way a paid call would be. */
+export function testGateway(g: Pick<Gateway, "upstreamUrl" | "upstreamAuthHeader" | "upstreamAuthSecret">, path = "") {
+  let auth: { header: string; secret: string } | undefined;
+  if (g.upstreamAuthHeader && g.upstreamAuthSecret && secretsEnabled()) {
+    try {
+      auth = { header: g.upstreamAuthHeader, secret: decryptSecret(g.upstreamAuthSecret) };
+    } catch {
+      return Promise.resolve<UpstreamTest>({ ok: false, error: "The saved key couldn't be read." });
+    }
+  }
+  return testUpstream(g.upstreamUrl, path, auth);
+}
+
 // ---------- queries ----------
 
 /** The wallet a gateway pays, which is also the one that holds for Verified. */
