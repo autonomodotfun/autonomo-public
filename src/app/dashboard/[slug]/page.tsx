@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { VerifiedBadge } from "@/components/verified";
 import { verifiedStatus } from "@/lib/verified";
+import { lastRejectionNote } from "@/lib/admin-log";
 import { notFound, redirect } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { TOKEN } from "@/lib/constants";
@@ -30,7 +31,11 @@ export default async function GatewayDashboard({
   if (!owner) redirect("/dashboard");
   const g = await getOwnedGateway((await params).slug, owner);
   if (!g) notFound();
-  const [stats, { verified }] = await Promise.all([gatewayStats(g.id), verifiedStatus(payeeOf(g))]);
+  const [stats, { verified }, rejectionNote] = await Promise.all([
+    gatewayStats(g.id),
+    verifiedStatus(payeeOf(g)),
+    g.listing === "rejected" ? lastRejectionNote(g.id) : null,
+  ]);
   const live = gatewayOffers(g);
   const url = `${SITE}/x/${g.slug}`;
 
@@ -262,6 +267,11 @@ export default async function GatewayDashboard({
                 }[g.listing]
               }
             </p>
+            {g.listing === "rejected" && rejectionNote && (
+              <p className="mt-2 rounded-md border border-warn p-2 text-sm">
+                <span className="font-medium">Why:</span> {rejectionNote}
+              </p>
+            )}
             {(g.listing === "unlisted" || g.listing === "rejected") && (
               <form action={requestListing} className="mt-3">
                 <input type="hidden" name="id" value={g.id} />

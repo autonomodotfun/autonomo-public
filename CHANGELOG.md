@@ -3,6 +3,13 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 14, 2026
+
+- **A reason when a listing isn't approved.** If your request to be listed is turned down, your API's dashboard page
+  now says why, so you know what to change before asking again.
+- **Listings are reviewed with live checks.** Before an API is listed, we now see whether it answers and whether its
+  paid address asks for payment correctly, and several requests can be approved together.
+
 ## November 13, 2026
 
 - **A clearer front door for API creators.** The launch page now opens on two choices: "I have a normal API", which

@@ -1,182 +1,107 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { connection } from "next/server";
 import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
-import { CATEGORY_INFO } from "@/lib/categories";
 import { payeeOf } from "@/lib/gateway";
 import { isContractWallet, safeInfo, verifiedStatus } from "@/lib/verified";
-import {
-  approveGateway,
-  approvePayToRequest,
-  approveSubmission,
-  rejectGateway,
-  rejectPayToRequest,
-  rejectSubmission,
-  setCreatorPayTo,
-  setProjectFlags,
-  switchCreatorWallet,
-} from "./actions";
+import { approvePayToRequest, rejectPayToRequest, setCreatorPayTo, switchCreatorWallet } from "./actions";
+import { ApisTab, type ApiFilter } from "./apis";
+import { HistoryTab } from "./history";
+import { ReviewTab } from "./review";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
-type SearchParams = Promise<{ from?: string; to?: string; switch?: string; owner?: string; payTo?: string; payToNote?: string; requestNote?: string }>;
+type SearchParams = Promise<{
+  tab?: string;
+  q?: string;
+  show?: string;
+  group?: string;
+  from?: string;
+  to?: string;
+  switch?: string;
+  owner?: string;
+  payTo?: string;
+  payToNote?: string;
+  requestNote?: string;
+}>;
+
+const TABS = { review: "Review", apis: "All APIs", payouts: "Payouts", history: "History" } as const;
+type Tab = keyof typeof TABS;
+const API_FILTERS: ApiFilter[] = ["all", "listed", "pending", "unlisted", "rejected", "paused"];
 
 export default async function AdminPage({ searchParams }: { searchParams: SearchParams }) {
   await connection();
   const db = await getDb();
   const params = await searchParams;
-  const [pending, recent, gatewayRequests, switches] = await Promise.all([
-    db
-      .select()
-      .from(schema.submissions)
-      .where(eq(schema.submissions.status, "pending"))
-      .orderBy(desc(schema.submissions.createdAt))
-      .limit(100),
-    db
-      .select()
-      .from(schema.submissions)
-      .where(eq(schema.submissions.status, "approved"))
-      .orderBy(desc(schema.submissions.reviewedAt))
-      .limit(10),
-    db
-      .select()
-      .from(schema.gateways)
-      .where(eq(schema.gateways.listing, "pending"))
-      .orderBy(desc(schema.gateways.updatedAt))
-      .limit(100),
-    db.select().from(schema.walletSwitches).orderBy(desc(schema.walletSwitches.createdAt)).limit(20),
+  const tab: Tab = params.tab && params.tab in TABS ? (params.tab as Tab) : "review";
+  const { gateways, submissions, payToRequests } = schema;
+  const n = sql<number>`count(*)::int`;
+  const [[apisWaiting], [subsWaiting], [payoutsWaiting], [live]] = await Promise.all([
+    db.select({ n }).from(gateways).where(eq(gateways.listing, "pending")),
+    db.select({ n }).from(submissions).where(eq(submissions.status, "pending")),
+    db.select({ n }).from(payToRequests).where(eq(payToRequests.status, "pending")),
+    db.select({ n, active: sql<number>`count(*) filter (where ${gateways.status} = 'active')::int` }).from(gateways),
   ]);
+  const waiting = apisWaiting.n + subsWaiting.n + payoutsWaiting.n;
+  const badge: Partial<Record<Tab, number>> = { review: apisWaiting.n + subsWaiting.n, payouts: payoutsWaiting.n };
 
   return (
     <div className="mx-auto max-w-4xl px-4 pt-10 sm:px-6">
-      <h1 className="heading text-3xl">Review queue</h1>
-      <p className="mt-1 text-sm text-muted">{pending.length} pending submissions</p>
+      <h1 className="heading text-3xl">Admin</h1>
+      <p className="mt-1 text-sm text-muted">
+        {waiting === 0 ? "Nothing is waiting for you." : `${waiting} ${waiting === 1 ? "thing is" : "things are"} waiting for you.`}
+      </p>
 
-      <ul className="mt-6 space-y-4">
-        {pending.map((s) => (
-          <li key={s.id} className="rounded-lg border border-line bg-surface p-5">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-medium">
-                {s.name} <span className="text-sm font-normal text-faint">· {CATEGORY_INFO[s.category]?.label}</span>
-              </h2>
-              <time className="text-xs text-faint">{s.createdAt.toISOString().slice(0, 16).replace("T", " ")}</time>
-            </div>
-            {s.reviewNote && <p className="mt-1 text-sm text-warn">{s.reviewNote}</p>}
-            <p className="mt-2 text-sm text-muted">{s.description}</p>
-            <dl className="mt-3 grid gap-1 font-mono text-xs text-muted">
-              {[
-                ["website", s.website],
-                ["github", s.github],
-                ["x", s.twitter],
-                ["endpoint", s.endpointUrl],
-                ["contact", s.contact],
-              ]
-                .filter(([, v]) => v)
-                .map(([k, v]) => (
-                  <div key={k} className="flex gap-2">
-                    <dt className="w-16 text-faint">{k}</dt>
-                    <dd className="break-all">{v}</dd>
-                  </div>
-                ))}
-            </dl>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <form action={approveSubmission}>
-                <input type="hidden" name="id" value={s.id} />
-                <button className="btn-brand px-3 py-1.5 text-sm">Approve &amp; publish</button>
-              </form>
-              <form action={rejectSubmission} className="flex gap-2">
-                <input type="hidden" name="id" value={s.id} />
-                <input name="note" placeholder="Reason (optional)" className="field w-48 py-1.5" />
-                <button className="rounded-md border border-line px-3 py-1.5 text-sm">Reject</button>
-              </form>
-            </div>
-          </li>
-        ))}
+      <ul className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Tile href="/admin?tab=review" count={apisWaiting.n} label={apisWaiting.n === 1 ? "API to review" : "APIs to review"} needsYou={apisWaiting.n > 0} />
+        <Tile href="/admin?tab=review#submissions" count={subsWaiting.n} label={subsWaiting.n === 1 ? "Directory submission" : "Directory submissions"} needsYou={subsWaiting.n > 0} />
+        <Tile href="/admin?tab=payouts" count={payoutsWaiting.n} label={payoutsWaiting.n === 1 ? "Payout request" : "Payout requests"} needsYou={payoutsWaiting.n > 0} />
+        <Tile href="/admin?tab=apis" count={live.active} label={`of ${live.n} ${live.n === 1 ? "API" : "APIs"} taking payments`} />
       </ul>
 
-      <section className="mt-12">
-        <h2 className="text-lg font-semibold">Gateway listing requests</h2>
-        <p className="mt-1 text-sm text-muted">{gatewayRequests.length} hosted APIs waiting to be listed in the catalog</p>
-        <ul className="mt-4 space-y-4">
-          {gatewayRequests.map((g) => (
-            <li key={g.id} className="rounded-lg border border-line bg-surface p-5">
-              <h3 className="font-medium">
-                {g.name} <span className="font-mono text-sm font-normal text-faint">/x/{g.slug}</span>
-              </h3>
-              {g.description && <p className="mt-1 text-sm text-muted">{g.description}</p>}
-              <dl className="mt-3 grid gap-1 font-mono text-xs text-muted">
-                {[
-                  ["upstream", g.upstreamUrl],
-                  ["owner", g.owner],
-                  ["price", `${g.acceptUsdg ? `$${Number(g.priceUsd)} USDG` : ""}${g.acceptUsdg && g.autonomoAmount ? " · " : ""}${g.autonomoAmount ? `${g.autonomoAmount} AUTONOMO` : ""}`],
-                  ["status", g.status],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex gap-2">
-                    <dt className="w-16 text-faint">{k}</dt>
-                    <dd className="break-all">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="mt-4 flex gap-2">
-                <form action={approveGateway}>
-                  <input type="hidden" name="id" value={g.id} />
-                  <button className="btn-brand px-3 py-1.5 text-sm">List in catalog</button>
-                </form>
-                <form action={rejectGateway}>
-                  <input type="hidden" name="id" value={g.id} />
-                  <button className="rounded-md border border-line px-3 py-1.5 text-sm">Reject</button>
-                </form>
-              </div>
+      <nav aria-label="Admin sections" className="-mx-4 mt-8 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <ul className="flex gap-1 border-b border-line text-sm whitespace-nowrap">
+          {(Object.keys(TABS) as Tab[]).map((t) => (
+            <li key={t}>
+              <Link
+                href={t === "review" ? "/admin" : `/admin?tab=${t}`}
+                aria-current={tab === t ? "page" : undefined}
+                className={`-mb-px inline-flex items-center gap-2 border-b-2 px-3 py-2 ${tab === t ? "border-brand font-medium text-ink" : "border-transparent text-muted hover:text-ink"}`}
+              >
+                {TABS[t]}
+                {badge[t] ? <span className="rounded-full bg-brand px-1.5 text-xs font-semibold text-on-brand">{badge[t]}</span> : null}
+              </Link>
             </li>
           ))}
         </ul>
-      </section>
+      </nav>
 
-      <section className="mt-12">
-        <h2 className="text-lg font-semibold">Update a project</h2>
-        <form action={setProjectFlags} className="mt-3 flex flex-wrap items-end gap-3 text-sm">
-          <label className="grid gap-1">
-            Slug
-            <input name="slug" required className="field w-56" placeholder="e.g. corbits" />
-          </label>
-          <label className="grid gap-1">
-            Visibility
-            <select name="status" className="field w-36" defaultValue="">
-              <option value="">No change</option>
-              <option value="approved">Visible</option>
-              <option value="hidden">Hidden</option>
-            </select>
-          </label>
-          <label className="grid gap-1">
-            Featured
-            <select name="featured" className="field w-36" defaultValue="">
-              <option value="">No change</option>
-              <option value="on">Featured</option>
-              <option value="off">Not featured</option>
-            </select>
-          </label>
-          <button className="btn-brand px-3 py-2">Save</button>
-        </form>
-      </section>
-
-      <PayToRequests message={params.requestNote} />
-
-      <SetPayTo owner={params.owner} payTo={params.payTo} message={params.payToNote} />
-
-      <SwitchWallet from={params.from} to={params.to} message={params.switch} switches={switches} />
-
-      {recent.length > 0 && (
-        <section className="mt-12">
-          <h2 className="text-lg font-semibold">Recently approved</h2>
-          <ul className="mt-3 space-y-1 text-sm">
-            {recent.map((s) => (
-              <li key={s.id}>{s.name}</li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <div className="mt-8">
+        {tab === "review" && <ReviewTab />}
+        {tab === "apis" && <ApisTab q={(params.q ?? "").trim().slice(0, 80)} show={API_FILTERS.includes(params.show as ApiFilter) ? (params.show as ApiFilter) : "all"} />}
+        {tab === "payouts" && (
+          <>
+            <PayToRequests message={params.requestNote} />
+            <SetPayTo owner={params.owner} payTo={params.payTo} message={params.payToNote} />
+            <SwitchWallet from={params.from} to={params.to} message={params.switch} switches={await db.select().from(schema.walletSwitches).orderBy(desc(schema.walletSwitches.createdAt)).limit(20)} />
+          </>
+        )}
+        {tab === "history" && <HistoryTab group={params.group ?? "all"} />}
+      </div>
     </div>
+  );
+}
+
+function Tile({ href, count, label, needsYou = false }: { href: string; count: number; label: string; needsYou?: boolean }) {
+  return (
+    <li>
+      <Link href={href} className={`block h-full rounded-lg border p-4 hover:border-faint ${needsYou ? "border-brand bg-surface" : "border-line"}`}>
+        <span className={`block font-mono text-2xl ${needsYou ? "text-ink" : "text-muted"}`}>{count}</span>
+        <span className="mt-1 block text-sm text-muted">{label}</span>
+      </Link>
+    </li>
   );
 }
 
@@ -199,7 +124,7 @@ async function PayToRequests({ message }: { message?: string }) {
   );
 
   return (
-    <section id="pay-to-requests" className="mt-12 scroll-mt-6">
+    <section id="pay-to-requests" className="scroll-mt-6">
       <h2 className="text-lg font-semibold">Payout wallet requests</h2>
       <p className="mt-1 text-sm text-muted">{pending.length} {pending.length === 1 ? "creator" : "creators"} asking to move their APIs to another Safe</p>
       {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm">{message}</p>}
@@ -285,6 +210,7 @@ async function SetPayTo({ owner: rawOwner, payTo: rawPayTo, message }: { owner?:
       </p>
       {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm">{message}</p>}
       <form className="mt-3 grid gap-3 text-sm sm:max-w-xl">
+        <input type="hidden" name="tab" value="payouts" />
         <label className="grid gap-1">
           Sign-in wallet
           <input name="owner" required defaultValue={owner} placeholder="0x…" spellCheck={false} className="field font-mono" />
@@ -373,6 +299,7 @@ async function SwitchWallet({
       </p>
       {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm">{message}</p>}
       <form className="mt-3 grid gap-3 text-sm sm:max-w-xl">
+        <input type="hidden" name="tab" value="payouts" />
         <label className="grid gap-1">
           Current wallet
           <input name="from" required defaultValue={from} placeholder="0x…" spellCheck={false} className="field font-mono" />
