@@ -5,6 +5,12 @@ repo gets a copy of each release.
 
 ## November 14, 2026
 
+- **Safer Borro borrowing in the SDKs.** `autonomo-sdk` 0.1.3 (npm) and `autonomo` 0.1.1 (PyPI) now check Borro's
+  answer before signing anything. When the wallet is short and borrows on a Borro credit line, the SDK sends only one
+  borrow, on your own line, into the agent's wallet, with no ETH attached, for no more than the call's price. Anything
+  else is refused with `borro_unsafe` and nothing is sent. Earlier versions sent whatever transactions the answer held,
+  outside the spending caps. If you use the Borro option, update. Thanks to r00k of HEY Research Lab for reporting it.
+  Security reports go to contact@autonomo.fun (see `SECURITY.md`).
 - **Research reports read the creator and the holders.** A report now also pays Dev Wallet Tracker (what the
   creator sold, burned, locked and claimed, who funded them, their other launches) and Holders & Bundles (wallets linked
   by one funder, snipers and what they still hold, same-block buys), with a card for each, and the summary connects

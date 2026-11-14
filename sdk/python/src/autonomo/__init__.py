@@ -33,8 +33,8 @@ import httpx
 from eth_account import Account
 from eth_utils import to_checksum_address
 
-__version__ = "0.1.0"
-__all__ = ["Autonomo", "AutonomoError", "Api", "Receipt", "CallResult", "MemoryStore", "FileStore", "rank_apis", "find_transactions"]
+__version__ = "0.1.1"
+__all__ = ["Autonomo", "AutonomoError", "Api", "Receipt", "CallResult", "MemoryStore", "FileStore", "rank_apis", "find_transactions", "check_borrow"]
 
 NETWORK = "eip155:4663"
 CHAIN_ID = 4663
@@ -327,6 +327,50 @@ def find_transactions(value: Any) -> list[dict]:
 
     walk(value)
     return out
+
+
+BORROW_SELECTOR = "0x4b3fd148"  # borrow(uint256 amount, address to) on a Borro credit line
+
+
+def check_borrow(txs: list[dict], line: str, wallet: str, most: int) -> dict:
+    """The one transaction an honest Borro credit_bill answer holds: "one unsigned borrow of just what it is short, from
+    the line to the wallet itself". Anything else is refused before it is signed: another target, ETH value, another
+    function, another recipient, more than the call's price, or more than one transaction."""
+
+    def refuse(why: str) -> None:
+        _fail("borro_unsafe", f"Borro's answer wasn't a plain borrow from your line into this wallet ({why}), so nothing was signed or sent.")
+
+    if not txs:
+        refuse("it held no borrow transaction")
+    if len(txs) > 1:
+        refuse(f"it held {len(txs)} transactions, and a borrow is one")
+    t = txs[0]
+    if t["to"].lower() != line.lower():
+        refuse(f"it goes to {t['to']}, not your credit line {line}")
+    raw = t.get("value")
+    try:
+        value = 0 if raw in (None, "") else int(raw, 0) if isinstance(raw, str) else int(raw)
+    except (TypeError, ValueError):
+        refuse(f'its value "{raw}" isn\'t a number')
+    if value != 0:
+        refuse(f"it sends {value / 10**18} ETH")
+    data = t["data"].lower()
+    if not data.startswith(BORROW_SELECTOR):
+        refuse(f"it calls {data[:10]}, not borrow")
+    if len(data) != 10 + 128:
+        refuse("its borrow arguments aren't an amount and a recipient")
+    amount = int(data[10:74], 16)
+    word = data[74:]
+    if not word.startswith("0" * 24):
+        refuse("its recipient isn't an address")
+    to = "0x" + word[24:]
+    if to != wallet.lower():
+        refuse(f"it borrows into {to_checksum_address(to)}, not this wallet")
+    if amount == 0:
+        refuse("it borrows nothing")
+    if amount > most:
+        refuse(f"it borrows {_fmt(amount, 6)} USDG, more than the call's {_fmt(most, 6)}")
+    return {"to": to_checksum_address(t["to"]), "data": data, "amount": amount}
 
 
 # ---------- The client ----------
@@ -632,13 +676,18 @@ class Autonomo:
             "credit_bill",
             {"wallet": self.address, "account": self.borro_account, "payment_required": _b64(required), "max_usdg": _fmt(self.per_call["usdg"], 6)},
         )
-        hashes = [self._send(t) for t in find_transactions(result)]
         need = int(offer["amount"])
+        # Borro's answer is checked before anything is signed: it may only borrow, on this line, into this wallet, at most the price.
+        tx = check_borrow(find_transactions(result), line=self.borro_account, wallet=self.address, most=need)
+        h = self._send({"to": tx["to"], "data": tx["data"], "value": 0})
         for _ in range(20):
             if self._balance(TOKENS["usdg"].address, self.address) >= need:
-                return hashes
+                return [h]
             time.sleep(1)
-        _fail("borrow_failed", "The borrowed USDG hasn't reached the wallet yet. Nothing was paid; try again shortly.")
+        _fail(
+            "borrow_failed",
+            f"Borrowed {_fmt(tx['amount'], 6)} USDG on your Borro line ({EXPLORER}/tx/{h}), but it hasn't reached the wallet yet. The API isn't paid; try again shortly.",
+        )
 
     # ----- Chain -----
 
