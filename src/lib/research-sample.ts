@@ -81,6 +81,64 @@ function txAnswer(token: string, story: Story) {
   };
 }
 
+function devAnswer(token: string, story: Exclude<Story, "none">) {
+  const s = {
+    risky: { holds: 10.1, bought: 12, sold: 1.9, pooled: 0, burned: 0, locked: 0, sent: 0, claimed: 0.21, pending: 0.03, other: 5, funderLaunches: 3 },
+    high: { holds: 0, bought: 9.5, sold: 9.5, pooled: 0, burned: 0, locked: 0, sent: 0, claimed: 0.48, pending: 0, other: 2, funderLaunches: 0 },
+    ordinary: { holds: 6.1, bought: 8, sold: 0, pooled: 0, burned: 1.9, locked: 0, sent: 0, claimed: 0.05, pending: 0.01, other: 0, funderLaunches: 0 },
+  }[story];
+  const flags = [
+    ...(s.sold ? [{ severity: "warn", text: `The creator sold ${s.sold.toFixed(2)}% of the supply` }] : []),
+    ...(s.burned ? [{ severity: "good", text: `The creator burned ${s.burned.toFixed(2)}% of the supply` }] : []),
+    ...(s.holds >= 5 ? [{ severity: "info", text: `The creator still holds ${s.holds.toFixed(2)}% of the supply` }] : []),
+    { severity: "info", text: `The creator has claimed ${s.claimed.toFixed(4)} ETH in creator fees` },
+    ...(s.other ? [{ severity: "warn", text: `The creator launched ${s.other} other tokens on the launchpad` }] : []),
+    ...(s.funderLaunches ? [{ severity: "warn", text: `The wallet that first funded the creator has launched ${s.funderLaunches} tokens itself: a probable link, not proof` }] : []),
+  ];
+  return {
+    token: { address: token, name: story === "ordinary" ? "Sample Steady" : "Sample Frog", symbol: story === "ordinary" ? "STEADY" : "SFROG" },
+    creator: { address: CREATOR, foundFrom: "launchpad launch event", launchTx: LAUNCH_TX, launchedAt: null },
+    flags,
+    supply: { holdsPercent: s.holds, boughtPercent: s.bought, mintedPercent: 0, receivedPercent: 0, soldPercent: s.sold, pooledPercent: s.pooled, burnedPercent: s.burned, lockedPercent: s.locked, sentPercent: s.sent },
+    fees: { claimedEth: s.claimed, pendingEth: s.pending, claims: [] },
+    funding: { funder: fill("f"), eth: 0.5, funderIsService: false, funderLaunches: { count: s.funderLaunches, tokens: [] } },
+    otherLaunches: { count: s.other, tokens: [] },
+    explorer: `${EXPLORER}/address/${CREATOR}`,
+  };
+}
+
+function holdersAnswer(token: string, story: Exclude<Story, "none">) {
+  const risky = story !== "ordinary";
+  const flags = risky
+    ? [
+        { severity: "warn", text: "9 wallets bought 24.0% of the supply in the first 15 seconds and still hold 15.2%" },
+        { severity: "warn", text: "2 groups of top holders share a first funder and hold 38.6% together: probably the same person, not proven" },
+        { severity: "info", text: "Several wallets bought in the same block at launch, 2 times: typical of a bundled buy" },
+        { severity: "warn", text: "The ten largest wallets hold 81.0% of the supply" },
+      ]
+    : [{ severity: "info", text: "The largest wallet holds 6.1% of the supply" }];
+  return {
+    token: { address: token, symbol: story === "ordinary" ? "STEADY" : "SFROG", holders: risky ? 42 : 310 },
+    creator: CREATOR,
+    flags,
+    summary: {
+      poolLaunchBurnPercent: risky ? 12 : 40,
+      unknownContractsPercent: 0,
+      largestWalletPercent: risky ? 30.4 : 6.1,
+      top10WalletsPercent: risky ? 81 : 28,
+      snipersBoughtPercent: risky ? 24 : 1.2,
+      snipersStillHoldPercent: risky ? 15.2 : 0.4,
+      linkedGroupsPercent: risky ? 38.6 : 0,
+    },
+    topHolders: [{ address: WHALE, percent: risky ? 30.4 : 6.1, kind: "wallet" }],
+    linkedGroups: risky ? [{ funder: fill("a") }, { funder: fill("b") }] : [],
+    snipers: { windowSeconds: 15, count: risky ? 9 : 1, boughtPercent: risky ? 24 : 1.2, stillHoldPercent: risky ? 15.2 : 0.4, buyers: risky ? [{ address: WHALE, otherLaunchesSniped: [fill("6")] }] : [] },
+    sameBlockBuyers: risky ? [{ block: 1 }, { block: 2 }] : [],
+    repeatSnipersChecked: true,
+    explorer: `${EXPLORER}/token/${token}`,
+  };
+}
+
 function portfolioAnswer(wallet: string, token: string, story: Story) {
   const isCreator = wallet.toLowerCase() === CREATOR;
   const self = { token, symbol: story === "ordinary" ? "STEADY" : "SFROG", amount: 1000, valueUsd: isCreator ? 3901 : 12500, priceSource: "launchpad-curve" };
@@ -102,8 +160,8 @@ function portfolioAnswer(wallet: string, token: string, story: Story) {
 
 const SUMMARIES: Record<Exclude<Story, "none">, string> = {
   risky:
-    "Sample summary: $SFROG has a risk score of 4, a heuristic, mainly because the top 10 wallets hold 81% of it. The launch was bundled, with 6 wallets buying in the launch transaction, and the largest holder (30%) looks like a fresh wallet that holds nothing else. The creator still holds some but also holds 5 other new launches and a copycat token, a pattern common with serial launchers.",
-  high: "Sample summary: $SFROG has a risk score of 7, a heuristic. The top 10 wallets hold 81%, and the creator no longer holds any of it while still holding other new launches. The launch transaction couldn't be read, so this report doesn't say who bought at launch.",
+    "Sample summary: $SFROG has a risk score of 4, a heuristic, mainly because the top 10 wallets hold 81% of it. Two groups of top holders share a first funder and hold about 39% together, probably the same person though not proven, and snipers still hold 15%. The launch was bundled, and the creator, who has launched 5 other tokens, was funded by a wallet that launches tokens too.",
+  high: "Sample summary: $SFROG has a risk score of 7, a heuristic. The creator sold their whole 9.5% and has launched 2 other tokens, while the top 10 wallets hold 81% and two groups of them look linked by one funder, which is probable rather than proven. The launch transaction couldn't be read, so this report doesn't say who bought in it.",
   ordinary:
     "Sample summary: $STEADY has a risk score of 1, a heuristic, with no major warning signs. It has graduated, holders are spread out with the top 10 at 28%, and the largest holder is the creator at about 6%. Nobody else bought in the launch transaction.",
 };
@@ -115,13 +173,26 @@ export function sampleDeps(token: string): ResearchDeps {
   const story = storyFor(token);
   const answer = (data: unknown): PayResult => ({ ok: true, amount: SAMPLE_PRICE, data, tx: null, explorer: null });
   return {
-    gateway: async (slug) => ({ name: { "token-risk": "Token Risk", "tx-explainer": "Tx Explainer", "wallet-portfolio": "Wallet Portfolio" }[slug] ?? slug, autonomoAmount: SAMPLE_PRICE }),
+    gateway: async (slug) => ({
+      name:
+        {
+          "token-risk": "Token Risk",
+          "dev-wallet": "Dev Wallet Tracker",
+          "holders-bundles": "Holders & Bundles",
+          "tx-explainer": "Tx Explainer",
+          "wallet-portfolio": "Wallet Portfolio",
+        }[slug] ?? slug,
+      autonomoAmount: SAMPLE_PRICE,
+    }),
     payAndCall: async (url) => {
       await wait(900);
       const path = new URL(url).pathname;
       if (path.includes("/risk/")) {
         return story === "none" ? { ok: false, error: "The API answered 404, so no payment was taken." } : answer(riskAnswer(token, story));
       }
+      if (story === "none") return { ok: false, error: "The API answered 404, so no payment was taken." };
+      if (path.includes("/dev/")) return answer(devAnswer(token, story));
+      if (path.includes("/holders/")) return answer(holdersAnswer(token, story));
       if (path.includes("/tx/")) {
         return story === "high" ? { ok: false, error: "The API answered 502, so no payment was taken." } : answer(txAnswer(token, story));
       }

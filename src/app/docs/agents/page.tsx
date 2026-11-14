@@ -177,8 +177,8 @@ export default function AgentsGuidePage() {
         </p>
         <p>
           Its <Link href="/playground?mode=research">Research a token</Link> tab is the research agent: paste a token and it pays Token
-          Risk, Tx Explainer and Wallet Portfolio one after another, then writes one report on the token, its launch, its creator and
-          its largest holder.
+          Risk, Dev Wallet Tracker, Holders &amp; Bundles, Tx Explainer and Wallet Portfolio one after another, then writes one
+          report on the token, what its creator did, who really holds it, its launch and its largest holder.
         </p>
         <p>
           <b>The Autonomo agent bot</b> does the same in Telegram. Message{" "}

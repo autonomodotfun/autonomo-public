@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { LaunchCheck, Receipt, Report, ResearchEvent, ResearchStep, Verdict, WalletCheck } from "@/lib/research";
+import type { CreatorRecord, HoldersCheck, LaunchCheck, Receipt, Report, ResearchEvent, ResearchStep, Verdict, WalletCheck } from "@/lib/research";
 
 // The Playground's Research mode: paste a token, watch the agent pay each official API that knows something about
 // it, and read one report. The server side is /api/research and src/lib/research.ts.
@@ -13,6 +13,8 @@ type StepState = { state: "waiting" | "running" | "done" | "fail" | "skipped"; d
 
 const STEPS: { step: ResearchStep; title: string }[] = [
   { step: "risk", title: "Token Risk" },
+  { step: "dev", title: "Dev Wallet Tracker: what the creator did" },
+  { step: "holders", title: "Holders & Bundles: who really holds it" },
   { step: "launch", title: "Tx Explainer: the launch" },
   { step: "creator", title: "Wallet Portfolio: the creator" },
   { step: "holder", title: "Wallet Portfolio: the largest holder" },
@@ -23,6 +25,8 @@ type Run = {
   token: string;
   steps: Record<ResearchStep, StepState>;
   report: Report | null;
+  dev: CreatorRecord | null;
+  holders: HoldersCheck | null;
   launch: LaunchCheck | null;
   creator: WalletCheck | null;
   holder: WalletCheck | null;
@@ -39,6 +43,8 @@ const newRun = (token: string): Run => ({
   token,
   steps: waitingSteps(),
   report: null,
+  dev: null,
+  holders: null,
   launch: null,
   creator: null,
   holder: null,
@@ -54,6 +60,10 @@ function applyEvent(run: Run, e: ResearchEvent): Run {
       return { ...run, steps: { ...run.steps, [e.step]: { state: e.state, detail: e.detail, receipt: e.receipt } } };
     case "report":
       return { ...run, report: e.report };
+    case "dev":
+      return { ...run, dev: e.record };
+    case "holders":
+      return { ...run, holders: e.check };
     case "launch":
       return { ...run, launch: e.launch };
     case "wallet":
@@ -197,8 +207,9 @@ export function ResearchPanel({
               The agent digs.
             </h1>
             <p className="mt-5 max-w-2xl text-lg text-muted">
-              The research agent pays every Autonomo API that knows something about a Robinhood Chain token: its risk, its launch, its
-              creator and its largest holder. Then it writes up what it found, with an on-chain receipt for each call.
+              The research agent pays every Autonomo API that knows something about a Robinhood Chain token: its risk, what its
+              creator did, who really holds it, its launch and its largest holder. Then it writes up what it found, with an on-chain
+              receipt for each call.
             </p>
           </>
         )}
@@ -450,12 +461,31 @@ function ReportView({
           <Fact label="Sells, 24 h" value={count(r.sells24h)} />
           <Fact label="Buyers, all time" value={count(r.uniqueBuyers)} />
           <Fact label="Still holding" value={count(r.stillHolding)} />
-          <Fact label="Launch-block buyers" value={count(r.launchBlockBuyers)} />
-          <Fact label="Bought at launch" value={pct(r.launchBlockBuyersPercent)} />
+          {/* Holders & Bundles reads snipers and same-block buyers in detail, so these two give way to its card. */}
+          {!run.holders && <Fact label="Launch-block buyers" value={count(r.launchBlockBuyers)} />}
+          {!run.holders && <Fact label="Bought at launch" value={pct(r.launchBlockBuyersPercent)} />}
           {r.burnedPercent !== null && r.burnedPercent > 0 && <Fact label="Burned" value={pct(r.burnedPercent)} />}
         </dl>
         <p className="mt-3 text-xs text-faint">Holder shares are of circulating supply; the creator&apos;s is of total supply.</p>
       </div>
+
+      {(run.dev || run.steps.dev.state === "fail") && (
+        <section className="border-t border-line p-5 sm:p-6">
+          <h3 className="heading text-xl">What the creator did</h3>
+          {run.dev ? <CreatorView record={run.dev} /> : <p className="mt-2 text-sm text-muted">The creator check didn&apos;t finish: {run.steps.dev.detail}</p>}
+        </section>
+      )}
+
+      {(run.holders || run.steps.holders.state === "fail") && (
+        <section className="border-t border-line p-5 sm:p-6">
+          <h3 className="heading text-xl">Who really holds it</h3>
+          {run.holders ? (
+            <HoldersView check={run.holders} />
+          ) : (
+            <p className="mt-2 text-sm text-muted">The holders check didn&apos;t finish: {run.steps.holders.detail}</p>
+          )}
+        </section>
+      )}
 
       {(run.launch || run.steps.launch.state === "fail") && (
         <section className="border-t border-line p-5 sm:p-6">
@@ -571,6 +601,81 @@ function ReportView({
         A heuristic from public on-chain data, not financial advice. A low score doesn&apos;t make a token safe.
       </p>
     </article>
+  );
+}
+
+/** Flags with their severity, as the two token checks give them: warnings, good signs and plain notes. */
+function SeverityFlags({ flags }: { flags: { severity: string; text: string }[] }) {
+  return (
+    <ul className="mt-3 space-y-2">
+      {flags.map((f) => (
+        <li key={f.text} className="flex gap-2.5 text-sm">
+          <span
+            aria-hidden
+            className={`mt-1.5 size-2 shrink-0 rounded-full ${f.severity === "warn" ? "bg-warn" : f.severity === "good" ? "bg-brand" : "bg-faint"}`}
+          />
+          <span>
+            {f.text}
+            {f.severity === "warn" && <span className="sr-only"> (warning)</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const ethAmount = (v: number | null) => (v === null ? "–" : v > 0 && v < 0.0001 ? "<0.0001 ETH" : `${v.toFixed(4)} ETH`);
+
+function CreatorView({ record: d }: { record: CreatorRecord }) {
+  return (
+    <div className="mt-1">
+      <SeverityFlags flags={d.flags} />
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+        <Fact label="Still holds" value={pct(d.holdsPercent)} />
+        <Fact label="Bought" value={pct(d.boughtPercent)} />
+        <Fact label="Sold" value={pct(d.soldPercent)} />
+        <Fact label="Burned" value={pct(d.burnedPercent)} />
+        {d.lockedPercent > 0 && <Fact label="Locked" value={pct(d.lockedPercent)} />}
+        {d.pooledPercent > 0 && <Fact label="Added to the pool" value={pct(d.pooledPercent)} />}
+        {d.sentPercent > 0 && <Fact label="Sent elsewhere" value={pct(d.sentPercent)} />}
+        <Fact label="Fees claimed" value={ethAmount(d.feesClaimedEth)} />
+        <Fact label="Fees waiting" value={ethAmount(d.feesPendingEth)} />
+        <Fact label="Other launches" value={count(d.otherLaunches)} />
+        {d.funder && <Fact label="Its funder's launches" value={count(d.funder.launches)} />}
+      </dl>
+      <p className="mt-3 text-xs text-faint">Shares are of total supply. A funder is a probable link, never proof.</p>
+      {d.explorer && (
+        <a href={d.explorer} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-muted underline hover:text-ink">
+          Creator on Blockscout
+        </a>
+      )}
+    </div>
+  );
+}
+
+function HoldersView({ check: c }: { check: HoldersCheck }) {
+  const seconds = c.sniperWindowSeconds ?? 15;
+  return (
+    <div className="mt-1">
+      <SeverityFlags flags={c.flags} />
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+        <Fact label="Largest wallet" value={pct(c.largestWalletPercent)} />
+        <Fact label="Top 10 wallets" value={pct(c.top10WalletsPercent)} />
+        <Fact label="Pool, launch and burns" value={pct(c.poolLaunchBurnPercent)} />
+        <Fact label="Linked groups" value={c.linkedGroups ? `${c.linkedGroups} · ${pct(c.linkedGroupsPercent)}` : "None"} />
+        <Fact label={`Snipers, first ${seconds} s`} value={count(c.snipers)} />
+        <Fact label="Snipers bought" value={pct(c.snipersBoughtPercent)} />
+        <Fact label="Snipers still hold" value={pct(c.snipersStillHoldPercent)} />
+        <Fact label="Same-block buys" value={count(c.sameBlockBuys)} />
+        {c.repeatSnipers !== null && <Fact label="Repeat snipers" value={count(c.repeatSnipers)} />}
+      </dl>
+      <p className="mt-3 text-xs text-faint">Shares are of total supply, across the top 30 holders. Linked wallets share a first funder: probable, never proven.</p>
+      {c.explorer && (
+        <a href={c.explorer} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-muted underline hover:text-ink">
+          Holders on Blockscout
+        </a>
+      )}
+    </div>
   );
 }
 
