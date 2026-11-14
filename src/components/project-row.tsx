@@ -56,6 +56,9 @@ export function ProjectRow({ p, verified = false }: { p: ProjectListItem; verifi
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{p.name}</span>
             {verified && <VerifiedBadge />}
+            {p.autonomo && (
+              <span className="shrink-0 rounded border border-accent px-1.5 py-px text-[11px] font-medium text-accent">Autonomo</span>
+            )}
             {p.featured && (
               <span className="rounded bg-accent-soft px-1.5 py-px text-[11px] font-medium text-accent">Featured</span>
             )}
