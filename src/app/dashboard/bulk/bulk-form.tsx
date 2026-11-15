@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { AUTONOMO_DISCOUNT_LABEL, AUTONOMO_PRICE_NOTE, autonomoAmountFor, usdPriceValid } from "@/lib/gateway-rules";
 import { checkMany, launchMany, type BulkApi, type BulkResult } from "./actions";
 
-const BLANK: BulkApi = { name: "", slug: "", description: "", priceUsd: "0.01", autonomoAmount: "100", path: "" };
+const BLANK: BulkApi = { name: "", slug: "", description: "", priceUsd: "0.01", acceptUsdg: true, acceptAutonomo: true, path: "" };
 const MAX_APIS = 20;
 
 const EXAMPLE = `[
@@ -12,8 +13,9 @@ const EXAMPLE = `[
     "name": "Weather Now",
     "slug": "weather-now",
     "description": "Current weather for any city.",
-    "usdg": "0.01",
-    "autonomo": "100",
+    "price": "0.01",
+    "usdg": true,
+    "autonomo": true,
     "path": "/weather?city=Paris"
   }
 ]`;
@@ -31,18 +33,21 @@ function readPaste(raw: string): { apis: BulkApi[]; address?: string; header?: s
   if (!list || !list.length) return "The list is empty.";
   if (list.length > MAX_APIS) return `That's more than ${MAX_APIS} APIs. Launch them in two goes.`;
   const s = (v: unknown) => (v === undefined || v === null ? "" : String(v).trim());
+  // A coin is accepted unless it's left out or set to false. Older lists put the dollar price in "usdg".
+  const on = (v: unknown) => v !== undefined && v !== null && v !== false && v !== "";
   const apis = (list as Record<string, unknown>[]).map((a) => ({
     name: s(a?.name),
     slug: s(a?.slug ?? a?.paidAddress).toLowerCase(),
     description: s(a?.description),
-    priceUsd: s(a?.usdg ?? a?.priceUsd),
-    autonomoAmount: s(a?.autonomo ?? a?.autonomoAmount),
+    priceUsd: s(a?.price ?? a?.priceUsd ?? (typeof a?.usdg === "string" || typeof a?.usdg === "number" ? a.usdg : "")),
+    acceptUsdg: on(a?.usdg),
+    acceptAutonomo: on(a?.autonomo),
     path: s(a?.path),
   }));
   return { apis, address: Array.isArray(data) ? undefined : s(top.address) || undefined, header: Array.isArray(data) ? undefined : s(top.header) || undefined };
 }
 
-export function BulkForm({ site, secretsEnabled }: { site: string; secretsEnabled: boolean }) {
+export function BulkForm({ site, secretsEnabled, tokenUsd }: { site: string; secretsEnabled: boolean; tokenUsd: number | null }) {
   const [upstreamUrl, setUpstreamUrl] = useState("");
   const [authHeader, setAuthHeader] = useState("");
   const [authSecret, setAuthSecret] = useState("");
@@ -166,7 +171,7 @@ export function BulkForm({ site, secretsEnabled }: { site: string; secretsEnable
         <details className="rounded-md border border-line p-4 text-sm">
           <summary className="cursor-pointer font-medium">Paste a list instead of typing</summary>
           <p className="mt-3 text-muted">
-            One block per API, like this. Leave out <code>usdg</code> or <code>autonomo</code> to not accept that coin. Your
+            One block per API, like this. <code>price</code> is in dollars. Leave out <code>usdg</code> or <code>autonomo</code> to not accept that coin. Your
             key is never part of the list: type it in the box above.
           </p>
           <pre className="mt-3 overflow-x-auto rounded-md bg-surface p-3 font-mono text-xs">{EXAMPLE}</pre>
@@ -218,16 +223,28 @@ export function BulkForm({ site, secretsEnabled }: { site: string; secretsEnable
                   </label>
                   <label className="block text-sm">
                     <span className="mb-1.5 block font-medium">
-                      USDG a call <span className="font-normal text-faint">blank to not accept</span>
+                      Price a call <span className="font-normal text-faint">in dollars</span>
                     </span>
                     <input value={a.priceUsd} onChange={(e) => setApi(i, { priceUsd: e.target.value })} inputMode="decimal" placeholder="0.01" className="field" />
                   </label>
-                  <label className="block text-sm">
-                    <span className="mb-1.5 block font-medium">
-                      $AUTONOMO a call <span className="font-normal text-faint">blank to not accept</span>
-                    </span>
-                    <input value={a.autonomoAmount} onChange={(e) => setApi(i, { autonomoAmount: e.target.value })} inputMode="decimal" placeholder="100" className="field" />
-                  </label>
+                  <div className="text-sm">
+                    <span className="mb-1.5 block font-medium">Agents pay in</span>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={a.acceptUsdg} onChange={(e) => setApi(i, { acceptUsdg: e.target.checked })} />
+                      USDG
+                    </label>
+                    <label className="mt-1 flex items-center gap-2">
+                      <input type="checkbox" checked={a.acceptAutonomo} onChange={(e) => setApi(i, { acceptAutonomo: e.target.checked })} />
+                      $AUTONOMO
+                      {a.acceptAutonomo && tokenUsd && usdPriceValid(a.priceUsd.trim()) ? (
+                        <span className="text-muted">
+                          <span className="font-mono">{Number(autonomoAmountFor(Number(a.priceUsd), tokenUsd)).toLocaleString("en-US")}</span> a call,{" "}
+                          {AUTONOMO_DISCOUNT_LABEL}
+                        </span>
+                      ) : null}
+                    </label>
+                    {a.acceptAutonomo && <p className="mt-1 text-xs text-faint">{AUTONOMO_PRICE_NOTE}</p>}
+                  </div>
                   <label className="block text-sm sm:col-span-2">
                     <span className="mb-1.5 block font-medium">
                       Path to test <span className="font-normal text-faint">what an agent adds after the paid address</span>

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { secretsEnabled } from "@/lib/gateway";
 import { currentOwner } from "@/lib/session";
 import { BulkForm } from "./bulk-form";
+import { dayPriceOrNull } from "@/lib/pool-price";
 
 export const metadata: Metadata = { title: "Launch several APIs", robots: { index: false } };
 
@@ -20,7 +21,7 @@ export default async function BulkLaunchPage() {
         <Link href="/dashboard/new" className="underline hover:text-ink">Launching just one?</Link>
       </p>
       <div className="mt-8">
-        <BulkForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} />
+        <BulkForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} tokenUsd={await dayPriceOrNull()} />
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ export const ADMIN_EVENT_LABELS = {
   pay_to_request_approved: "Payout request approved",
   pay_to_request_rejected: "Payout request rejected",
   wallet_switched: "Creator wallet switched",
+  prices_updated: "$AUTONOMO prices updated",
 } as const;
 export type AdminEventKind = keyof typeof ADMIN_EVENT_LABELS;
 export type AdminEvent = typeof adminEvents.$inferSelect;

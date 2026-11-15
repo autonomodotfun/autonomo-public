@@ -4,7 +4,8 @@ import { inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
 import { checkUpstream, encryptSecret, ownerPayTo, RESERVED_SLUGS, secretsEnabled, testUpstream } from "@/lib/gateway";
-import { autonomoAmountValid, headerNameValid, slugError, testVerdict, usdPriceValid } from "@/lib/gateway-rules";
+import { autonomoAmountFor, headerNameValid, slugError, testVerdict, usdPriceValid } from "@/lib/gateway-rules";
+import { dayPriceUsd } from "@/lib/pool-price";
 import { revalidateCatalog } from "@/lib/queries";
 import { currentOwner } from "@/lib/session";
 
@@ -20,7 +21,8 @@ const TESTS_AT_ONCE = 4;
 const recentChecks = new Map<string, number[]>();
 
 export type BulkShared = { upstreamUrl: string; authHeader: string; authSecret: string };
-export type BulkApi = { name: string; slug: string; description: string; priceUsd: string; autonomoAmount: string; path: string };
+// One dollar price per API; the $AUTONOMO price follows it (src/lib/gateway-rules.ts).
+export type BulkApi = { name: string; slug: string; description: string; priceUsd: string; acceptUsdg: boolean; acceptAutonomo: boolean; path: string };
 export type BulkApiResult = { slug: string; problems: string[]; test: { pass: boolean; text: string } | null };
 export type BulkResult = {
   // A problem with the shared fields or the list itself, shown above the list.
@@ -45,7 +47,8 @@ function clean(shared: BulkShared, apis: BulkApi[]) {
       slug: text(a?.slug, 40).toLowerCase(),
       description: text(a?.description, 300),
       priceUsd: text(a?.priceUsd, 20),
-      autonomoAmount: text(a?.autonomoAmount, 30),
+      acceptUsdg: a?.acceptUsdg === true,
+      acceptAutonomo: a?.acceptAutonomo === true,
       path: String(a?.path ?? "").slice(0, 500),
     })),
   };
@@ -81,9 +84,8 @@ async function inspect(owner: string, rawShared: BulkShared, rawApis: BulkApi[])
     if (slug) problems.push(`Paid address: ${slug}`);
     else if (taken.has(a.slug)) problems.push("That paid address is taken.");
     else if (apis.findIndex((b) => b.slug === a.slug) !== i) problems.push("Another API in this list has the same paid address.");
-    if (!a.priceUsd && !a.autonomoAmount) problems.push("Set a price in USDG, in $AUTONOMO, or both.");
-    if (a.priceUsd && !usdPriceValid(a.priceUsd)) problems.push("USDG price: between 0.000001 and 100, up to 6 decimals.");
-    if (a.autonomoAmount && !autonomoAmountValid(a.autonomoAmount)) problems.push("$AUTONOMO price: a number above zero.");
+    if (!usdPriceValid(a.priceUsd)) problems.push("Price: between 0.000001 and 100 dollars, up to 6 decimals.");
+    if (!a.acceptUsdg && !a.acceptAutonomo) problems.push("Accept USDG, $AUTONOMO, or both.");
     return { slug: a.slug, problems, test: null };
   });
 
@@ -119,6 +121,12 @@ export async function launchMany(shared: BulkShared, apis: BulkApi[], askListing
     return { error: "Nothing was launched. Fix the APIs marked below, then try again.", apis: checked.apis };
   }
 
+  // Every $AUTONOMO price comes from the dollar price at today's token price, worked out here, never sent by the page.
+  const tokenUsd = checked.list.some((a) => a.acceptAutonomo) ? await dayPriceUsd().catch(() => null) : null;
+  if (checked.list.some((a) => a.acceptAutonomo) && !tokenUsd) {
+    return { error: "Nothing was launched: the $AUTONOMO price can't be read right now. Try again in a minute.", apis: checked.apis };
+  }
+
   const db = await getDb();
   const payTo = await ownerPayTo(owner);
   const upstreamUrl = checked.upstream.url.href.replace(/\/+$/, "");
@@ -132,9 +140,9 @@ export async function launchMany(shared: BulkShared, apis: BulkApi[], askListing
         upstreamUrl,
         upstreamAuthHeader: checked.shared.authHeader || null,
         upstreamAuthSecret: checked.shared.authHeader ? secret : null,
-        priceUsd: a.priceUsd || "0",
-        acceptUsdg: Boolean(a.priceUsd),
-        autonomoAmount: a.autonomoAmount || null,
+        priceUsd: a.priceUsd,
+        acceptUsdg: a.acceptUsdg,
+        autonomoAmount: a.acceptAutonomo && tokenUsd ? autonomoAmountFor(Number(a.priceUsd), tokenUsd) : null,
         owner,
         payTo,
         ...(askListing ? { listing: "pending" as const } : {}),

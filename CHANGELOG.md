@@ -5,6 +5,12 @@ repo gets a copy of each release.
 
 ## November 15, 2026
 
+- **$AUTONOMO prices follow the dollar price.** An API now has one price, in dollars. Paying in $AUTONOMO costs
+  that price 20% lower, in tokens at the token's average price over the previous day, and every API's $AUTONOMO
+  price is worked out again each day, so it never drifts from the dollar price. The launch form shows the amount as
+  you type. This covers every API, official ones included: at today's price a $0.01 call is about 59 $AUTONOMO, down
+  from a fixed 100. The `/api/v1/gateways` list gains `autonomoPricing`, with the dollar price it follows and the
+  discount.
 - **A rewards vesting contract is on-chain.** `AutonomoRewardsVesting` holds the $AUTONOMO set aside for rewards,
   just over 10 million (1% of supply), at
   [`0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277`](https://robinhoodchain.blockscout.com/address/0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277).

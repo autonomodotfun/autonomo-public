@@ -5,6 +5,7 @@ import { ownerPayTo, secretsEnabled } from "@/lib/gateway";
 import { currentOwner } from "@/lib/session";
 import { VerifiedPanel } from "@/components/verified";
 import { burnPercent } from "@/lib/burn";
+import { dayPriceOrNull } from "@/lib/pool-price";
 import { GatewayForm } from "../gateway-form";
 
 export const metadata: Metadata = { title: "Launch an API", robots: { index: false } };
@@ -22,7 +23,7 @@ export default async function NewGatewayPage() {
         <Link href="/docs/launch" className="underline hover:text-ink">Read the launch guide</Link>.
       </p>
       <div className="mt-8">
-        <GatewayForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} burnPercent={burnPercent()} />
+        <GatewayForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} burnPercent={burnPercent()} tokenUsd={await dayPriceOrNull()} />
       </div>
       {/* Optional, so it sits after the form: nobody needs it to launch. */}
       <VerifiedPanel owner={(await ownerPayTo(owner)) ?? owner} className="mt-12" />

@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { isAddress, isHex, verifyMessage, type Hex } from "viem";
 import { getDb, schema } from "@/db";
 import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo, testUpstream, type UpstreamTest } from "@/lib/gateway";
-import { autonomoAmountValid, headerNameValid, slugError, usdPriceValid } from "@/lib/gateway-rules";
+import { autonomoAmountFor, headerNameValid, slugError, usdPriceValid } from "@/lib/gateway-rules";
+import { dayPriceUsd } from "@/lib/pool-price";
 import { applyPayTo, firstSafeMessage } from "@/lib/pay-to";
 import { currentOwner, seal, unseal } from "@/lib/session";
 import { revalidateCatalog } from "@/lib/queries";
@@ -88,7 +89,6 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
     upstreamUrl: str(form, "upstreamUrl", 500),
     authHeader: str(form, "authHeader", 64),
     priceUsd: str(form, "priceUsd", 20),
-    autonomoAmount: str(form, "autonomoAmount", 30),
     acceptUsdg: form.get("acceptUsdg") === "on" ? "on" : "",
     acceptAutonomo: form.get("acceptAutonomo") === "on" ? "on" : "",
   };
@@ -105,11 +105,16 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
   const acceptUsdg = values.acceptUsdg === "on";
   const acceptAutonomo = values.acceptAutonomo === "on";
   const priceValid = usdPriceValid(values.priceUsd);
-  if (acceptUsdg && !priceValid) errors.priceUsd = "A USD price between 0.000001 and 100, up to 6 decimals.";
-  if (acceptAutonomo && !autonomoAmountValid(values.autonomoAmount)) {
-    errors.autonomoAmount = "How many $AUTONOMO per call.";
-  }
+  // The dollar price is always needed: it is the USDG price, and the $AUTONOMO price follows it.
+  if (!priceValid) errors.priceUsd = "A USD price between 0.000001 and 100, up to 6 decimals.";
   if (!acceptUsdg && !acceptAutonomo) errors.acceptUsdg = "Accept at least one payment option.";
+  // Worked out here from the dollar price, never taken from the form.
+  let autonomoAmount: string | null = null;
+  if (acceptAutonomo && priceValid) {
+    const tokenUsd = await dayPriceUsd().catch(() => null);
+    if (tokenUsd) autonomoAmount = autonomoAmountFor(Number(values.priceUsd), tokenUsd);
+    else errors.acceptUsdg = "The $AUTONOMO price can't be read right now, so its price per call can't be set. Try again in a minute.";
+  }
 
   if (values.authHeader && !headerNameValid(values.authHeader)) {
     errors.authHeader = "Use a plain header name, like Authorization or X-API-Key.";
@@ -143,9 +148,9 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
       : clearSecret || !values.authHeader
         ? null
         : (existing?.upstreamAuthSecret ?? null),
-    priceUsd: priceValid ? values.priceUsd : "0",
+    priceUsd: values.priceUsd,
     acceptUsdg,
-    autonomoAmount: acceptAutonomo ? values.autonomoAmount : null,
+    autonomoAmount,
     updatedAt: new Date(),
   };
 
