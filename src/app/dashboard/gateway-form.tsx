@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { UpstreamTest } from "@/lib/gateway";
+import { AUTONOMO_DISCOUNT_LABEL, AUTONOMO_PRICE_NOTE, autonomoAmountFor, autonomoUsdHint, usdPriceValid } from "@/lib/gateway-rules";
 import { checkLaunchStep, saveGateway, testApi, type GatewayFormState } from "./actions";
 
 export type GatewayDefaults = {
@@ -14,7 +15,7 @@ export type GatewayDefaults = {
   authHeader: string;
   priceUsd: string;
   acceptUsdg: boolean;
-  autonomoAmount: string;
+  acceptAutonomo: boolean;
 };
 
 const EMPTY: GatewayDefaults = {
@@ -25,11 +26,8 @@ const EMPTY: GatewayDefaults = {
   authHeader: "",
   priceUsd: "0.01",
   acceptUsdg: true,
-  autonomoAmount: "",
+  acceptAutonomo: false,
 };
-
-// What ticking $AUTONOMO starts at, per call. The official APIs charge the same.
-const DEFAULT_AUTONOMO = "100";
 
 // A new API is launched in three steps. Editing one shows every field at once.
 const STEPS = ["Your API", "Your price", "Review and launch"];
@@ -42,7 +40,6 @@ const STEP_OF: Record<string, number> = {
   authHeader: 0,
   authSecret: 0,
   priceUsd: 1,
-  autonomoAmount: 1,
   acceptUsdg: 1,
 };
 
@@ -57,7 +54,6 @@ const FIELD_LABEL: Record<string, string> = {
   authHeader: "Your API key",
   authSecret: "Your API key",
   priceUsd: "Price per call",
-  autonomoAmount: "Price per call",
   acceptUsdg: "Price per call",
 };
 
@@ -76,13 +72,8 @@ function checkStep(step: number, f: FormData): Errors {
   if (step === 1) {
     const usdg = f.get("acceptUsdg") === "on";
     const autonomo = f.get("acceptAutonomo") === "on";
-    const price = Number(get("priceUsd"));
-    if (usdg && !(/^\d+(\.\d{1,6})?$/.test(get("priceUsd")) && price > 0 && price <= 100)) {
-      e.priceUsd = "A USD price between 0.000001 and 100, up to 6 decimals.";
-    }
-    if (autonomo && (!/^\d+(\.\d{1,18})?$/.test(get("autonomoAmount")) || !(Number(get("autonomoAmount")) > 0))) {
-      e.autonomoAmount = "How many $AUTONOMO per call.";
-    }
+    // Always needed: the $AUTONOMO price follows it, even when USDG isn't accepted.
+    if (!usdPriceValid(get("priceUsd"))) e.priceUsd = "A USD price between 0.000001 and 100, up to 6 decimals.";
     if (!usdg && !autonomo) e.acceptUsdg = "Accept at least one payment option.";
   }
   return e;
@@ -113,12 +104,15 @@ export function GatewayForm({
   secretSet = false,
   secretsEnabled,
   burnPercent,
+  tokenUsd,
 }: {
   defaults?: GatewayDefaults;
   site: string;
   secretSet?: boolean;
   secretsEnabled: boolean;
   burnPercent?: number;
+  /** Today's $AUTONOMO price in USD (the previous day's average), or null when it couldn't be read. */
+  tokenUsd: number | null;
 }) {
   const [state, action, pending] = useActionState<GatewayFormState, FormData>(saveGateway, { ok: false });
   const v = state.values;
@@ -137,12 +131,11 @@ export function GatewayForm({
   const err: Errors = { ...(wizard ? launchErrors : (state.errors ?? {})), ...stepErrors };
   const [slug, setSlug] = useState(v?.slug ?? defaults.slug);
   const [slugTouched, setSlugTouched] = useState(Boolean(defaults.slug));
-  const [acceptAutonomo, setAcceptAutonomo] = useState(v ? v.acceptAutonomo === "on" : Boolean(defaults.autonomoAmount));
+  const [acceptAutonomo, setAcceptAutonomo] = useState(v ? v.acceptAutonomo === "on" : defaults.acceptAutonomo);
   // Controlled so they survive a failed submit: React resets uncontrolled fields after a form action, and the
   // server never sends the secret back.
   const [acceptUsdg, setAcceptUsdg] = useState(v ? v.acceptUsdg === "on" : defaults.acceptUsdg);
   const [priceUsd, setPriceUsd] = useState(v?.priceUsd ?? defaults.priceUsd);
-  const [autonomoAmount, setAutonomoAmount] = useState(v?.autonomoAmount || defaults.autonomoAmount || DEFAULT_AUTONOMO);
   const [secret, setSecret] = useState("");
 
   // The server refused the launch: stay on the review and say why there, with a way back to the step to fix.
@@ -399,11 +392,26 @@ export function GatewayForm({
         <fieldset className="space-y-4 rounded-lg border border-line p-4">
           <legend className="px-1 text-sm font-medium">Price per call</legend>
           <p className="text-sm text-muted">
-            Choose what agents can pay with, and what one call costs in each.{" "}
+            Set one price in dollars, then choose what agents can pay with.{" "}
             {burnPercent
               ? `${burnPercent}% of each payment is burned and your wallet gets the other ${keep}%, usually within a day. Autonomo keeps none of it.`
               : "Payments go straight to the wallet you signed in with. Autonomo takes no cut."}
           </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm text-faint">$</span>
+              <input
+                name="priceUsd"
+                value={priceUsd}
+                onChange={(e) => setPriceUsd(e.target.value)}
+                inputMode="decimal"
+                className="field w-32"
+                aria-label="Price per call in USD"
+              />
+              <span className="text-sm text-muted">per call</span>
+            </div>
+            {err.priceUsd && <p className="mt-1 text-sm text-warn" role="alert">{err.priceUsd}</p>}
+          </div>
           {/* One box per chain. Labels wrap only the checkbox and its title, so clicking near a price never toggles the option. */}
           <div className="space-y-4 rounded-md border border-line p-4">
           <ChainHead name="Robinhood Chain" />
@@ -413,20 +421,7 @@ export function GatewayForm({
               <span className="text-sm font-medium">USDG</span>
               <span className="text-xs text-faint">a dollar stablecoin</span>
             </label>
-            <div className="mt-2 ml-7 flex items-center gap-2">
-              <span className="font-mono text-sm text-faint">$</span>
-              <input
-                name="priceUsd"
-                value={priceUsd}
-                onChange={(e) => setPriceUsd(e.target.value)}
-                disabled={!acceptUsdg}
-                inputMode="decimal"
-                className="field w-32 disabled:opacity-50"
-                aria-label="Price in USD"
-              />
-              <span className="text-sm text-muted">per call</span>
-            </div>
-            {err.priceUsd && <p className="mt-1 ml-7 text-sm text-warn" role="alert">{err.priceUsd}</p>}
+            {acceptUsdg && <p className="mt-1 ml-7 text-sm"><span className="font-mono">{usdPriceValid(priceUsd.trim()) ? `$${Number(priceUsd)}` : "—"}</span> per call</p>}
           </div>
           <div>
             <label className="flex items-center gap-3">
@@ -434,21 +429,7 @@ export function GatewayForm({
               <span className="text-sm font-medium">$AUTONOMO</span>
               <span className="text-xs text-faint">our token</span>
             </label>
-            {acceptAutonomo && (
-              <div className="mt-2 ml-7 flex items-center gap-2">
-                <input
-                  name="autonomoAmount"
-                  value={autonomoAmount}
-                  onChange={(e) => setAutonomoAmount(e.target.value)}
-                  inputMode="decimal"
-                  placeholder={DEFAULT_AUTONOMO}
-                  className="field w-32"
-                  aria-label="Price in AUTONOMO"
-                />
-                <span className="text-sm text-muted">AUTONOMO per call</span>
-              </div>
-            )}
-            {err.autonomoAmount && <p className="mt-1 ml-7 text-sm text-warn" role="alert">{err.autonomoAmount}</p>}
+            {acceptAutonomo && <AutonomoPrice priceUsd={priceUsd} tokenUsd={tokenUsd} />}
           </div>
           {err.acceptUsdg && <p className="text-sm text-warn" role="alert">{err.acceptUsdg}</p>}
           </div>
@@ -484,7 +465,7 @@ export function GatewayForm({
             />
             <Row
               label="Price per call"
-              value={`${[review.acceptUsdg === "on" && `$${review.priceUsd} in USDG`, review.acceptAutonomo === "on" && `${review.autonomoAmount} $AUTONOMO`]
+              value={`${[review.acceptUsdg === "on" && `$${review.priceUsd} in USDG`, review.acceptAutonomo === "on" && autonomoReview(review.priceUsd, tokenUsd)]
                 .filter(Boolean)
                 .join(", or ")}, on Robinhood Chain`}
             />
@@ -607,4 +588,32 @@ function Field({
       ) : null}
     </div>
   );
+}
+
+/** The $AUTONOMO price, worked out from the dollar price as the creator types it. */
+function AutonomoPrice({ priceUsd, tokenUsd }: { priceUsd: string; tokenUsd: number | null }) {
+  const price = priceUsd.trim();
+  const amount = tokenUsd && usdPriceValid(price) ? Number(autonomoAmountFor(Number(price), tokenUsd)) : null;
+  return (
+    <div className="mt-1 ml-7 text-sm" aria-live="polite">
+      <p>
+        <span className="font-mono">{amount === null ? "—" : amount.toLocaleString("en-US")}</span> per call
+        {amount !== null && tokenUsd ? (
+          <span className="text-muted">
+            {" "}
+            · {AUTONOMO_DISCOUNT_LABEL}, {autonomoUsdHint(amount, tokenUsd)}
+          </span>
+        ) : null}
+      </p>
+      <p className="mt-0.5 text-xs text-faint">
+        {tokenUsd ? AUTONOMO_PRICE_NOTE : "The $AUTONOMO price can't be read right now. It's worked out when you save."}
+      </p>
+    </div>
+  );
+}
+
+/** "59 $AUTONOMO (20% off, updated daily)" for the review, or a note when the token price isn't known. */
+function autonomoReview(priceUsd: string, tokenUsd: number | null) {
+  if (!tokenUsd || !usdPriceValid(priceUsd)) return `$AUTONOMO, at ${AUTONOMO_DISCOUNT_LABEL}`;
+  return `${Number(autonomoAmountFor(Number(priceUsd), tokenUsd)).toLocaleString("en-US")} $AUTONOMO (${AUTONOMO_DISCOUNT_LABEL}, updated daily)`;
 }

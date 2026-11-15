@@ -288,7 +288,7 @@ server.registerTool(
     title: "Pay for and call an API",
     description:
       "Pay for one call to an Autonomo API with x402 and return the answer. Spends USDG or $AUTONOMO from the configured wallet on " +
-      "Robinhood Chain (usually 0.01 USDG or 100 $AUTONOMO), within a per-call cap and a daily budget. Returns the data and the " +
+      "Robinhood Chain (usually 0.01 USDG, or 20% less in $AUTONOMO), within a per-call cap and a daily budget. Returns the data and the " +
       "payment transaction link.",
     inputSchema: {
       slug: z.string().describe("The API's slug from find_apis, e.g. token-risk."),

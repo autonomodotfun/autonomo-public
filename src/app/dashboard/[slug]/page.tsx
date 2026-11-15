@@ -9,6 +9,7 @@ import { TOKEN } from "@/lib/constants";
 import { gatewayOffers, gatewayStats, getOwnedGateway, payeeOf, secretsEnabled } from "@/lib/gateway";
 import { afterBurn, fmtAutonomo, fmtRail, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 import { burnPercent } from "@/lib/burn";
+import { dayPriceOrNull } from "@/lib/pool-price";
 import { platform } from "@/lib/payments";
 import { currentOwner } from "@/lib/session";
 import { deleteGateway, requestListing, setGatewayStatus } from "../actions";
@@ -237,6 +238,7 @@ export default async function GatewayDashboard({
           <div className="mt-4">
             <GatewayForm
               burnPercent={burnPercent()}
+              tokenUsd={await dayPriceOrNull()}
               site={SITE}
               secretsEnabled={secretsEnabled()}
               secretSet={Boolean(g.upstreamAuthSecret)}
@@ -249,7 +251,7 @@ export default async function GatewayDashboard({
                 authHeader: g.upstreamAuthHeader ?? "",
                 priceUsd: Number(g.priceUsd) > 0 ? String(Number(g.priceUsd)) : "0.01",
                 acceptUsdg: g.acceptUsdg,
-                autonomoAmount: g.autonomoAmount ?? "",
+                acceptAutonomo: g.autonomoAmount !== null,
               }}
             />
           </div>

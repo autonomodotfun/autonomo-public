@@ -24,6 +24,7 @@ import { metadata as numbers } from "../numbers/page";
 import { metadata as partners } from "../partners/page";
 import { metadata as playground } from "../playground/page";
 import { metadata as roadmap } from "../roadmap/page";
+import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway-rules";
 
 // /llms.txt (https://llmstxt.org): a plain-text map of Autonomo for AI agents and LLMs. Nothing here is written twice:
 // page titles and descriptions come from each page's own metadata, the official APIs and their prices from the same
@@ -80,7 +81,7 @@ async function officialApiLines() {
       `${i ? "\n" : ""}### ${shelf.title}${shelf.onchain ? ` (on-chain, reads ${TOKEN.chainName})` : ""}\n`,
       ...apis.map((g) => {
         const prices = [
-          g.autonomoAmount === null ? null : `${amount(Number(g.autonomoAmount))} ${TOKEN.symbol}`,
+          g.autonomoAmount === null ? null : `${amount(Number(g.autonomoAmount))} ${TOKEN.symbol} (${AUTONOMO_DISCOUNT_LABEL}, set daily)`,
           g.acceptUsdg ? `${amount(Number(g.priceUsd))} USDG` : null,
         ].filter(Boolean);
         const usage = GATEWAY_USAGE[g.slug] ?? "/";

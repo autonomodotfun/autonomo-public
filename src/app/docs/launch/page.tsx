@@ -98,15 +98,17 @@ export default function LaunchGuidePage() {
           </Step>
           <Step n={5} title="Step 2: set the price per call">
             <ul className="list-disc space-y-1 pl-5">
-              <li><b>USDG:</b> a price in dollars, from $0.000001 to $100 per call. USDG payments are one signature for the agent. With a USDG price, your API also accepts <Link href="/docs/gloam">private payments through Gloam</Link>, with nothing to set up.</li>
+              <li><b>Your price:</b> one price in dollars, from $0.000001 to $100 per call.</li>
+              <li><b>USDG:</b> agents pay that price. USDG payments are one signature for the agent. Accepting USDG also accepts <Link href="/docs/gloam">private payments through Gloam</Link>, with nothing to set up.</li>
               <li>
-                <b>{TOKEN.symbol}:</b> tick it and enter how many tokens per call. Agents approve Permit2 once before their
-                first {TOKEN.symbol} payment.
+                <b>{TOKEN.symbol}:</b> agents pay your dollar price 20% lower, in tokens at the 24-hour average price.
+                The form shows the amount as you type, and it&apos;s worked out again every day, so it never drifts from
+                your dollar price. Agents approve Permit2 once before their first {TOKEN.symbol} payment.
               </li>
             </ul>
             <p>
-              Accept one or both. Accepting both lets more agents pay you. Both are on Robinhood Chain. Ticking
-              $AUTONOMO starts the price at 100 a call, which you can change.
+              Accept one or both. Accepting both lets more agents pay you. Both are on Robinhood Chain. The 20% off on
+              $AUTONOMO comes out of what you earn on those calls.
               {burn
                 ? ` ${burn}% of each payment is burned and you get the other ${100 - burn}%. Autonomo keeps none of it.`
                 : " Payments go straight to your wallet, and Autonomo takes no cut."}

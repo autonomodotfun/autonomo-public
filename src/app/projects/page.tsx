@@ -15,6 +15,7 @@ import {
   type Sort,
 } from "@/lib/queries";
 import { Avatar, compact, ProjectList } from "@/components/project-row";
+import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway-rules";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 type AutonomoApi = Awaited<ReturnType<typeof listAutonomoGateways>>[number];
@@ -200,7 +201,7 @@ function ApiCard({ g, className = "" }: { g: AutonomoApi; className?: string }) 
           <span className="mt-1.5 block font-mono text-xs">
             {g.acceptUsdg ? `${formatUsd(g.priceUsd)} USDG` : ""}
             {g.acceptUsdg && g.autonomoAmount ? " · " : ""}
-            {g.autonomoAmount ? `${Number(g.autonomoAmount).toLocaleString("en")} ${TOKEN.symbol}` : ""}
+            {g.autonomoAmount ? `${Number(g.autonomoAmount).toLocaleString("en")} ${TOKEN.symbol} (${AUTONOMO_DISCOUNT_LABEL})` : ""}
           </span>
         </span>
       </Link>
