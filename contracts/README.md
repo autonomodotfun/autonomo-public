@@ -16,6 +16,7 @@ Needs [Foundry](https://getfoundry.sh).
 
 ```bash
 forge install foundry-rs/forge-std --no-git
+forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-git
 forge test
 ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com forge test --match-contract ForkTest -vv
 ```
@@ -29,3 +30,22 @@ BURN_OWNER=<Autonomo Safe> BURN_KEEPER=<a dedicated gas-only wallet> forge scrip
 ```
 
 Check that both contracts show verified source on the explorer: the docs send holders there to read the code. Then set `BUYBACK_BURNER`, `BURN_SPLITTER_FACTORY`, `BURN_START_BLOCK` and `BURN_KEEPER_PRIVATE_KEY` (the deployment block shown on the explorer) in the app's environment. Payments start going to splitters on the next deploy; until then they go straight to payees.
+
+## Rewards vesting
+
+**`AutonomoRewardsVesting`** holds the $AUTONOMO set aside for rewards and releases it in a straight line between its start and its end. It is OpenZeppelin's `VestingWallet` (v5.1.0) with two guards on who receives:
+
+- Ownership can't be given up. Released tokens go to the owner, so with no owner they would be stuck for good.
+- Handing over to a new owner takes two steps: the new owner has to accept.
+
+Anyone can call `release(token)`; it only ever pays the owner, the Rewards Safe. Nobody, the owner included, can take tokens out ahead of the schedule. Tokens sent in after the start vest on the same schedule, so part of them is releasable at once: refills go to the Rewards Safe, never to this contract.
+
+It has no pieces of its own to configure, so it is deployed from [Remix](https://remix.ethereum.org) with the single file [`flat/AutonomoRewardsVesting.flat.sol`](flat/AutonomoRewardsVesting.flat.sol), which is this contract and the OpenZeppelin files it uses. Compiler 0.8.26, optimizer on with 10000 runs, EVM version cancun: the same file and settings verify it on the explorer.
+
+Deployed on Robinhood Chain at [`0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277`](https://robinhoodchain.blockscout.com/address/0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277), paying the Rewards Safe `0x26FB8dc4550893e832e3238637dd93D2B6beB6B4` (2 of 2) from December 1, 2026 to May 30, 2027. `owner()`, `start()`, `end()` and `releasable(token)` read all of it back.
+
+| Constructor value | What it is |
+| --- | --- |
+| `beneficiary` | The Rewards Safe |
+| `startTimestamp` | When vesting starts, in Unix seconds (Dec 1, 2026 00:00 UTC is `1796083200`) |
+| `durationSeconds` | How long it runs (180 days is `15552000`) |
