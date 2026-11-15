@@ -3,6 +3,15 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 15, 2026
+
+- **A rewards vesting contract is on-chain.** `AutonomoRewardsVesting` holds the $AUTONOMO set aside for rewards,
+  just over 10 million (1% of supply), at
+  [`0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277`](https://robinhoodchain.blockscout.com/address/0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277).
+  It releases them in a straight line from December 1, 2026 to May 30, 2027, only to a 2-of-2 Rewards Safe. Nobody can
+  take tokens out ahead of the schedule, the owner included. It is OpenZeppelin's `VestingWallet` with two guards:
+  ownership can't be given up, and a handover has to be accepted. The code and its tests are in `contracts/`.
+
 ## November 14, 2026
 
 - **Safer Borro borrowing in the SDKs.** `autonomo-sdk` 0.1.3 (npm) and `autonomo` 0.1.1 (PyPI) now check Borro's
