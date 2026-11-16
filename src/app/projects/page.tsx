@@ -247,6 +247,7 @@ function Directory({ query, result, stats, noteTags }: { query: ProjectQuery; re
   const pages = Math.max(1, Math.ceil(result.total / result.limit));
   const sorts: Sort[] = query.q ? ["relevance", "popular", "new", "price", "name"] : ["popular", "new", "price", "name"];
   const filtered = !!(query.q || query.category || query.network);
+  const onlyNetwork = !!query.network && !query.q && !query.category;
   const topNetworks = stats.networks.slice(0, TOP_NETWORKS);
   const moreNetworks = stats.networks.slice(TOP_NETWORKS);
   const activeInMore = moreNetworks.some((n) => n.network === query.network);
@@ -258,8 +259,10 @@ function Directory({ query, result, stats, noteTags }: { query: ProjectQuery; re
         <h2 className="heading text-2xl sm:text-3xl">{heading}</h2>
         <span className="text-sm text-muted">
           <span className="font-mono text-ink">{result.total.toLocaleString("en")}</span>{" "}
-          {result.total === 1 ? "project" : "projects"}
-          {query.network && <> on {networkLabel(query.network)}</>}
+          {/* A project can accept several chains, so a chain's count is a share of the directory, not a slice of it. */}
+          {onlyNetwork && <>of {stats.projects.toLocaleString("en")} </>}
+          {result.total === 1 && !onlyNetwork ? "project" : "projects"}
+          {query.network && <> {onlyNetwork ? "accept" : "on"} {networkLabel(query.network)}</>}
           {query.q && <> for “{query.q}”</>}
           {noteTags && <> · Autonomo&apos;s own are tagged</>}
         </span>
@@ -298,6 +301,7 @@ function Directory({ query, result, stats, noteTags }: { query: ProjectQuery; re
               </ul>
             </details>
           )}
+          <p className="mt-3 px-2 text-xs text-faint">Many projects accept several chains, so these counts overlap.</p>
         </aside>
 
         <section className="min-w-0">

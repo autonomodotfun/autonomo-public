@@ -3,6 +3,12 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 16, 2026
+
+- **Explore's chain counts read correctly.** A project that accepts several chains is counted under each of them, so
+  the chain counts add up to more than the directory's total. Picking a chain now says so ("5,022 of 5,2xx projects
+  accept Base"), and a note under the chain list says the counts overlap. The numbers themselves did not change.
+
 ## November 15, 2026
 
 - **$AUTONOMO prices follow the dollar price.** An API now has one price, in dollars. Paying in $AUTONOMO costs
