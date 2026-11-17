@@ -31,6 +31,27 @@ BURN_OWNER=<Autonomo Safe> BURN_KEEPER=<a dedicated gas-only wallet> forge scrip
 
 Check that both contracts show verified source on the explorer: the docs send holders there to read the code. Then set `BUYBACK_BURNER`, `BURN_SPLITTER_FACTORY`, `BURN_START_BLOCK` and `BURN_KEEPER_PRIVATE_KEY` (the deployment block shown on the explorer) in the app's environment. Payments start going to splitters on the next deploy; until then they go straight to payees.
 
+## Mirror burn for Base payments
+
+Official APIs also take USDC on Base, paid straight to the official Safe there. Base has no splitter and no $AUTONOMO pool, so **`MirrorBurnPot`** burns the same 5% on Robinhood Chain instead:
+
+- It holds a float of USDG, refilled by the official Safe from its fees. Anyone can refill it by sending USDG to it.
+- Once a day the keeper calls `mirror(amount, paidElsewhere)`. It sends `amount` to the `BuybackBurner`, which buys and burns with it as usual.
+- `paidElsewhere` is the running total of Base payments, in USDC's 6 decimals, which USDG shares. It can only go up, and everything ever sent can't exceed 5% of it. So the `Mirrored(usdgSent, paidElsewhere, mirroredTotal)` events show what each burn was for.
+- When the pot runs short, the app sends what it holds. The rest stays owed (`owedFor(total)`) and goes out after the next refill.
+- The keeper is the `BuybackBurner`'s own keeper, read from it, so replacing that keeper replaces this one too.
+- The USDG can only go to the `BuybackBurner`, or back to the owner (`withdraw`). A compromised keeper can at worst burn the float early. Handing over ownership takes two steps.
+
+Deploy it from [Remix](https://remix.ethereum.org) with [`flat/MirrorBurnPot.flat.sol`](flat/MirrorBurnPot.flat.sol): compiler 0.8.26, optimizer on with 10000 runs, EVM version cancun.
+
+| Constructor value | What it is |
+| --- | --- |
+| `buybackBurner_` | `0x4d0D18a0EcbA457a4A8DB093553EaDEC37D08464` |
+| `burnBps_` | `500` (5%) |
+| `owner_` | The official payment Safe, `0x92a99FBD386F87277b6009BFF4C56728Ec5f7354` |
+
+Then set `MIRROR_BURN_POT` in the app's environment and send the pot its first USDG. The fork test runs it against the deployed `BuybackBurner`: `forge test --match-contract MirrorBurnPotForkTest -vv`.
+
 ## Rewards vesting
 
 **`AutonomoRewardsVesting`** holds the $AUTONOMO set aside for rewards and releases it in a straight line between its start and its end. It is OpenZeppelin's `VestingWallet` (v5.1.0) with two guards on who receives:

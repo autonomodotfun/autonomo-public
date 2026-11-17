@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TOKEN } from "@/lib/constants";
-import { BURN_BPS, BURN_DEAD, burnEnabled, burnFactory, buybackBurner, getBurns } from "@/lib/burn";
+import { BURN_BPS, BURN_DEAD, burnEnabled, burnFactory, buybackBurner, getBurns, getMirror, mirrorPot } from "@/lib/burn";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 
 export const metadata: Metadata = {
@@ -17,13 +17,14 @@ function fmtDate(iso: string) {
 
 export default async function BurnPage() {
   if (!burnEnabled()) notFound();
-  const { totals, receipts } = await getBurns();
+  const [{ totals, receipts }, mirror] = await Promise.all([getBurns(), getMirror()]);
   const total = (kind: string) => totals.find((t) => t.kind === kind);
   const all = totals.reduce((sum, t) => sum + BigInt(t.burned), 0n).toString();
   const burn = BURN_BPS / 100;
   const contracts = [
     { label: "Splitter factory", address: burnFactory() },
     { label: "Buyback and burn", address: buybackBurner() },
+    { label: "Mirror burn pot (Base payments)", address: mirrorPot() },
     { label: "Dead address", address: BURN_DEAD },
   ];
 
@@ -73,6 +74,23 @@ export default async function BurnPage() {
         Autonomo pays the gas separately. Burning only takes a share of incoming payments, so it
         can&apos;t touch tokens a wallet holds for Verified.
       </p>
+
+      {mirror && (
+        <>
+          <h2 className="heading mt-12 text-2xl">Payments on Base</h2>
+          <p className="mt-4 text-muted">
+            Official APIs also take USDC on Base. It goes straight to Autonomo&apos;s Safe there, and there&apos;s no {TOKEN.symbol} pool on
+            Base to burn in. So the same {burn}% is burned here instead: once a day, that share in USDG goes from a pot Autonomo
+            keeps filled to the buyback contract, which buys {TOKEN.symbol} and burns it. Those burns show below as USDG
+            buybacks. If the pot runs short, the rest stays owed and goes out after the next refill.
+          </p>
+          <div className="mt-6 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
+            <Stat label="Paid in USDC on Base" value={fmtUsdg(mirror.paidOnBase)} note={`${burn}% of it is burned`} />
+            <Stat label="Sent to the buyback" value={fmtUsdg(mirror.mirrored)} note={`Still owed: ${fmtUsdg(mirror.owed)}`} />
+            <Stat label="Left in the pot" value={fmtUsdg(mirror.held)} note="Refilled by Autonomo from its fees" />
+          </div>
+        </>
+      )}
 
       <h2 className="heading mt-12 text-2xl">Receipts</h2>
       {receipts.length === 0 ? (
