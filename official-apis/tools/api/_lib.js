@@ -137,7 +137,7 @@ export const BASE_LAUNCHPADS = [
 const word = (data, i) => (data ?? "0x").slice(2 + i * 64, 2 + (i + 1) * 64);
 
 /** The token a launch log names: Clanker in its first indexed topic, Zora in the fifth word of its data. */
-function launchedToken(p, log) {
+export function launchedToken(p, log) {
   const raw = p.token === "tokenAddress" ? log.topics?.[1]?.slice(26) : word(log.data, 4).slice(24);
   return raw && raw.length === 40 ? `0x${raw}`.toLowerCase() : null;
 }
