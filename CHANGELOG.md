@@ -8,7 +8,17 @@ repo gets a copy of each release.
 - **Official APIs take USDC on Base.** All 13 official APIs now accept USDC on Base, at the same dollar price, next
   to USDG and $AUTONOMO on Robinhood Chain. Base payments are settled by Coinbase's x402 facilitator and paid to
   the same 2-of-2 payment Safe on Base, which is checked before Base is offered (same owners and threshold on both
-  chains). They aren't burned yet: a mirror burn for Base payments is next, and will cover payments made from today.
+  chains).
+- **Base payments are burned too, through a mirror burn.** Base has no $AUTONOMO pool, so the same 5% is burned on
+  Robinhood Chain instead. A new contract, the mirror burn pot, holds a float of USDG there. Once a day it sends 5% of
+  all Base payments so far to the buyback contract, which buys $AUTONOMO and burns it. The pot records the running
+  Base total and can never send more than 5% of it; only the payment Safe can take USDG back out. If the pot runs
+  short, the rest stays owed until the next refill. [/burn](https://autonomo.fun/burn) shows the Base total, what was
+  sent, what's still owed and what's left in the pot. Base payments from November 17 onward are covered.
+- **Every API can take USDC on Base, not just the official ones.** A creator's Base payments go to their own splitter
+  on Base, which sends them 95% and keeps 5% for Autonomo's Base Safe; that 5% refills the mirror burn pot, so the
+  burn on Base pays for itself and Autonomo never holds creators' money. Plain wallets, and Safes with the same
+  signers on Base, can be paid there.
 - **Nine official APIs read Base too.** Token Risk, Dev Wallet Tracker, Holders & Bundles, Wallet Portfolio, Tx
   Explainer, Payment Check and Token Lookup take `chain=base`. Left out, they read Robinhood Chain exactly as before,
   or Base when the token, transaction or wallet is only there; the answer then says it's Base. New Launches and Gas
