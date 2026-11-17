@@ -235,10 +235,11 @@ export async function noteBurnCall(payee: string) {
 }
 
 // ---------- splitters on Base ----------
-// Creator APIs paid in USDC on Base are paid to the creator's splitter there, from the same BurnSplitterFactory
-// contract deployed on Base (contracts/test/BaseSplitter.t.sol): USDC in the USDG slot, no $AUTONOMO, and Autonomo's
-// Base Safe in the buyback slot. A flush sends 95% to the creator and 5% to that Safe, which refills the mirror burn
-// pot below, so the burn on creators' Base payments pays for itself. Official APIs on Base are paid to the Safe itself.
+// Creator APIs paid in USDC on Base are paid to the creator's splitter there, from the BaseSplitterFactory
+// (contracts/src/BaseSplitter.sol: BurnSplitter's logic, named for Base). A flush sends 95% to the creator and 5% to
+// its reserve, Autonomo's Base Safe, which refills the mirror burn pot below, so the burn on creators' Base payments
+// pays for itself. Official APIs on Base are paid to the Safe itself. The factory's splitterOf and flush match
+// BurnSplitterFactory's, so factoryAbi serves both.
 // The keeper flushes with the same key on Base, so it needs a little ETH there.
 
 export const baseSplitterFactory = () => envAddress("BASE_SPLITTER_FACTORY");
