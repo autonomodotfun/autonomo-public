@@ -3,7 +3,8 @@ import { burnEnabled, runBurnKeeper } from "@/lib/burn";
 
 // Daily backup for the burn (scheduled in vercel.json): a payment flushes its payee's splitter at a threshold, and this
 // catches anyone below it. It flushes each payee's burn splitter, which burns 5% of $AUTONOMO and sends
-// 5% of USDG to the buyback contract, then buys back and burns with that USDG. Vercel calls it with
+// 5% of USDG to the buyback contract, sends 5% of Base payments from the mirror burn pot to it (once MIRROR_BURN_POT is
+// set), then buys back and burns with that USDG. Vercel calls it with
 // `Authorization: Bearer $CRON_SECRET`; anyone else gets 401.
 
 export const maxDuration = 300;

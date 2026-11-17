@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { untilLocalDbIsFree } from "@/lib/prerender";
 import { revalidateTag, unstable_cache } from "next/cache";
 import {
@@ -32,6 +32,7 @@ import { USDG } from "@/lib/payments";
 //   BUYBACK_BURNER          The deployed BuybackBurner.
 //   BURN_KEEPER_PRIVATE_KEY The BuybackBurner's keeper: a gas-only wallet that flushes and runs buybacks.
 //   BURN_START_BLOCK        The block the contracts were deployed in, where the search for burn receipts starts.
+//   MIRROR_BURN_POT         The deployed MirrorBurnPot, for the mirror burn of payments on Base (see below).
 
 export const BURN_BPS = 500;
 export const BURN_DEAD = "0x000000000000000000000000000000000000dEaD";
@@ -112,6 +113,7 @@ const BUYBACK_SLIPPAGE_BPS = 200n;
 
 export type BurnRun = {
   flushed: { payee: string; splitter: string; tx: string }[];
+  mirror: { usdgSent: string; paidOnBase: string; stillOwed: string; tx: string } | null;
   buyback: { usdgIn: string; quotedBurn: string; tx: string } | null;
   receipts: number;
   errors: string[];
@@ -169,7 +171,7 @@ async function runBuyback(k: Keeper) {
 /** The daily backup: flushes every splitter holding enough, then buys back. Catches creators with few calls. */
 export async function runBurnKeeper(): Promise<BurnRun> {
   const k = keeper();
-  const run: BurnRun = { flushed: [], buyback: null, receipts: 0, errors: [] };
+  const run: BurnRun = { flushed: [], mirror: null, buyback: null, receipts: 0, errors: [] };
 
   for (const payee of await payees()) {
     try {
@@ -178,6 +180,13 @@ export async function runBurnKeeper(): Promise<BurnRun> {
     } catch (e) {
       run.errors.push(`flush ${payee}: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  // Before the buyback, so the mirrored USDG is bought and burned in the same run.
+  try {
+    run.mirror = await runMirror(k);
+  } catch (e) {
+    run.errors.push(`mirror: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   try {
@@ -208,6 +217,87 @@ export async function noteBurnCall(payee: string) {
   await runBuyback(k);
   await syncBurnReceipts();
   revalidateTag(BURNS_TAG, { expire: 0 });
+}
+
+// ---------- mirror burn for Base ----------
+// USDC paid on Base goes straight to the official Safe there: there's no splitter on Base, and no $AUTONOMO pool to
+// burn in. So the MirrorBurnPot (contracts/src/MirrorBurnPot.sol) holds a float of USDG on Robinhood Chain, and the
+// daily run sends 5% of all Base payments so far from it to the BuybackBurner, which buys and burns with it like any
+// other USDG. The pot keeps the running totals on-chain and refuses to send more than 5% of the total it's given, so
+// what the pot couldn't cover stays owed and goes out after the next refill.
+
+export const mirrorPot = () => envAddress("MIRROR_BURN_POT");
+const potAbi = parseAbi([
+  "function mirror(uint256 amount, uint256 paidElsewhere)",
+  "function mirrored() view returns (uint256)",
+  "function paidElsewhere() view returns (uint256)",
+  "function owedFor(uint256 paidElsewhere) view returns (uint256)",
+]);
+// Robinhood Chain gas is a fraction of a cent, so even small amounts are worth sending. The buyback waits for 0.10 USDG.
+const MIN_MIRROR_USDG = 10_000n; // 0.01 USDG
+
+/** Every settled USDC payment on Base, in USDC's 6 decimals (which USDG shares). Only official APIs take Base. */
+async function paidOnBase() {
+  const db = await getDb();
+  const { gatewayCalls: c } = schema;
+  const [{ total }] = await db
+    .select({ total: sql<string>`coalesce(sum(${c.amount}::numeric), 0)::text` })
+    .from(c)
+    .where(and(eq(c.settled, true), eq(c.rail, "usdc_base")));
+  return BigInt(total.split(".")[0]);
+}
+
+/** Sends what's owed for Base payments from the pot to the BuybackBurner, as far as the pot holds it. */
+async function runMirror(k: Keeper) {
+  const pot = mirrorPot();
+  if (!pot) return null;
+  const [counted, onChain, held] = await Promise.all([
+    paidOnBase(),
+    publicClient.readContract({ address: pot, abi: potAbi, functionName: "paidElsewhere" }),
+    publicClient.readContract({ address: USDG.address, abi: balanceAbi, functionName: "balanceOf", args: [pot] }),
+  ]);
+  // The pot refuses a total lower than the last one, which only happens if call rows were deleted.
+  const total = counted > onChain ? counted : onChain;
+  const owed = await publicClient.readContract({ address: pot, abi: potAbi, functionName: "owedFor", args: [total] });
+  const send = owed < held ? owed : held;
+  if (send < MIN_MIRROR_USDG) return null;
+  const hash = await k.wallet.writeContract({ address: pot, abi: potAbi, functionName: "mirror", args: [send, total] });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`mirror reverted in ${hash}`);
+  return { usdgSent: send.toString(), paidOnBase: total.toString(), stillOwed: (owed - send).toString(), tx: hash };
+}
+
+export type MirrorState = { pot: string; held: string; mirrored: string; paidOnBase: string; owed: string };
+
+const readMirror = unstable_cache(
+  async (): Promise<MirrorState | null> => {
+    const pot = mirrorPot();
+    if (!pot) return null;
+    const [counted, mirrored, held] = await Promise.all([
+      paidOnBase(),
+      publicClient.readContract({ address: pot, abi: potAbi, functionName: "mirrored" }),
+      publicClient.readContract({ address: USDG.address, abi: balanceAbi, functionName: "balanceOf", args: [pot] }),
+    ]);
+    const due = (counted * BigInt(BURN_BPS)) / 10_000n;
+    return {
+      pot,
+      held: held.toString(),
+      mirrored: mirrored.toString(),
+      paidOnBase: counted.toString(),
+      owed: (due > mirrored ? due - mirrored : 0n).toString(),
+    };
+  },
+  ["burn-mirror"],
+  { revalidate: 300, tags: ["burns"] },
+);
+
+/** The mirror burn's pot, what it has sent and what's still owed, for the /burn page. Null until the pot is set. */
+export async function getMirror() {
+  await untilLocalDbIsFree();
+  return readMirror().catch((e) => {
+    console.error("mirror read failed", e);
+    return null;
+  });
 }
 
 // ---------- receipts ----------
