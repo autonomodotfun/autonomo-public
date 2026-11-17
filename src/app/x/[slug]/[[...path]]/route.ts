@@ -3,16 +3,18 @@ import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
 import { updating } from "@/lib/api";
 import { BURN_BPS, noteBurnCall, payToFor } from "@/lib/burn";
-import { forward, gatewayOffers, getGateway, recordCall, payeeOf } from "@/lib/gateway";
+import { baseEligible, forward, gatewayOffers, getGateway, recordCall, payeeOf } from "@/lib/gateway";
 import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/gloam";
 import { GLOAM_USDG, GLOAM_VAULT } from "@/lib/gloam-check";
-import { acceptsFor, railForAsset, x402Server } from "@/lib/payments";
+import { acceptsFor, baseReady, baseSafeOk, railForAsset, x402Server } from "@/lib/payments";
 
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
 // Payments go to the owner's wallet, or to its burn splitter when burning is on (src/lib/burn.ts); the upstream is
 // only called after the payment verifies, and the payment only settles when the upstream answers below 400.
 // Gateways that accept USDG also offer a Gloam cash-out (src/lib/gloam.ts), where the payment lands
 // before the call; its transaction is only marked used once the upstream answers below 400.
+// Official APIs also take USDC on Base, settled by Coinbase's facilitator and paid straight to their Safe on Base,
+// so nothing of it is burned on the way (src/lib/payments.ts).
 
 // Upstream calls may take up to 25 s (see forward()); leave headroom for payment verification and settlement.
 export const maxDuration = 60;
@@ -44,8 +46,8 @@ function decodeHeader(value: string | null): Record<string, any> | null {
 // One paid wrapper per gateway version, so edits take effect immediately.
 const wrappers = new Map<string, (req: NextRequest) => Promise<NextResponse>>();
 
-function paidHandler(g: Gateway, payTo: string) {
-  const key = `${g.id}:${g.updatedAt.getTime()}:${payTo}`;
+function paidHandler(g: Gateway, payTo: string, basePayTo: string | null) {
+  const key = `${g.id}:${g.updatedAt.getTime()}:${payTo}:${basePayTo}`;
   let fn = wrappers.get(key);
   if (!fn) {
     const prefix = `/x/${g.slug}`;
@@ -55,7 +57,7 @@ function paidHandler(g: Gateway, payTo: string) {
         return new NextResponse(res.body, { status: res.status, headers: res.headers });
       },
       {
-        accepts: acceptsFor(payTo, gatewayOffers(g)),
+        accepts: acceptsFor(payTo, gatewayOffers(g, basePayTo)),
         description: g.description || g.name,
         mimeType: "application/json",
       },
@@ -98,7 +100,9 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
   const gloam = gloamEnabledFor(g) ? gloamPaymentOf(request) : null;
   if (gloam) return withHeaders(await gloamCall(request, g, payTo, path, gloam, started), slug);
 
-  let res = await paidHandler(g, payTo)(request);
+  // USDC on Base pays the API's own Safe directly (there is no splitter on Base), once it's checked on Base.
+  const basePayTo = baseEligible(g) && (await baseReady()) && (await baseSafeOk(payeeOf(g))) ? payeeOf(g) : null;
+  let res = await paidHandler(g, payTo, basePayTo)(request);
   if (res.status === 402 && gloamEnabledFor(g)) res = await withGloamOption(res, request, g, payTo, path);
 
   // Record attempts that carried a payment, after the response is sent.
@@ -108,7 +112,9 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
     const accepted = payment.accepted ?? {};
     const auth = payment.payload?.authorization ?? payment.payload?.permit2Authorization ?? {};
     const settled = settlement?.success === true;
-    const burnBps = payTo === payeeOf(g) ? 0 : BURN_BPS;
+    const rail = railForAsset(accepted.asset, accepted.network);
+    // USDC on Base goes straight to the Base Safe, past the burn splitter, so none of it is burned here.
+    const burnBps = rail === "usdc_base" || payTo === payeeOf(g) ? 0 : BURN_BPS;
     after(async () => {
       await recordCall({
         gatewayId: g.id,
@@ -116,7 +122,7 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
         path: path.slice(0, 300),
         status: res.status,
         latencyMs: Date.now() - started,
-        rail: railForAsset(accepted.asset),
+        rail,
         asset: typeof accepted.asset === "string" ? accepted.asset : null,
         amount: typeof accepted.amount === "string" ? accepted.amount : null,
         burnBps,

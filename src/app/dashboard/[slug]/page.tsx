@@ -7,7 +7,7 @@ import { notFound, redirect } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { TOKEN } from "@/lib/constants";
 import { gatewayOffers, gatewayStats, getOwnedGateway, payeeOf, secretsEnabled } from "@/lib/gateway";
-import { afterBurn, fmtAutonomo, fmtRail, fmtUsdg, shortAddr } from "@/lib/gateway-format";
+import { afterBurn, fmtAutonomo, fmtRail, fmtUsdg, shortAddr, txUrl } from "@/lib/gateway-format";
 import { burnPercent } from "@/lib/burn";
 import { dayPriceOrNull } from "@/lib/pool-price";
 import { platform } from "@/lib/payments";
@@ -160,6 +160,7 @@ export default async function GatewayDashboard({
       </section>
       <p className="mt-2 text-xs text-faint">
         All time: {stats.allTime.settled} paid calls · {fmtUsdg(stats.allTime.usdg)} USDG · {fmtAutonomo(stats.allTime.autonomo)}
+        {stats.allTime.usdcBase !== "0" && <> · {fmtUsdg(stats.allTime.usdcBase)} USDC on Base</>}
       </p>
       {burnPercent() && (
         <p className="mt-1 text-xs text-faint">
@@ -208,7 +209,7 @@ export default async function GatewayDashboard({
                     <td className="px-3 py-2">{shortAddr(c.payer)}</td>
                     <td className="px-3 py-2">
                       {c.tx ? (
-                        <a href={`${TOKEN.explorer}/tx/${c.tx}`} target="_blank" rel="noreferrer" className="underline hover:text-ink">
+                        <a href={txUrl(c.rail, c.tx)} target="_blank" rel="noreferrer" className="underline hover:text-ink">
                           {shortAddr(c.tx)}
                         </a>
                       ) : (
