@@ -443,22 +443,28 @@ export function GatewayForm({
           {err.acceptUsdg && <p className="text-sm text-warn" role="alert">{err.acceptUsdg}</p>}
           </div>
           {baseOffered && (
-            <div className="space-y-2 rounded-md border border-line p-4">
+            <div className="space-y-4 rounded-md border border-line p-4">
               <input type="hidden" name="baseShown" value="1" />
               <ChainHead name="Base" />
-              <label className="flex items-center gap-3">
-                <input type="checkbox" name="acceptBase" checked={acceptBase} onChange={(e) => setAcceptBase(e.target.checked)} />
-                <span className="text-sm font-medium">USDC</span>
-                <span className="text-xs text-faint">same dollar price, for agents on Base</span>
-              </label>
-              {acceptBase && (
-                <p className="ml-7 text-sm text-muted">
-                  <span className="font-mono">{usdPriceValid(priceUsd.trim()) ? `$${Number(priceUsd)}` : "—"}</span> per call, paid to your own
-                  splitter on Base. You get {100 - BASE_RESERVE_PERCENT}% in USDC on Base, at the same wallet address;{" "}
-                  {BASE_RESERVE_PERCENT}% goes to the burn, which happens on Robinhood Chain. If your wallet is a Safe, it needs
-                  to exist on Base with the same signers.
-                </p>
-              )}
+              <div>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" name="acceptBase" checked={acceptBase} onChange={(e) => setAcceptBase(e.target.checked)} />
+                  <span className="text-sm font-medium">USDC</span>
+                  <span className="text-xs text-faint">same dollar price, for agents on Base</span>
+                </label>
+                {acceptBase && (
+                  <>
+                    <p className="mt-1 ml-7 text-sm">
+                      <span className="font-mono">{usdPriceValid(priceUsd.trim()) ? `$${Number(priceUsd)}` : "—"}</span> per call
+                    </p>
+                    <p className="mt-1 ml-7 text-xs text-faint">
+                      Paid to your own splitter on Base. You get {100 - BASE_RESERVE_PERCENT}% in USDC on Base, at the same
+                      wallet address; {BASE_RESERVE_PERCENT}% goes to the burn, which happens on Robinhood Chain. If your wallet
+                      is a Safe, it needs to exist on Base with the same signers.
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

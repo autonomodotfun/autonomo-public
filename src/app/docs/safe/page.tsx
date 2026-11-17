@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TOKEN } from "@/lib/constants";
+import { baseCoverage } from "@/lib/gateway";
 import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
 
 export const metadata: Metadata = {
@@ -61,6 +62,13 @@ export default function SafeGuidePage() {
               network. The Safe only exists on the network you pick, so make sure it&apos;s this one: your APIs are paid on{" "}
               {TOKEN.chainName}.
             </p>
+            {baseCoverage() === "all" && (
+              <p>
+                Your APIs can also take USDC on Base. For that, the same Safe has to exist on Base: add Base to it in the
+                Safe app, with the same signers and threshold, so it gets the same address there. Until it does, your
+                APIs are paid on {TOKEN.chainName} only, and your API&apos;s page says why Base is off.
+              </p>
+            )}
           </Step>
           <Step n={3} title="Add signers and choose the threshold">
             <p>
@@ -152,6 +160,13 @@ const FAQ: [string, React.ReactNode][] = [
   [
     "Does Autonomo get access to the Safe?",
     <>No. Autonomo only writes the Safe&apos;s address into your APIs&apos; payment details. Only your signers can move what&apos;s in it.</>,
+  ],
+  [
+    "Does the Safe get paid on Base too?",
+    <>
+      Yes, when it exists on Base with the same signers and threshold: USDC on Base goes to your splitter on Base, which
+      pays the Safe there. Autonomo checks the Safe on both networks before offering Base, and checks again every hour.
+    </>,
   ],
   [
     "Can my sign-in wallet also be a signer?",

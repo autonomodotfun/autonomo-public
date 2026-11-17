@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { shelve } from "@/lib/api-shelves";
 import { TOKEN } from "@/lib/constants";
+import { baseCoverage } from "@/lib/gateway";
 import { Page, Section, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Official APIs",
-  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, creators and holders, transactions and payments, wallets, gas, website and endpoint checks, web pages and agents for hire on Ostrapad, payable per call in USDG or ${TOKEN.symbol}.`,
+  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, creators and holders, transactions and payments, wallets, gas, website and endpoint checks, web pages and agents for hire on Ostrapad, payable per call in USDG or ${TOKEN.symbol}, or USDC on Base. Most read Base too.`,
 };
 
 const HOST = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun").replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -34,12 +35,25 @@ const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }
   },
 ];
 
+// The official APIs that read Base too, with chain=base or by falling back to it (official-apis/tools/README.md).
+const READS_BASE = new Set([
+  "token-lookup",
+  "new-launches",
+  "token-risk",
+  "holders-bundles",
+  "dev-wallet",
+  "wallet-portfolio",
+  "tx-explainer",
+  "payment-check",
+  "gas-now",
+]);
+
 // The wallets the official APIs use since Nov 3, 2026, when payments and the Verified tokens moved to the Safe.
 const OFFICIAL_WALLETS = [
   {
     job: "Gets paid",
     address: "0x92a99FBD386F87277b6009BFF4C56728Ec5f7354",
-    about: `A 2-of-2 Safe. Every official API pays it, and it holds about 1M ${TOKEN.symbol}, including the 984,245 bought back for Verified.`,
+    about: `A 2-of-2 Safe. Every official API pays it, and it holds about 1M ${TOKEN.symbol}, including the 984,245 bought back for Verified. The same Safe, with the same signers, exists on Base and gets the USDC paid there.`,
   },
   {
     job: "Signs in",
@@ -49,7 +63,7 @@ const OFFICIAL_WALLETS = [
   {
     job: "Pays gas",
     address: "0x68aa21699247a5f0b90661c50004e426507fe9f8",
-    about: "Our server uses it to submit each payment on-chain, so agents don't pay gas.",
+    about: `Our server uses it to submit each payment on ${TOKEN.chainName}, so agents don't pay gas. On Base, Coinbase's facilitator submits the payment.`,
   },
 ];
 
@@ -62,8 +76,15 @@ export default function OfficialApisPage() {
     <Page eyebrow="Docs" title="Official APIs">
       <p>
         Autonomo runs its own APIs for {TOKEN.chainName}, each behind a gateway and payable per call in USDG or{" "}
-        {TOKEN.symbol}. Call them at <code>{HOST}/x/&lt;slug&gt;&lt;path&gt;</code>. They are grouped by what you are
-        asking about: a token, a wallet or a transaction. Those three groups read {TOKEN.chainName} directly.
+        {TOKEN.symbol}
+        {baseCoverage() !== "none" ? ", or in USDC on Base at the same dollar price" : ""}. Call them at{" "}
+        <code>{HOST}/x/&lt;slug&gt;&lt;path&gt;</code>. They are grouped by what you are asking about: a token, a wallet or
+        a transaction. Those three groups read {TOKEN.chainName} directly.
+      </p>
+      <p>
+        The ones marked <b>Reads Base</b> also answer for Base: add <code>chain=base</code>, or leave it out and they look on
+        Base by themselves when the token, wallet or transaction isn&apos;t on {TOKEN.chainName}. The answer says which
+        chain it came from. <code>chain=robinhood</code> keeps them on {TOKEN.chainName}.
       </p>
       {shelve(OFFICIAL_APIS).map(({ shelf, apis }) => (
         <div key={shelf.id}>
@@ -85,7 +106,12 @@ export default function OfficialApisPage() {
                   {a.path}
                 </span>
               </>,
-              a.about,
+              <>
+                {a.about}
+                {READS_BASE.has(a.slug) && (
+                  <span className="ml-2 rounded-full border border-line px-2 py-0.5 text-[11px] whitespace-nowrap text-muted">Reads Base</span>
+                )}
+              </>,
             ])}
           />
         </div>
