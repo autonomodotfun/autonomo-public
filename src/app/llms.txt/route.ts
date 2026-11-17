@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { shelve } from "@/lib/api-shelves";
 import { BURN_BPS, burnFactory } from "@/lib/burn";
+import { baseCoverage } from "@/lib/gateway";
 import { TOKEN } from "@/lib/constants";
 import { GATEWAY_USAGE } from "@/lib/playground";
 import { listAutonomoGateways } from "@/lib/queries";
@@ -99,6 +100,13 @@ export async function GET() {
   const burnLine = burnFactory()
     ? `- ${BURN_BPS / 100}% of every payment through a hosted gateway buys back and burns ${TOKEN.symbol}. Every burn is listed at ${SITE}/burn.\n`
     : "";
+  const base = baseCoverage();
+  const baseLine =
+    base === "all"
+      ? " Every hosted gateway also takes USDC on Base at the same price, settled by Coinbase's facilitator."
+      : base === "official"
+        ? " The official APIs also take USDC on Base at the same price, settled by Coinbase's facilitator."
+        : "";
 
   const text = `# Autonomo
 
@@ -108,7 +116,7 @@ Key facts:
 
 - Chain: ${TOKEN.chainName}, chain ID ${TOKEN.chainId} (x402 network \`${TOKEN.network}\`). Explorer: ${TOKEN.explorer}
 - ${TOKEN.symbol} contract: \`${TOKEN.address}\` (${TOKEN.decimals} decimals). This is the only official address.
-- Each hosted gateway takes USDG, ${TOKEN.symbol} or both, as its creator chooses; the prices below show which. Self-hosted APIs in the directory use whatever their own facilitator supports, most often USDC on Base.
+- Each hosted gateway takes USDG, ${TOKEN.symbol} or both, as its creator chooses; the prices below show which.${baseLine} Self-hosted APIs in the directory use whatever their own facilitator supports, most often USDC on Base.
 - Autonomo's facilitator settles each gateway payment on-chain and pays the gas. Paying in ${TOKEN.symbol} needs a one-time Permit2 approval, which costs a little ETH.
 ${burnLine}- The discovery API is free JSON, with no key and open CORS.
 

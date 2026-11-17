@@ -3,6 +3,7 @@ import Link from "next/link";
 import { compact } from "@/components/project-row";
 import { BURN_BPS, burnFactory } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
+import { baseCoverage } from "@/lib/gateway";
 import { getStats } from "@/lib/queries";
 import { Card, Cards, Faq, Page, Section } from "./ui";
 
@@ -43,7 +44,14 @@ const FAQ: [string, React.ReactNode][] = [
   ],
   [
     "Which networks are supported?",
-    <>Hosted gateways and the official APIs take USDG or {TOKEN.symbol} on {TOKEN.chainName}. Self-hosted APIs use whatever their facilitator supports: most listed endpoints settle on Base, followed by Solana, Polygon, Arbitrum and others. Testnet-only services are hidden. Base and Solana for gateways are on the <Link href="/roadmap">roadmap</Link>.</>,
+    <>
+      Hosted gateways and the official APIs take USDG or {TOKEN.symbol} on {TOKEN.chainName}
+      {baseCoverage() === "all" ? ", or USDC on Base" : ""}.
+      {baseCoverage() === "official" && " The official APIs also take USDC on Base."} Self-hosted APIs use whatever their
+      facilitator supports: most listed endpoints settle on Base, followed by Solana, Polygon, Arbitrum and others.
+      Testnet-only services are hidden. {baseCoverage() === "all" ? "Solana for gateways is" : "Base and Solana for gateways are"} on
+      the <Link href="/roadmap">roadmap</Link>.
+    </>,
   ],
 ];
 
