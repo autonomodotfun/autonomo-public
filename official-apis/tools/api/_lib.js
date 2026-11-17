@@ -89,23 +89,27 @@ export function chainRequest(query) {
   return { chain, fallback: !given, key: (token) => (given ? `${chain.key}:${token}` : token) };
 }
 
-const PICKED = "No token at this address on Robinhood Chain, so this is the token at it on Base. Pass chain=robinhood to look on Robinhood Chain only.";
+const picked = (noun) =>
+  noun === "transaction"
+    ? "No such transaction on Robinhood Chain, so this is the one on Base. Pass chain=robinhood to look on Robinhood Chain only."
+    : `No ${noun} at this address on Robinhood Chain, so this is the ${noun} at it on Base. Pass chain=robinhood to look on Robinhood Chain only.`;
 
 /** Runs a check on the asked chain; with the chain left out, falls back to Base when Robinhood Chain has no such
  * token. A fallback answer says which chain it read (chain: "base") and why (chainNote). When Base has no answer
  * either, the Robinhood Chain 404 goes out as it was. Asked for chain=robinhood, a Base token's 404 says so. */
-export async function checkOnChain(req, token, checks) {
+export async function checkOnChain(req, token, checks, { exists = isBaseToken, noun = "token" } = {}) {
   const { chain, fallback } = req;
   if (chain === CHAINS.base) return checks.base(token);
   const result = await checks.robinhood(token);
-  if (result.status !== 404 || result.body?.error !== "not_found" || !(await isBaseToken(token))) return result;
+  if (result.status !== 404 || result.body?.error !== "not_found" || !chainReady(CHAINS.base) || !(await exists(token))) return result;
   if (!fallback) {
-    return { ...result, body: { ...result.body, message: `${result.body.message} This token is on Base: pass chain=base.`, hint: { chain: "base" } } };
+    const This = noun === "transaction" ? "This transaction" : `This ${noun}`;
+    return { ...result, body: { ...result.body, message: `${result.body.message} ${This} is on Base: pass chain=base.`, hint: { chain: "base" } } };
   }
   const onBase = await checks.base(token);
   if (onBase.status === 404 && onBase.body?.error === "not_found") return result;
   const { chain: label, ...rest } = onBase.body ?? {};
-  return { ...onBase, body: { chain: label ?? "base", chainNote: PICKED, ...rest } };
+  return { ...onBase, body: { chain: label ?? "base", chainNote: picked(noun), ...rest } };
 }
 
 // Launchpads on Base whose launch event names the creator, checked on Base's Blockscout (Nov 2026). The creator is
