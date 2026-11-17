@@ -13,13 +13,21 @@
 // call); balances and wallet checks from the chain. Based on the audit method in an advisor's notes (Nov 2026).
 //
 // A link is always "probable", never proven. Every claim comes with the addresses and transactions behind it.
+//
+// ?chain=base reads Base instead. Holders come from Base's Blockscout when it has indexed the token; it misses many
+// new ones, so otherwise every transfer since the mint is read from the chain and added up. Snipers are read from
+// the chain too: the blocks of the first seconds, where buys come from the Uniswap v4 pool, the contract that got
+// the minted supply, or whichever address sent to the most wallets.
 
 import { isAddress } from "viem";
-import { authorized, blockscout, blockscoutList, erc20, EXPLORER, findLaunch, hasBlockscout, rh, sendJson, tokenMeta } from "./_lib.js";
+import {
+  authorized, badChain, chainNotReady, chainReady, withBaseHint, baseOrigin, blockscout, blockscoutList, chainOf, CHAINS, contractName, erc20, findLaunch, firstLog,
+  hasBlockscout, logsBetween, rh, sendJson, tokenMeta, TRANSFER, transferRow,
+} from "./_lib.js";
+import { pad, parseAbi } from "viem";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEAD = "0x000000000000000000000000000000000000dead";
-const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"; // Uniswap v4: where graduated tokens trade
 const LOCKER = "0x267444d099b10fb5ed7c3cc7b7c767adca574952"; // PonsV2LaunchLocker: no way to send tokens out
 const TOP = 30; // holders looked at
 const SNIPE_SECONDS = 15; // a buy this soon after the first transfer is a snipe
@@ -33,28 +41,40 @@ const REPEAT_DEADLINE_MS = 14_000; // past this, the repeat-sniper step is skipp
 const CACHE_MS = 10 * 60_000;
 const cache = new Map(); // token -> { at, status, body }
 const firstTransferAt = new Map(); // token -> time of its first transfer, which never changes
+const BASE_SNIPE_BLOCKS = 10n; // Base makes a block every 2 seconds, so 10 blocks cover the snipe window
+const pairAbi = parseAbi(["function token0() view returns (address)", "function token1() view returns (address)"]);
+
+/** Whether a contract is a Uniswap-style pool of the token: it answers token0() and token1() and one of them is it. */
+async function isPoolOf(address, token, client) {
+  const [t0, t1] = await Promise.all(
+    ["token0", "token1"].map((fn) => client.readContract({ address, abi: pairAbi, functionName: fn }).catch(() => null)),
+  );
+  return [t0, t1].some((t) => t && t.toLowerCase() === token);
+}
 
 const iso = (ts) => new Date(Number(ts) * 1000).toISOString();
 const low = (a) => String(a ?? "").toLowerCase();
 const positive = (t) => BigInt(t.value || 0) > 0n;
 
 /** What a holder is, when it isn't a person: burned supply, the trading pool, or the launchpad's own contracts. */
-export function infraKind(address, name, isContract, launchSource) {
+export function infraKind(address, name, isContract, launchSource, chain = CHAINS.robinhood) {
   if (address === ZERO || address === DEAD) return "burn";
-  if (address === POOL_MANAGER) return "pool";
+  if (address === chain.poolManager) return "pool";
   if (address === LOCKER || (launchSource && address === launchSource)) return "launch";
   if (!isContract) return null;
   const n = (name ?? "").toLowerCase();
   if (/pool|pair/.test(n)) return "pool";
   if (/lock|curve|launch/.test(n)) return "launch";
+  // Base launchpads' own contracts: Clanker's vaults and lockers, Virtuals' bonding curve.
+  if (chain === CHAINS.base && /bonding|vault|clanker|vesting/.test(n)) return "launch";
   return null;
 }
 
 /** The earliest ETH that reached a wallet, sent directly or from inside a contract. */
-async function firstFunder(wallet) {
+async function firstFunder(wallet, chain) {
   const [normal, internal] = await Promise.all([
-    blockscoutList("txlist", { address: wallet, page: 1, offset: 20 }),
-    blockscoutList("txlistinternal", { address: wallet, page: 1, offset: 20 }),
+    blockscoutList("txlist", { address: wallet, page: 1, offset: 20 }, chain),
+    blockscoutList("txlistinternal", { address: wallet, page: 1, offset: 20 }, chain),
   ]);
   const first = [...normal.filter((t) => t.isError !== "1"), ...internal]
     .filter((t) => low(t.to) === wallet && positive(t))
@@ -64,28 +84,36 @@ async function firstFunder(wallet) {
 }
 
 /** Whether an address funds so many wallets that sharing it means nothing: a contract, or a very busy wallet. */
-async function isService(address) {
+async function isService(address, chain) {
   const [sent, code] = await Promise.all([
-    rh.getTransactionCount({ address }).catch(() => 0),
-    rh.getCode({ address }).catch(() => undefined),
+    chain.client.getTransactionCount({ address }).catch(() => 0),
+    chain.client.getCode({ address }).catch(() => undefined),
   ]);
   return Boolean(code && code !== "0x") || sent > SERVICE_TXS;
 }
 
-async function firstTransferTime(token) {
-  if (firstTransferAt.has(token)) return firstTransferAt.get(token);
-  const [first] = await blockscoutList("tokentx", { contractaddress: token, page: 1, offset: 1 });
-  const at = first ? Number(first.timeStamp) : null;
+async function firstTransferTime(token, chain) {
+  const key = chain === CHAINS.robinhood ? token : `${chain.key}:${token}`;
+  if (firstTransferAt.has(key)) return firstTransferAt.get(key);
+  let at = null;
+  if (chain === CHAINS.robinhood) {
+    const [first] = await blockscoutList("tokentx", { contractaddress: token, page: 1, offset: 1 });
+    at = first ? Number(first.timeStamp) : null;
+  } else {
+    // Base's Blockscout misses many new tokens, so the first mint is read from the chain.
+    const mint = await firstLog({ address: token, topics: [TRANSFER, pad("0x0")] }, 0n, await chain.client.getBlockNumber(), chain);
+    at = mint?.blockTimestamp ? Number(mint.blockTimestamp) : null;
+  }
   if (at !== null) {
     if (firstTransferAt.size > 20_000) firstTransferAt.clear();
-    firstTransferAt.set(token, at);
+    firstTransferAt.set(key, at);
   }
   return at;
 }
 
 /** Other tokens a wallet bought within the snipe window of their first transfer. */
-async function otherSnipes(wallet, token) {
-  const rows = await blockscoutList("tokentx", { address: wallet, sort: "desc", page: 1, offset: 200 });
+async function otherSnipes(wallet, token, chain) {
+  const rows = await blockscoutList("tokentx", { address: wallet, sort: "desc", page: 1, offset: 200 }, chain);
   const earliest = new Map(); // other token -> the wallet's earliest receipt of it in these rows
   for (const t of rows) {
     const tk = low(t.contractAddress);
@@ -95,7 +123,7 @@ async function otherSnipes(wallet, token) {
   const recent = [...earliest].slice(0, REPEAT_TOKENS);
   const hits = await Promise.all(
     recent.map(async ([tk, got]) => {
-      const start = await firstTransferTime(tk).catch(() => null);
+      const start = await firstTransferTime(tk, chain).catch(() => null);
       const after = start === null ? null : got.at - start;
       return after !== null && after >= 0 && after <= SNIPE_SECONDS ? { token: tk, symbol: got.symbol, secondsAfterLaunch: after, tx: got.tx } : null;
     }),
@@ -103,7 +131,8 @@ async function otherSnipes(wallet, token) {
   return hits.filter(Boolean);
 }
 
-async function check(token) {
+async function checkRobinhood(token) {
+  const chain = CHAINS.robinhood;
   const started = Date.now();
   const [page, info, early, meta, supply, latest, about] = await Promise.all([
     blockscout(`/api/v2/tokens/${token}/holders`),
@@ -126,17 +155,103 @@ async function check(token) {
   // Where the whole supply went first: the launch contract that buyers then buy from.
   const launchSource = launch?.curve ?? (early[0] && low(early[0].from) === ZERO ? low(early[0].to) : null);
 
+  return report({
+    chain, token, started, meta, supply, dev, launchSource, early,
+    holders: page.items.map((h) => ({ address: low(h.address.hash), value: h.value, name: h.address.name ?? null, isContract: Boolean(h.address.is_contract) })),
+    holdersCount: Number(info?.holders_count ?? info?.holders ?? 0) || null,
+    buyFrom: launchSource ? new Set([launchSource]) : null,
+    windowFullyRead: (t0) => early.length < EARLY_ROWS || Number(early.at(-1).timeStamp) > t0 + SNIPE_SECONDS,
+  });
+}
+
+async function checkBase(token) {
+  const chain = CHAINS.base;
+  const started = Date.now();
+  const [page, info, meta, supply, origin] = await Promise.all([
+    blockscout(`/api/v2/tokens/${token}/holders`, {}, chain).catch(() => null),
+    blockscout(`/api/v2/tokens/${token}`, {}, chain).catch(() => null),
+    tokenMeta(token, chain),
+    chain.client.readContract({ address: token, abi: erc20, functionName: "totalSupply" }).catch(() => null),
+    baseOrigin(token).catch(() => null),
+  ]);
+  const indexed = Boolean(page?.items?.length);
+  if (!supply || meta.symbol === null || (!indexed && !origin)) {
+    return { status: 404, body: { error: "not_found", message: "No token found at this address on Base." } };
+  }
+  const dev = origin?.launch?.creator ?? origin?.sender ?? null;
+  const launchSource = origin?.mintedTo ?? null;
+
+  // The first seconds after the mint, read from the chain.
+  const early = origin
+    ? (await logsBetween({ address: token, topics: [TRANSFER] }, origin.block, origin.block + BASE_SNIPE_BLOCKS, chain)).map(transferRow)
+    : [];
+
+  let holders, holdersCount;
+  if (indexed) {
+    holders = page.items.map((h) => ({ address: low(h.address.hash), value: h.value, name: h.address.name ?? null, isContract: Boolean(h.address.is_contract) }));
+    holdersCount = Number(info?.holders_count ?? info?.holders ?? 0) || null;
+  } else {
+    // Not indexed yet: add up every transfer since the mint.
+    const balances = new Map();
+    const logs = await logsBetween({ address: token, topics: [TRANSFER] }, origin.block, origin.latest, chain);
+    for (const l of logs) {
+      const t = transferRow(l);
+      const value = BigInt(t.value);
+      if (t.from !== ZERO) balances.set(t.from, (balances.get(t.from) ?? 0n) - value);
+      balances.set(t.to, (balances.get(t.to) ?? 0n) + value);
+    }
+    const held = [...balances].filter(([a, b]) => b > 0n && a !== ZERO);
+    holdersCount = held.length;
+    const top = held.sort((x, y) => (y[1] > x[1] ? 1 : y[1] < x[1] ? -1 : 0)).slice(0, TOP);
+    holders = await Promise.all(
+      top.map(async ([address, value]) => {
+        const code = await chain.client.getCode({ address }).catch(() => undefined);
+        const isContract = Boolean(code && code !== "0x");
+        return { address, value: value.toString(), name: isContract ? await contractName(address, chain) : null, isContract };
+      }),
+    );
+  }
+
+  // Unnamed contracts among the top holders may be the token's own v2 or v3 pool.
+  await Promise.all(
+    holders.slice(0, TOP).map(async (h) => {
+      if (h.isContract && !/pool|pair/i.test(h.name ?? "") && (await isPoolOf(h.address, token, chain.client))) h.pool = true;
+    }),
+  );
+
+  // The launch transaction itself hands the supply to the pool, vaults and airdrops: those aren't buys.
+  const launchTx = origin?.tx ?? null;
+  const trading = early.filter((e) => e.hash !== launchTx);
+
+  // Buys in the first seconds come from the v4 pool, the contract the supply was minted to, or the market that sent
+  // to the most wallets (a v3 pool or a curve this API doesn't know by name).
+  const fanOut = new Map();
+  for (const e of trading) if (e.from !== ZERO) fanOut.set(e.from, new Set([...(fanOut.get(e.from) ?? []), e.to]));
+  const busiest = [...fanOut].sort((x, y) => y[1].size - x[1].size)[0]?.[0] ?? null;
+  const pools = holders.filter((h) => h.pool).map((h) => h.address);
+  const buyFrom = new Set([chain.poolManager, launchSource, busiest, ...pools].filter(Boolean));
+
+  return report({
+    chain, token, started, meta, supply, dev, launchSource, early, holders, holdersCount, buyFrom,
+    notBuys: launchTx ? new Set([launchTx]) : null,
+    windowFullyRead: () => true,
+    holdersFrom: indexed ? "Base's Blockscout" : "every transfer since the mint, read from the chain",
+  });
+}
+
+/** The report from what was read, the same on both chains. */
+async function report({ chain, token, started, meta, supply, dev, launchSource, early, holders, holdersCount, buyFrom, notBuys, windowFullyRead, holdersFrom }) {
+  const client = chain.client;
   const unit = 10 ** meta.decimals;
   const pct = (raw) => Number((BigInt(raw) * 1_000_000n) / supply) / 10_000;
 
   // ---- 1. Top holders
-  const rows = page.items.slice(0, TOP).map((h) => {
-    const address = low(h.address.hash);
-    const isContract = Boolean(h.address.is_contract);
-    const infra = infraKind(address, h.address.name, isContract, launchSource);
+  const rows = holders.slice(0, TOP).map((h) => {
+    const { address, isContract } = h;
+    const infra = h.pool ? "pool" : infraKind(address, h.name, isContract, launchSource, chain);
     return {
       address,
-      name: h.address.name ?? null,
+      name: h.name ?? null,
       percent: pct(h.value),
       kind: infra ?? (isContract ? "contract" : "wallet"),
       ...(address === dev ? { isCreator: true } : {}),
@@ -148,9 +263,9 @@ async function check(token) {
   // ---- 2. Linked wallets: the same first funder, once exchanges and other services are set aside
   // Started here and collected after the sniper steps, so the two run side by side.
   const linking = (async () => {
-  await Promise.all(wallets.map(async (r) => { r.funding = await firstFunder(r.address).catch(() => null); }));
+  await Promise.all(wallets.map(async (r) => { r.funding = await firstFunder(r.address, chain).catch(() => null); }));
   const funders = [...new Set(wallets.map((r) => r.funding?.funder).filter(Boolean))];
-  const service = new Map(await Promise.all(funders.map(async (f) => [f, await isService(f)])));
+  const service = new Map(await Promise.all(funders.map(async (f) => [f, await isService(f, chain)])));
   const byFunder = new Map();
   for (const r of wallets) {
     const f = r.funding?.funder;
@@ -180,13 +295,13 @@ async function check(token) {
   // ---- 3. Snipers: buys from the launch contract in the first seconds, leaving out the creator
   const snipers = { windowSeconds: SNIPE_SECONDS, count: 0, boughtPercent: 0, stillHoldPercent: 0, buyers: [] };
   const sameBlock = new Map();
-  if (early.length && launchSource) {
+  if (early.length && buyFrom?.size) {
     const t0 = Number(early[0].timeStamp);
     const bought = new Map();
     for (const e of early) {
       const to = low(e.to);
-      if (low(e.from) !== launchSource || Number(e.timeStamp) > t0 + SNIPE_SECONDS) continue;
-      if (to === dev || infraKind(to, null, false, launchSource)) continue;
+      if (!buyFrom.has(low(e.from)) || Number(e.timeStamp) > t0 + SNIPE_SECONDS || notBuys?.has(e.hash)) continue;
+      if (to === dev || buyFrom.has(to) || infraKind(to, null, false, launchSource, chain)) continue;
       const b = bought.get(to) ?? { address: to, raw: 0n, firstTx: e.hash, secondsAfterLaunch: Number(e.timeStamp) - t0 };
       b.raw += BigInt(e.value);
       bought.set(to, b);
@@ -195,14 +310,14 @@ async function check(token) {
     const all = [...bought.values()].sort((a, b) => (a.raw > b.raw ? -1 : 1));
     const listed = all.slice(0, SNIPERS_LISTED);
     const held = await Promise.all(
-      listed.map((s) => rh.readContract({ address: token, abi: erc20, functionName: "balanceOf", args: [s.address] }).catch(() => null)),
+      listed.map((s) => client.readContract({ address: token, abi: erc20, functionName: "balanceOf", args: [s.address] }).catch(() => null)),
     );
     snipers.count = all.length;
     snipers.boughtPercent = all.reduce((s, b) => s + pct(b.raw), 0);
     snipers.buyers = listed.map(({ raw, ...s }, i) => ({ ...s, boughtPercent: pct(raw), stillHoldsPercent: held[i] === null ? null : pct(held[i]) }));
     snipers.stillHoldPercent = snipers.buyers.reduce((s, b) => s + (b.stillHoldsPercent ?? 0), 0);
     // The first rows may not reach the end of the window on a very busy launch.
-    snipers.windowFullyRead = early.length < EARLY_ROWS || Number(early.at(-1).timeStamp) > t0 + SNIPE_SECONDS;
+    snipers.windowFullyRead = windowFullyRead(t0);
   }
   const sameBlockBuyers = [...sameBlock]
     .filter(([, set]) => set.size > 1)
@@ -212,7 +327,7 @@ async function check(token) {
   let repeatChecked = false;
   if (snipers.buyers.length && Date.now() - started < REPEAT_DEADLINE_MS) {
     const top = snipers.buyers.slice(0, REPEAT_CHECKED);
-    const found = await Promise.all(top.map((s) => otherSnipes(s.address, token).catch(() => null)));
+    const found = await Promise.all(top.map((s) => otherSnipes(s.address, token, chain).catch(() => null)));
     top.forEach((s, i) => { s.otherLaunchesSniped = found[i]; });
     repeatChecked = true;
   }
@@ -254,7 +369,8 @@ async function check(token) {
   return {
     status: 200,
     body: {
-      token: { address: token, name: meta.name, symbol: meta.symbol, holders: Number(info?.holders_count ?? info?.holders ?? 0) || null },
+      ...(chain === CHAINS.robinhood ? {} : { chain: chain.key, holdersFrom }),
+      token: { address: token, name: meta.name, symbol: meta.symbol, holders: holdersCount },
       creator: dev,
       flags,
       summary,
@@ -264,7 +380,7 @@ async function check(token) {
       snipers,
       sameBlockBuyers,
       repeatSnipersChecked: repeatChecked,
-      explorer: `${EXPLORER}/token/${token}`,
+      explorer: `${chain.explorer}/token/${token}`,
       note: `Read from public on-chain data. Covers the top ${TOP} holders. Linked groups share a first funder, with exchanges and services left out: probable, never proven. Unnamed contracts are likely bots or smart wallets. Not financial advice.`,
       updatedAt: new Date().toISOString(),
     },
@@ -278,12 +394,17 @@ export default async function handler(req, res) {
   if (!isAddress(token)) {
     return sendJson(res, 400, { error: "bad_token", message: "Pass a token contract address: /v1/holders/0x…" });
   }
+  const chain = chainOf(req.query);
+  if (!chain) return sendJson(res, 400, badChain);
+  if (!chainReady(chain)) return sendJson(res, 503, chainNotReady);
+  const key = chain === CHAINS.robinhood ? token : `${chain.key}:${token}`;
   try {
-    const hit = cache.get(token);
+    const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_MS) return sendJson(res, hit.status, hit.body);
-    const result = await check(token);
+    // A Base token asked for without chain=base gets a 404 that says so. A 404 is never charged.
+    const result = chain === CHAINS.base ? await checkBase(token) : await withBaseHint(await checkRobinhood(token), token);
     if (cache.size > 2000) cache.clear();
-    cache.set(token, { at: Date.now(), ...result });
+    cache.set(key, { at: Date.now(), ...result });
     return sendJson(res, result.status, result.body);
   } catch (e) {
     console.error(e.message);

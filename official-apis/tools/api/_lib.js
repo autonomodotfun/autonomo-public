@@ -1,7 +1,7 @@
 // Shared helpers for the Autonomo tools API (files starting with "_" are not deployed as routes on Vercel).
 
 import { timingSafeEqual } from "node:crypto";
-import { createPublicClient, defineChain, http, pad, parseAbi, toHex } from "viem";
+import { createPublicClient, defineChain, http, pad, parseAbi, toEventSelector, toHex } from "viem";
 import { base } from "viem/chains";
 
 export const FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
@@ -28,7 +28,123 @@ const robinhood = defineChain({
   rpcUrls: { default: { http: [process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com"] } },
 });
 export const rh = createPublicClient({ chain: robinhood, transport: http() });
-const bs = createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL || undefined) });
+// Base: the ETH/USD feed, and the APIs that take chain=base. Reads are batched into multicalls, since a report reads
+// dozens of balances and Base's public RPC limits how often it's asked.
+const bs = createPublicClient({ chain: base, transport: http(process.env.BASE_RPC_URL || undefined), batch: { multicall: true } });
+
+// The chains an API can read, picked with ?chain=. Left out, it's Robinhood Chain, exactly as before.
+export const CHAINS = {
+  robinhood: {
+    key: "robinhood",
+    id: 4663,
+    name: "Robinhood Chain",
+    client: rh,
+    blockscout: "https://api.blockscout.com/4663",
+    explorer: EXPLORER,
+    poolManager: "0x8366a39cc670b4001a1121b8f6a443a643e40951", // Uniswap v4: where graduated tokens trade
+  },
+  base: {
+    key: "base",
+    id: 8453,
+    name: "Base",
+    client: bs,
+    blockscout: "https://api.blockscout.com/8453",
+    explorer: "https://base.blockscout.com",
+    poolManager: "0x498581ff718922c3f8e6a244956af099b2652b2b", // Uniswap v4 PoolManager on Base (verified on Blockscout)
+  },
+};
+
+/** The chain a request asks for: robinhood (the default) or base. Null for anything else. */
+export function chainOf(query) {
+  const v = String(query?.chain ?? "").trim().toLowerCase();
+  if (!v || v === "robinhood" || v === "robinhood-chain" || v === "4663") return CHAINS.robinhood;
+  if (v === "base" || v === "8453") return CHAINS.base;
+  return null;
+}
+
+export const badChain = { error: "bad_chain", message: "chain can be robinhood (the default) or base." };
+
+/** Base reads a token's whole history in one request, which needs an RPC of our own (BASE_RPC_URL): the public one
+ * refuses those. Without it, chain=base answers "not set up" instead of failing halfway through a report. */
+export const chainReady = (chain) => chain !== CHAINS.base || Boolean(process.env.BASE_RPC_URL?.trim());
+export const chainNotReady = { error: "not_configured", message: "Base isn't set up for this API yet." };
+
+/** For a token Robinhood Chain doesn't know: whether it's a token on Base, so the 404 can say to add chain=base.
+ * One read of its supply. Never throws, and stays quiet when Base isn't set up, since chain=base couldn't answer. */
+export async function isBaseToken(token) {
+  if (!chainReady(CHAINS.base)) return false;
+  try {
+    return (await bs.readContract({ address: token, abi: erc20, functionName: "totalSupply" })) > 0n;
+  } catch {
+    return false;
+  }
+}
+
+/** A Robinhood Chain "not found" answer, pointing to chain=base when the token is there. */
+export async function withBaseHint(result, token) {
+  if (result.status !== 404 || result.body?.error !== "not_found" || !(await isBaseToken(token))) return result;
+  return {
+    ...result,
+    body: { ...result.body, message: `${result.body.message} This token is on Base: add ?chain=base.`, hint: { chain: "base" } },
+  };
+}
+
+// Launchpads on Base whose launch event names the creator, checked on Base's Blockscout (Nov 2026). The creator is
+// read from the event in the token's creation transaction; tokens from anywhere else fall back to whoever sent it.
+// `creator` is the event field that names them, always the second indexed topic, so launches by a wallet can be searched too.
+export const BASE_LAUNCHPADS = [
+  {
+    name: "Clanker", factory: "0xe85a59c628f7d27878aceb4bf3b35733630083a9", token: "tokenAddress", creator: "tokenAdmin", // v4
+    event: "TokenCreated(address,address,address,string,string,string,string,string,int24,address,bytes32,address,address,address,uint256,address[])",
+  },
+  {
+    name: "Clanker", factory: "0x2a787b2362021cc3eea3c24c4748a6cd5b687382", token: "tokenAddress", creator: "creatorAdmin", // v3.1
+    event: "TokenCreated(address,address,address,address,address,uint256,string,string,int24,string,uint256,uint256,uint8,address)",
+  },
+  {
+    name: "Zora", factory: "0x777777751622c0d3258f214f9df38e35bf45baf3", token: "coin", creator: "payoutRecipient",
+    event: "CoinCreatedV4(address,address,address,address,string,string,string,address,(address,address,uint24,int24,address),bytes32,string)",
+  },
+  {
+    name: "Zora", factory: "0x777777751622c0d3258f214f9df38e35bf45baf3", token: "coin", creator: "payoutRecipient",
+    event: "CreatorCoinCreated(address,address,address,address,string,string,string,address,(address,address,uint24,int24,address),bytes32,string)",
+  },
+].map((p) => ({ ...p, topic0: toEventSelector(p.event) }));
+
+const word = (data, i) => (data ?? "0x").slice(2 + i * 64, 2 + (i + 1) * 64);
+
+/** The token a launch log names: Clanker in its first indexed topic, Zora in the fifth word of its data. */
+function launchedToken(p, log) {
+  const raw = p.token === "tokenAddress" ? log.topics?.[1]?.slice(26) : word(log.data, 4).slice(24);
+  return raw && raw.length === 40 ? `0x${raw}`.toLowerCase() : null;
+}
+
+/** Which Base launchpad made a token and who its creator is, from the raw logs of the transaction that minted it. */
+export function baseLaunchFromLogs(token, logs) {
+  for (const l of logs ?? []) {
+    const p = BASE_LAUNCHPADS.find((x) => x.factory === String(l.address).toLowerCase() && x.topic0 === l.topics?.[0]);
+    if (!p || launchedToken(p, l) !== token.toLowerCase()) continue;
+    const creator = `0x${l.topics[2]?.slice(26) ?? ""}`.toLowerCase();
+    if (/^0x[0-9a-f]{40}$/.test(creator)) return { launchpad: p.name, factory: p.factory, creator, tx: l.transactionHash ?? null };
+  }
+  return null;
+}
+
+/** Tokens a wallet launched on the Base launchpads above, read from the chain. Null when the search failed. */
+export async function baseLaunchesBy(wallet) {
+  const latest = await bs.getBlockNumber();
+  try {
+    const found = await Promise.all(
+      BASE_LAUNCHPADS.map(async (p) => {
+        const logs = await logsBetween({ address: p.factory, topics: [p.topic0, null, pad(wallet.toLowerCase())] }, 0n, latest, CHAINS.base);
+        return logs.map((log) => ({ token: launchedToken(p, log), launchpad: p.name, tx: log.transactionHash }));
+      }),
+    );
+    return found.flat().filter((l) => l.token);
+  } catch {
+    return null;
+  }
+}
 
 export const erc20 = parseAbi([
   "function name() view returns (string)",
@@ -48,22 +164,22 @@ export function authorized(req) {
   return given.length === want.length && timingSafeEqual(given, want);
 }
 
-export const getLogs = (filter) => rh.request({ method: "eth_getLogs", params: [filter] });
+export const getLogs = (filter, client = rh) => client.request({ method: "eth_getLogs", params: [filter] });
 export const words = (data) => (data.length > 2 ? data.slice(2).match(/.{64}/g).map((w) => BigInt(`0x${w}`)) : []);
 export const addr = (topic) => `0x${topic.slice(26)}`.toLowerCase();
 export const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** All logs for a filtered query over [from, to], halving the range when the RPC says it's too much. */
-export async function logsBetween(filter, from, to) {
+export async function logsBetween(filter, from, to, chain = CHAINS.robinhood) {
   try {
-    return await getLogs({ ...filter, fromBlock: toHex(from), toBlock: toHex(to) });
+    return await getLogs({ ...filter, fromBlock: toHex(from), toBlock: toHex(to) }, chain.client);
   } catch (e) {
     const said = `${e.details ?? e.message}`;
     // Being rate limited isn't a range problem: splitting would only send more requests.
     if (e.status === 429 || /too many requests|rate.?limit/i.test(said)) throw e;
     if (to - from < 500n || !/exceed|limit|too many|spans|allowed/i.test(said)) throw e;
     const mid = from + (to - from) / 2n;
-    const [a, b] = await Promise.all([logsBetween(filter, from, mid), logsBetween(filter, mid + 1n, to)]);
+    const [a, b] = await Promise.all([logsBetween(filter, from, mid, chain), logsBetween(filter, mid + 1n, to, chain)]);
     return [...a, ...b];
   }
 }
@@ -81,10 +197,11 @@ export async function ethUsd() {
 
 const metaCache = new Map();
 /** name, symbol, decimals of a token (null fields when the contract doesn't answer). */
-export async function tokenMeta(token) {
-  const key = token.toLowerCase();
+export async function tokenMeta(token, chain = CHAINS.robinhood) {
+  const address = token.toLowerCase();
+  const key = chain === CHAINS.robinhood ? address : `${chain.id}:${address}`;
   if (metaCache.has(key)) return metaCache.get(key);
-  const read = (fn) => rh.readContract({ address: key, abi: erc20, functionName: fn }).catch(() => null);
+  const read = (fn) => chain.client.readContract({ address, abi: erc20, functionName: fn }).catch(() => null);
   const [name, symbol, decimals] = await Promise.all([read("name"), read("symbol"), read("decimals")]);
   const meta = { name, symbol, decimals: decimals === null ? 18 : Number(decimals) };
   if (symbol !== null) metaCache.set(key, meta);
@@ -221,7 +338,6 @@ export async function launchPrice(token, launch, latest) {
 // ---- Blockscout PRO API: a wallet's whole history, which the RPC can't give. Used by Dev Wallet Tracker and
 // Holders & Bundles. BLOCKSCOUT_KEY is its own key; BLOCKSCOUT_RPS is how many requests a second the plan allows
 // (the Builder plan takes 15, so the default leaves a little room).
-const BLOCKSCOUT = "https://api.blockscout.com/4663";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const GAP_MS = 1000 / Math.max(1, Number(process.env.BLOCKSCOUT_RPS) || 13);
 let queue = Promise.resolve();
@@ -238,9 +354,10 @@ function turn() {
 
 export const hasBlockscout = () => Boolean(process.env.BLOCKSCOUT_KEY?.trim());
 
-/** One Blockscout request; null for a 404. The key rides in the query, so errors never carry the URL. */
-export async function blockscout(path, params = {}) {
-  const url = new URL(BLOCKSCOUT + path);
+/** One Blockscout request on a chain (Robinhood Chain unless given); null for a 404. The key rides in the query,
+ * so errors never carry the URL. Both chains share one key and one rate limit. */
+export async function blockscout(path, params = {}, chain = CHAINS.robinhood) {
+  const url = new URL(chain.blockscout + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
   url.searchParams.set("apikey", process.env.BLOCKSCOUT_KEY.trim());
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -274,12 +391,13 @@ async function creationBlock(address) {
 
 const names = new Map();
 /** The verified name of a contract ("PoolManager"), or null for a wallet or an unnamed contract. Never throws. */
-export async function contractName(address) {
-  const key = address.toLowerCase();
+export async function contractName(address, chain = CHAINS.robinhood) {
+  const address_ = address.toLowerCase();
+  const key = chain === CHAINS.robinhood ? address_ : `${chain.id}:${address_}`;
   if (names.has(key)) return names.get(key);
   if (!hasBlockscout()) return null;
   try {
-    const about = await blockscout(`/api/v2/addresses/${key}`);
+    const about = await blockscout(`/api/v2/addresses/${address_}`, {}, chain);
     const name = about?.is_contract && about.name ? String(about.name).slice(0, 60) : null;
     if (names.size > 20_000) names.clear();
     names.set(key, name);
@@ -290,10 +408,61 @@ export async function contractName(address) {
 }
 
 /** An Etherscan-style list (tokentx, txlist, txlistinternal), oldest first. Empty comes back as a message, not a list. */
-export async function blockscoutList(action, params) {
-  const r = await blockscout("/api", { module: "account", action, sort: "asc", ...params });
+export async function blockscoutList(action, params, chain = CHAINS.robinhood) {
+  const r = await blockscout("/api", { module: "account", action, sort: "asc", ...params }, chain);
   return Array.isArray(r?.result) ? r.result : [];
 }
+
+/** The earliest log matching a filter in [from, to], or null. Halves the range when the RPC says it holds too many
+ * logs and looks at the later half only when the earlier one is empty, so a busy contract costs a few dozen requests at most. */
+export async function firstLog(filter, from, to, chain, budget = { left: 60 }) {
+  if (budget.left-- <= 0) throw new Error("first log search ran out of requests");
+  try {
+    const logs = await getLogs({ ...filter, fromBlock: toHex(from), toBlock: toHex(to) }, chain.client);
+    return logs[0] ?? null;
+  } catch (e) {
+    const said = `${e.details ?? e.message}`;
+    if (e.status === 429 || /too many requests|rate.?limit/i.test(said)) throw e;
+    if (to - from < 500n || !/exceed|limit|too many|spans|allowed/i.test(said)) throw e;
+    const mid = from + (to - from) / 2n;
+    return (await firstLog(filter, from, mid, chain, budget)) ?? firstLog(filter, mid + 1n, to, chain, budget);
+  }
+}
+
+const origins = new Map();
+/** Where a Base token came from: its first mint (block, time, transaction, who sent it, who got the supply) and,
+ * when one of the known launchpads made it, which one and its creator. Null when the token was never minted. */
+export async function baseOrigin(token) {
+  const key = token.toLowerCase();
+  const latest = await bs.getBlockNumber();
+  if (origins.has(key)) return { ...origins.get(key), latest };
+  const mint = await firstLog({ address: key, topics: [TRANSFER, pad("0x0")] }, 0n, latest, CHAINS.base);
+  if (!mint) return null;
+  const hash = mint.transactionHash;
+  const [receipt, tx] = await Promise.all([bs.getTransactionReceipt({ hash }), bs.getTransaction({ hash })]);
+  const origin = {
+    block: BigInt(mint.blockNumber),
+    time: mint.blockTimestamp ? Number(mint.blockTimestamp) : null,
+    tx: hash,
+    sender: tx.from.toLowerCase(),
+    mintedTo: addr(mint.topics[2]),
+    launch: baseLaunchFromLogs(key, receipt.logs),
+  };
+  if (origins.size > 5000) origins.clear();
+  origins.set(key, origin);
+  return { ...origin, latest };
+}
+
+/** A Transfer log as an Etherscan-style row, the shape the Blockscout lists use. */
+export const transferRow = (l) => ({
+  from: addr(l.topics[1]),
+  to: addr(l.topics[2]),
+  value: BigInt(l.data === "0x" ? 0 : l.data).toString(),
+  timeStamp: String(Number(l.blockTimestamp ?? 0)),
+  blockNumber: String(Number(l.blockNumber)),
+  hash: l.transactionHash,
+  logIndex: Number(l.logIndex),
+});
 
 export function sendJson(res, status, body) {
   res.setHeader("Cache-Control", "no-store");
