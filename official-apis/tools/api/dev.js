@@ -12,13 +12,19 @@
 // the chain. Based on the audit method in an advisor's notes (Nov 2026).
 //
 // A link between wallets is never proof: the funder is reported with the evidence, for the caller to check.
+//
+// ?chain=base reads Base instead. There the creator comes from the Clanker or Zora launch event in the transaction
+// that minted the token (otherwise whoever sent that transaction), and the creator's token moves are read from the
+// chain itself, since Base's Blockscout misses many new tokens. Creator fees aren't tracked on Base yet.
 
 import { isAddress, pad } from "viem";
-import { addr, authorized, blockscout, blockscoutList, erc20, EXPLORER, FACTORY, findLaunch, fullHistory, LAUNCHED, LAUNCHPAD_START, logsBetween, rh, sendJson, tokenMeta } from "./_lib.js";
+import {
+  addr, authorized, badChain, chainNotReady, chainReady, withBaseHint, baseLaunchesBy, baseOrigin, blockscout, blockscoutList, chainOf, CHAINS, erc20, FACTORY, findLaunch,
+  fullHistory, LAUNCHED, LAUNCHPAD_START, logsBetween, rh, sendJson, tokenMeta, TRANSFER, transferRow,
+} from "./_lib.js";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEAD = "0x000000000000000000000000000000000000dead";
-const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"; // Uniswap v4: where graduated tokens trade
 const LOCKER = "0x267444d099b10fb5ed7c3cc7b7c767adca574952"; // PonsV2LaunchLocker: no way to send tokens out
 const FEE_ESCROW = "0xd3afeb2a57f70ef218aa82451c51b2fb0416ac9e"; // PonsV2FeeEscrow: pays creator fees in ETH
 // A funder that has sent more transactions than this is an exchange or a service, not a person behind the creator.
@@ -44,15 +50,16 @@ async function launchesBy(wallet, latest) {
 }
 
 /** What one token transfer of the creator's was: bought, burned, locked, sold, or just moved. */
-export function classify(incoming, other, launchSource) {
-  const venue = other === POOL_MANAGER || (launchSource && other === launchSource);
+export function classify(incoming, other, launchSource, chain = CHAINS.robinhood) {
+  const venue = other === chain.poolManager || (launchSource && other === launchSource);
   if (incoming) return other === ZERO ? "minted" : venue ? "bought" : "received";
   if (other === ZERO || other === DEAD) return "burned";
   if (other === LOCKER) return "locked";
   return venue ? "sold" : "sent";
 }
 
-async function check(token) {
+async function checkRobinhood(token) {
+  const chain = CHAINS.robinhood;
   const [info, latest, meta, supply] = await Promise.all([
     blockscout(`/api/v2/addresses/${token}`),
     rh.getBlockNumber(),
@@ -87,6 +94,75 @@ async function check(token) {
   // Where the supply first went: the bonding curve. Trades with it, or with the v4 pool, are buys and sells.
   const launchSource = launch?.curve ?? (firstTransfer[0] ? low(firstTransfer[0].to) : null);
 
+  return report({
+    chain, token, meta, supply, dev, launchSource, moves, internal, normal, balance, ownLaunches,
+    creator: {
+      address: dev,
+      foundFrom: launch ? "launchpad launch event" : "contract creation transaction",
+      launchTx: launch?.tx ?? creationTx,
+      launchedAt: created?.timestamp ?? null,
+    },
+    fees: { from: FEE_ESCROW, pending: pendingFees },
+    launchesOf: (wallet) => launchesBy(wallet, latest),
+    where: "on the launchpad",
+    launchSearch: fullHistory() ? "the launchpad's whole history" : "the last 13 days or so",
+  });
+}
+
+async function checkBase(token) {
+  const chain = CHAINS.base;
+  const [meta, supply, origin] = await Promise.all([
+    tokenMeta(token, chain),
+    chain.client.readContract({ address: token, abi: erc20, functionName: "totalSupply" }).catch(() => null),
+    baseOrigin(token).catch(() => null),
+  ]);
+  if (!supply || meta.symbol === null) {
+    return { status: 404, body: { error: "not_found", message: "No token found at this address on Base." } };
+  }
+  const dev = origin?.launch?.creator ?? origin?.sender;
+  if (!origin || !isAddress(dev ?? "")) {
+    return { status: 404, body: { error: "creator_not_found", message: "Couldn't find who created this token." } };
+  }
+
+  // The creator's token moves, straight from the chain: Base's Blockscout misses many new tokens.
+  const mine = pad(dev);
+  const [incoming, outgoing, internal, normal, balance, ownLaunches] = await Promise.all([
+    logsBetween({ address: token, topics: [TRANSFER, null, mine] }, origin.block, origin.latest, chain),
+    logsBetween({ address: token, topics: [TRANSFER, mine] }, origin.block, origin.latest, chain),
+    list("txlistinternal", { address: dev }, chain),
+    list("txlist", { address: dev }, chain),
+    chain.client.readContract({ address: token, abi: erc20, functionName: "balanceOf", args: [dev] }).catch(() => 0n),
+    baseLaunchesBy(dev),
+  ]);
+  const seen = new Set();
+  const moves = [...incoming, ...outgoing]
+    .filter((l) => {
+      const id = `${l.transactionHash}:${l.logIndex}`;
+      return !seen.has(id) && seen.add(id);
+    })
+    .map(transferRow)
+    .sort((x, y) => Number(x.blockNumber) - Number(y.blockNumber) || x.logIndex - y.logIndex);
+
+  return report({
+    chain, token, meta, supply, dev, launchSource: origin.mintedTo, moves, internal, normal, balance, ownLaunches,
+    creator: {
+      address: dev,
+      foundFrom: origin.launch ? `${origin.launch.launchpad} launch event` : "the transaction that minted the token",
+      launchpad: origin.launch?.launchpad ?? null,
+      launchTx: origin.tx,
+      launchedAt: origin.time ? iso(origin.time) : null,
+    },
+    fees: null,
+    launchesOf: (wallet) => baseLaunchesBy(wallet),
+    where: "on Clanker or Zora",
+    launchSearch: "Clanker and Zora's whole history on Base",
+  });
+}
+
+/** The report from what was read, the same on both chains. */
+async function report({ chain, token, meta, supply, dev, launchSource, moves, internal, normal, balance, ownLaunches, creator, fees, launchesOf, where, launchSearch }) {
+  const feeFrom = fees?.from ?? null;
+
   const unit = 10 ** meta.decimals;
   const pct = (raw) => Number((raw * 1_000_000n) / supply) / 10_000;
   const totals = { minted: 0n, bought: 0n, received: 0n, burned: 0n, locked: 0n, sold: 0n, pooled: 0n, sent: 0n };
@@ -101,7 +177,7 @@ async function check(token) {
     const incoming = low(t.to) === dev;
     const other = low(incoming ? t.from : t.to);
     const raw = BigInt(t.value);
-    const type = classify(incoming, other, launchSource);
+    const type = classify(incoming, other, launchSource, chain);
     return { time: iso(t.timeStamp), type: type === "sold" && !paidIn.has(low(t.hash)) ? "pooled" : type, raw, counterparty: other, tx: t.hash };
   });
 
@@ -111,7 +187,7 @@ async function check(token) {
   const biggest = [...sentTo].sort((a, b) => (a[1] > b[1] ? -1 : 1)).slice(0, LOOKUPS).map(([a]) => a);
   const named = new Map();
   for (const a of biggest) {
-    const who = await blockscout(`/api/v2/addresses/${a}`).catch(() => null);
+    const who = await blockscout(`/api/v2/addresses/${a}`, {}, chain).catch(() => null);
     if (who) named.set(a, { name: who.name ?? null, isContract: Boolean(who.is_contract) });
   }
   for (const r of rows) {
@@ -124,9 +200,9 @@ async function check(token) {
   }
   for (const r of rows) totals[r.type] += r.raw;
 
-  // Creator fees: ETH the fee escrow paid out to the creator, and what is still waiting there.
+  // Creator fees: ETH the fee escrow paid out to the creator, and what is still waiting there (Robinhood Chain only).
   const claims = internal
-    .filter((t) => low(t.from) === FEE_ESCROW && low(t.to) === dev && BigInt(t.value || 0) > 0n)
+    .filter((t) => feeFrom && low(t.from) === feeFrom && low(t.to) === dev && BigInt(t.value || 0) > 0n)
     .map((t) => ({ time: iso(t.timeStamp), eth: eth(t.value), tx: t.transactionHash ?? t.hash ?? null }));
   const claimedEth = claims.reduce((s, c) => s + c.eth, 0);
 
@@ -146,18 +222,18 @@ async function check(token) {
 
   // Who funded the wallet: the earliest ETH that reached it, sent directly or from inside a contract.
   const firstIn = [...normal.filter((t) => t.isError !== "1"), ...internal]
-    .filter((t) => low(t.to) === dev && BigInt(t.value || 0) > 0n && low(t.from) !== FEE_ESCROW)
+    .filter((t) => low(t.to) === dev && BigInt(t.value || 0) > 0n && low(t.from) !== feeFrom)
     .sort((a, b) => Number(a.timeStamp) - Number(b.timeStamp))[0];
   let funding = null;
   if (firstIn) {
     const funder = low(firstIn.from);
     const [sent, code] = await Promise.all([
-      rh.getTransactionCount({ address: funder }).catch(() => null),
-      rh.getCode({ address: funder }).catch(() => undefined),
+      chain.client.getTransactionCount({ address: funder }).catch(() => null),
+      chain.client.getCode({ address: funder }).catch(() => undefined),
     ]);
     const isContract = Boolean(code && code !== "0x");
     const isService = isContract || (sent ?? 0) > SERVICE_TXS;
-    const launches = isService ? null : await launchesBy(funder, latest).catch(() => null);
+    const launches = isService ? null : await launchesOf(funder).catch(() => null);
     funding = {
       funder,
       eth: eth(firstIn.value),
@@ -182,7 +258,7 @@ async function check(token) {
   if (totals.sent > 0n) flag("info", `The creator sent ${pct(totals.sent).toFixed(2)}% of the supply to other addresses: check who received it`);
   if (holds >= 5) flag("info", `The creator still holds ${holds.toFixed(2)}% of the supply`);
   if (claimedEth > 0) flag("info", `The creator has claimed ${claimedEth.toFixed(4)} ETH in creator fees`);
-  if (otherLaunches?.length) flag("warn", `The creator launched ${otherLaunches.length} other token${otherLaunches.length === 1 ? "" : "s"} on the launchpad`);
+  if (otherLaunches?.length) flag("warn", `The creator launched ${otherLaunches.length} other token${otherLaunches.length === 1 ? "" : "s"} ${where}`);
   const funderCount = funding?.funderLaunches?.count ?? 0;
   if (funderCount > 0) flag("warn", `The wallet that first funded the creator has launched ${funderCount} token${funderCount === 1 ? "" : "s"} itself: a probable link, not proof`);
   if (!flags.length) flag("info", "Nothing stands out in what the creator did");
@@ -190,13 +266,9 @@ async function check(token) {
   return {
     status: 200,
     body: {
+      ...(chain === CHAINS.robinhood ? {} : { chain: chain.key }),
       token: { address: token, name: meta.name, symbol: meta.symbol },
-      creator: {
-        address: dev,
-        foundFrom: launch ? "launchpad launch event" : "contract creation transaction",
-        launchTx: launch?.tx ?? creationTx,
-        launchedAt: created?.timestamp ?? null,
-      },
+      creator,
       flags,
       supply: {
         holdsPercent: holds,
@@ -214,9 +286,10 @@ async function check(token) {
         count: rows.length,
         list: rows.slice(-LIST_MAX).map(({ raw, ...r }) => ({ ...r, tokens: Number(raw) / unit, percent: pct(raw) })),
       },
-      fees: {
+      // Creator fees are tracked on Robinhood Chain's launchpad only, so on Base this is null.
+      fees: fees && {
         claimedEth,
-        pendingEth: pendingFees === null ? null : eth(pendingFees),
+        pendingEth: fees.pending === null ? null : eth(fees.pending),
         claims: claims.slice(-LIST_MAX),
       },
       ethSent: {
@@ -225,8 +298,8 @@ async function check(token) {
       },
       funding,
       otherLaunches: otherLaunches && { count: otherLaunches.length, tokens: otherLaunches.slice(0, 20) },
-      launchSearch: fullHistory() ? "the launchpad's whole history" : "the last 13 days or so",
-      explorer: `${EXPLORER}/address/${dev}`,
+      launchSearch,
+      explorer: `${chain.explorer}/address/${dev}`,
       note: "Read from public on-chain data. 'Sent' can be a sale, a lock or a move to another wallet: check who received it. A funder is a probable link, never proof. Not financial advice.",
       updatedAt: new Date().toISOString(),
     },
@@ -242,12 +315,17 @@ export default async function handler(req, res) {
   if (!isAddress(token)) {
     return sendJson(res, 400, { error: "bad_token", message: "Pass a token contract address: /v1/dev/0x…" });
   }
+  const chain = chainOf(req.query);
+  if (!chain) return sendJson(res, 400, badChain);
+  if (!chainReady(chain)) return sendJson(res, 503, chainNotReady);
+  const key = chain === CHAINS.robinhood ? token : `${chain.key}:${token}`;
   try {
-    const hit = cache.get(token);
+    const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_MS) return sendJson(res, hit.status, hit.body);
-    const result = await check(token);
+    // A Base token asked for without chain=base gets a 404 that says so. A 404 is never charged.
+    const result = chain === CHAINS.base ? await checkBase(token) : await withBaseHint(await checkRobinhood(token), token);
     if (cache.size > 2000) cache.clear();
-    cache.set(token, { at: Date.now(), ...result });
+    cache.set(key, { at: Date.now(), ...result });
     return sendJson(res, result.status, result.body);
   } catch (e) {
     console.error(e.message);

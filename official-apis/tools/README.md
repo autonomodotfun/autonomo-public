@@ -11,8 +11,8 @@ All gateways use the same upstream base, `https://tools.autonomo.fun/v1`, and th
 | `token-lookup` | `/v1/price/<token>` | Live price and market cap of any Robinhood Chain launchpad token, from its bonding curve or, once it has graduated, its launchpad Uniswap v4 pool (USDG and WETH too) |
 | `tx-explainer` | `/v1/tx/<hash>` | A Robinhood Chain transaction in plain English: launches, curve buys and sells (router and bundled buys grouped), transfers, fee |
 | `wallet-portfolio` | `/v1/portfolio/<wallet>?days=2` | ETH, USDG, WETH and $AUTONOMO, plus tokens received in the last 1–7 days, valued in USD; copies of known symbols are flagged as likely impostors |
-| `dev-wallet` | `/v1/dev/<token>` | What a token's creator did: bought, burned, locked, sold and still holds, creator fees claimed and waiting, where their ETH went, who first funded them, and other launches by the creator and that funder. Needs `BLOCKSCOUT_KEY` |
-| `holders-bundles` | `/v1/holders/<token>` | Who really holds a token: top 30 holders with the pool, launch contracts and burns set apart, wallets linked by a shared first funder, snipers in the first 15 seconds and what they still hold, same-block buyers, and early buyers who sniped other launches. Needs `BLOCKSCOUT_KEY` |
+| `dev-wallet` | `/v1/dev/<token>?chain=base` | What a token's creator did: bought, burned, locked, sold and still holds, creator fees claimed and waiting, where their ETH went, who first funded them, and other launches by the creator and that funder. `chain=base` reads Base (creator fees aren't tracked there). Needs `BLOCKSCOUT_KEY` |
+| `holders-bundles` | `/v1/holders/<token>?chain=base` | Who really holds a token: top 30 holders with the pool, launch contracts and burns set apart, wallets linked by a shared first funder, snipers in the first 15 seconds and what they still hold, same-block buyers, and early buyers who sniped other launches. `chain=base` reads Base. Needs `BLOCKSCOUT_KEY` |
 | `payment-check` | `/v1/payment/<hash>?to=<address>&amount=<number>&asset=usdg\|autonomo` | Did a payment settle: who paid whom, how much, how it was settled and who paid the gas, with the wallet behind a burn splitter. With `to`, `amount` or `asset`, a yes or no on whether a payment in the transaction matches |
 | `gas-now` | `/v1/gas` | The gas price now, and what sending ETH, sending USDG, a curve buy and a launch cost in ETH and USD, from what recent real transactions used |
 | `endpoint-health` | `/v1/endpoint?url=https://…&method=GET\|POST` | Is an x402 API up and payable right now: one unpaid call, the answer time, and whether each payment option it offers is complete enough to pay. Never pays |
@@ -24,7 +24,7 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
 
 ## Notes
 
-- Everything is read from public chains (Robinhood Chain RPC; ETH/USD from Chainlink on Base). Launchpad tokens are
+- Everything is read from public chains (Robinhood Chain RPC; ETH/USD from Chainlink on Base; Base itself for `chain=base`). Launchpad tokens are
   found through the factory's launch event, like the Risk Checker.
 - `ROBINHOOD_RPC_URL` (optional, a paid RPC such as Alchemy): with it, Token Risk and Token Lookup find tokens from
   the launchpad's whole history (from block 27,000,000). Without it they search the last ~13 days on the public RPC,
@@ -40,6 +40,18 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
 - `BLOCKSCOUT_KEY` (needed by Dev Wallet Tracker and Holders & Bundles): a Blockscout PRO API key, used by nothing
   else. A wallet's full history can't be read from the RPC, so these two ask Blockscout: about 6 requests for a dev
   check, 60 to 110 for a holders check. Without the key they answer 503 and callers aren't charged.
+- `chain=base` (Dev Wallet Tracker and Holders & Bundles): left out, or `robinhood`, gives exactly the Robinhood
+  Chain answer. On Base the creator comes from the Clanker (v4, v3.1) or Zora launch event in the transaction that
+  minted the token, otherwise from whoever sent it. Base's Blockscout misses many new tokens (Nov 2026: about 93% of
+  blocks indexed, and Clanker tokens a day old not listed), so the token's own history (its mint, the creator's
+  moves, the first seconds of trading, and holders when Blockscout hasn't listed the token) is read from the chain;
+  wallet histories and contract names still come from Blockscout, on the same key. That needs `BASE_RPC_URL`, an RPC
+  of our own such as Alchemy, since the public one refuses whole-history log searches; without it `chain=base`
+  answers 503 and callers aren't charged. A Base token asked for without `chain=base` gets the usual 404, with
+  "This token is on Base: add ?chain=base." and `"hint": { "chain": "base" }` (one supply read on Base, and only
+  once Base is set up). The chain is never switched on its own: the same address can be a different contract on
+  each chain. Measured per report: Dev Wallet about 2 to 5 Blockscout and 12 to 14 RPC
+  requests; Holders about 2 to 10 Blockscout requests for a new token and about 50 for a large one like Brett.
 - `BLOCKSCOUT_RPS` (optional, default 13): requests a second sent to Blockscout. The Builder plan allows 15; set 4
   on the free plan.
 - Portfolio discovery scans incoming transfers within a time budget so answers stay well inside the gateway's 25 s.
