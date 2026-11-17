@@ -3,11 +3,12 @@ import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
 import { updating } from "@/lib/api";
 import { bazaarRouteFields } from "@/lib/bazaar";
-import { BURN_BPS, baseSplitterFor, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/burn";
-import { baseEligible, forward, gatewayOffers, getGateway, isOfficial, recordCall, payeeOf } from "@/lib/gateway";
+import { baseStatus } from "@/lib/base-pay";
+import { BURN_BPS, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/burn";
+import { forward, gatewayOffers, getGateway, isOfficial, recordCall, payeeOf } from "@/lib/gateway";
 import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/gloam";
 import { GLOAM_USDG, GLOAM_VAULT } from "@/lib/gloam-check";
-import { acceptsFor, baseReady, basePayeeOk, baseSafeOk, railForAsset, x402Server } from "@/lib/payments";
+import { acceptsFor, railForAsset, x402Server } from "@/lib/payments";
 
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
 // Payments go to the owner's wallet, or to its burn splitter when burning is on (src/lib/burn.ts); the upstream is
@@ -16,24 +17,8 @@ import { acceptsFor, baseReady, basePayeeOk, baseSafeOk, railForAsset, x402Serve
 // before the call; its transaction is only marked used once the upstream answers below 400.
 // APIs also take USDC on Base, settled by Coinbase's facilitator (src/lib/payments.ts). Official APIs are paid
 // straight to Autonomo's Safe there; creator APIs to the creator's splitter on Base, which keeps 5% for the mirror
-// burn (src/lib/burn.ts). The burn itself happens on Robinhood Chain, from the mirror burn pot.
-
-/**
- * Where this API's USDC on Base is paid, or null when Base isn't offered right now: Autonomo's own Safe for official
- * APIs, otherwise the creator's splitter on Base, once their wallet is one that can be paid there.
- */
-async function basePayToFor(g: Gateway): Promise<string | null> {
-  if (!baseEligible(g) || !(await baseReady())) return null;
-  const payee = payeeOf(g);
-  if (isOfficial(g)) return (await baseSafeOk(payee)) ? payee : null;
-  if (!(await basePayeeOk(payee))) return null;
-  try {
-    return await baseSplitterFor(payee);
-  } catch (e) {
-    console.error("base splitter lookup failed; Base not offered", e);
-    return null;
-  }
-}
+// burn (src/lib/burn.ts). The burn itself happens on Robinhood Chain, from the mirror burn pot. Owners can switch
+// Base off per API (acceptBase); where Base is paid, and why it's off, is worked out in src/lib/base-pay.ts.
 
 // Upstream calls may take up to 25 s (see forward()); leave headroom for payment verification and settlement.
 export const maxDuration = 60;
@@ -121,7 +106,7 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
   const gloam = gloamEnabledFor(g) ? gloamPaymentOf(request) : null;
   if (gloam) return withHeaders(await gloamCall(request, g, payTo, path, gloam, started), slug);
 
-  const basePayTo = await basePayToFor(g);
+  const basePayTo = (await baseStatus(g)).payTo;
   let res = await paidHandler(g, payTo, basePayTo)(request);
   if (res.status === 402 && gloamEnabledFor(g)) res = await withGloamOption(res, request, g, payTo, path);
 

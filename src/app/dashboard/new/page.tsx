@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ownerPayTo, secretsEnabled } from "@/lib/gateway";
+import { baseCoverage, ownerPayTo, secretsEnabled } from "@/lib/gateway";
 import { currentOwner } from "@/lib/session";
 import { VerifiedPanel } from "@/components/verified";
 import { burnPercent } from "@/lib/burn";
@@ -23,7 +23,13 @@ export default async function NewGatewayPage() {
         <Link href="/docs/launch" className="underline hover:text-ink">Read the launch guide</Link>.
       </p>
       <div className="mt-8">
-        <GatewayForm site={process.env.NEXT_PUBLIC_SITE_URL ?? ""} secretsEnabled={secretsEnabled()} burnPercent={burnPercent()} tokenUsd={await dayPriceOrNull()} />
+        <GatewayForm
+          site={process.env.NEXT_PUBLIC_SITE_URL ?? ""}
+          secretsEnabled={secretsEnabled()}
+          burnPercent={burnPercent()}
+          tokenUsd={await dayPriceOrNull()}
+          baseOffered={baseCoverage() === "all"}
+        />
       </div>
       {/* Optional, so it sits after the form: nobody needs it to launch. */}
       <VerifiedPanel owner={(await ownerPayTo(owner)) ?? owner} className="mt-12" />
