@@ -9,7 +9,7 @@ import { getDb, schema } from "@/db";
 import { isAuthorized } from "@/lib/admin-auth";
 import { logAdmin } from "@/lib/admin-log";
 import { TOKEN } from "@/lib/constants";
-import { gatewayOffers, payeeOf } from "@/lib/gateway";
+import { gatewayNetworks, gatewayOffers, payeeOf, syncGatewayNetworks } from "@/lib/gateway";
 import { applyPayTo } from "@/lib/pay-to";
 import { USDG } from "@/lib/payments";
 import { slugify } from "@/lib/slug";
@@ -202,7 +202,7 @@ async function listGateway(id: number) {
         category: "service",
         website: url,
         tags: ["autonomo-gateway"],
-        networks: ["eip155:4663"],
+        networks: gatewayNetworks(g),
         status: "approved",
         source: "gateway",
         endpointCount: 1,
@@ -226,6 +226,8 @@ async function listGateway(id: number) {
     });
   }
   await db.update(schema.gateways).set({ listing: "listed", projectId }).where(eq(schema.gateways.id, g.id));
+  // An entry made before Base existed, or before the API's Base setting changed, is filed under today's chains.
+  await syncGatewayNetworks({ ...g, projectId });
   await logAdmin({ kind: "listing_approved", subject: `/x/${g.slug}`, detail: g.name, gatewayId: g.id });
 }
 

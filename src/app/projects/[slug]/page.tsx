@@ -139,7 +139,10 @@ export default async function ProjectPage({ params }: Props) {
                       {e.description && <p className="mt-1 line-clamp-2 text-xs text-muted">{e.description}</p>}
                     </td>
                     <td className="px-4 py-3 text-right font-mono whitespace-nowrap">{formatUsd(e.priceUsd)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted">{e.network ? networkLabel(e.network) : "—"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted">
+                      {/* An Autonomo gateway is one address paid on every chain its entry is filed under. */}
+                      {p.source === "gateway" ? p.networks.map(networkLabel).join(", ") : e.network ? networkLabel(e.network) : "—"}
+                    </td>
                     <td className="hidden px-4 py-3 text-muted md:table-cell">
                       {FACILITATOR_LABELS[e.facilitator] ?? e.facilitator}
                     </td>
@@ -192,7 +195,8 @@ function HowToPay({ onAutonomo, networks }: { onAutonomo: boolean; networks: str
       {onAutonomo ? (
         <p className="mt-2 max-w-3xl text-sm text-muted">
           This API runs on an Autonomo gateway. Call an endpoint, read the price in the <code>402</code> answer, and pay
-          per call in USDG or {TOKEN.symbol} on {TOKEN.chainName}, with no account or key. See{" "}
+          per call in USDG or {TOKEN.symbol} on {TOKEN.chainName}
+          {networks.includes("base") ? ", or USDC on Base at the same dollar price" : ""}, with no account or key. See{" "}
           <Link href="/docs/agents" className="underline hover:text-ink">Use Autonomo from your agent</Link>.
         </p>
       ) : (

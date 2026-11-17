@@ -2,6 +2,7 @@ import { json, options, withUpdating } from "@/lib/api";
 import { GATEWAY_USAGE } from "@/lib/playground";
 import { getTrackRecords, getVerifiedGateways, listAutonomoGateways } from "@/lib/queries";
 import { AUTONOMO_DISCOUNT } from "@/lib/gateway-rules";
+import { offersBase } from "@/lib/gateway";
 
 export { options as OPTIONS };
 
@@ -19,7 +20,12 @@ export const GET = withUpdating(async () => {
       description: g.description,
       url: `https://autonomo.fun/x/${g.slug}`,
       usage: GATEWAY_USAGE[g.slug] ?? "/",
-      price: { autonomo: g.autonomoAmount === null ? null : Number(g.autonomoAmount), usdg: g.acceptUsdg ? Number(g.priceUsd) : null },
+      price: {
+        autonomo: g.autonomoAmount === null ? null : Number(g.autonomoAmount),
+        usdg: g.acceptUsdg ? Number(g.priceUsd) : null,
+        // USDC on Base, same dollar price. The 402 lists it while Coinbase's facilitator is answering.
+        usdcBase: offersBase(g) ? Number(g.priceUsd) : null,
+      },
       // The $AUTONOMO amount follows the dollar price, this much lower, at the previous day's average. Set daily.
       autonomoPricing: g.autonomoAmount === null ? null : { followsUsd: Number(g.priceUsd), discount: AUTONOMO_DISCOUNT },
       project: `https://autonomo.fun/projects/${g.projectSlug}`,

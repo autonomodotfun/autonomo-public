@@ -162,6 +162,9 @@ async function listAutonomoGatewaysFresh() {
       autonomoAmount: gateways.autonomoAmount,
       priceUsd: gateways.priceUsd,
       acceptUsdg: gateways.acceptUsdg,
+      // With owner, whether the API takes USDC on Base (offersBase in src/lib/gateway.ts).
+      acceptBase: gateways.acceptBase,
+      owner: gateways.owner,
       projectSlug: projects.slug,
     })
     .from(gateways)

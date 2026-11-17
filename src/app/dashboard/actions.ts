@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAddress, isHex, verifyMessage, type Hex } from "viem";
 import { getDb, schema } from "@/db";
-import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo, testUpstream, type UpstreamTest } from "@/lib/gateway";
+import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo, syncGatewayNetworks, testUpstream, type UpstreamTest } from "@/lib/gateway";
 import { autonomoAmountFor, headerNameValid, slugError, usdPriceValid } from "@/lib/gateway-rules";
 import { dayPriceUsd } from "@/lib/pool-price";
 import { applyPayTo, firstSafeMessage } from "@/lib/pay-to";
@@ -162,6 +162,8 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
 
   if (existing) {
     await db.update(gateways).set(fields).where(eq(gateways.id, existing.id));
+    // A listed API's directory entry follows its Base setting, so Explore's chain filter stays right.
+    if (existing.projectId && existing.acceptBase !== fields.acceptBase) await syncGatewayNetworks({ ...existing, ...fields });
   } else {
     await db.insert(gateways).values({ ...fields, owner, payTo: await ownerPayTo(owner) });
   }

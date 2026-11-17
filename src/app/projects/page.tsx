@@ -16,6 +16,7 @@ import {
 } from "@/lib/queries";
 import { Avatar, compact, ProjectList } from "@/components/project-row";
 import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway-rules";
+import { baseCoverage, offersBase } from "@/lib/gateway";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 type AutonomoApi = Awaited<ReturnType<typeof listAutonomoGateways>>[number];
@@ -106,8 +107,9 @@ export default async function ProjectsPage({ searchParams }: Props) {
           </>
         ) : autonomoView ? (
           <p className="mt-3 max-w-2xl text-muted">
-            Autonomo&apos;s gateways on {TOKEN.chainName}: pay per call in USDG or {TOKEN.symbol}, no account or key. The
-            ones marked On-chain read {TOKEN.chainName} directly.
+            Autonomo&apos;s gateways: pay per call in USDG or {TOKEN.symbol} on {TOKEN.chainName}
+            {baseCoverage() !== "none" ? ", or USDC on Base" : ""}, no account or key. The ones marked On-chain read{" "}
+            {TOKEN.chainName} directly{baseCoverage() !== "none" ? ", and most read Base too" : ""}.
           </p>
         ) : (
           <p className="mt-3 max-w-2xl text-muted">
@@ -203,6 +205,7 @@ function ApiCard({ g, className = "" }: { g: AutonomoApi; className?: string }) 
             {g.acceptUsdg && g.autonomoAmount ? " · " : ""}
             {g.autonomoAmount ? `${Number(g.autonomoAmount).toLocaleString("en")} ${TOKEN.symbol} (${AUTONOMO_DISCOUNT_LABEL})` : ""}
           </span>
+          {offersBase(g) && <span className="mt-0.5 block font-mono text-xs text-muted">{formatUsd(g.priceUsd)} USDC on Base</span>}
         </span>
       </Link>
     </li>

@@ -99,6 +99,13 @@
       "when": 1794927461193,
       "tag": "0013_gateway_accept_base",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794929532062,
+      "tag": "0014_gateway_networks_base",
+      "breakpoints": true
     }
   ]
 }
