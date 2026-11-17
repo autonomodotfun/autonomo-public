@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TOKEN } from "@/lib/constants";
-import { BURN_BPS, BURN_DEAD, burnEnabled, burnFactory, buybackBurner, getBurns, getMirror, mirrorPot } from "@/lib/burn";
+import { BURN_BPS, BURN_DEAD, baseSplitterFactory, burnEnabled, burnFactory, buybackBurner, getBurns, getMirror, mirrorPot } from "@/lib/burn";
+import { baseCoverage } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default async function BurnPage() {
     { label: "Splitter factory", address: burnFactory() },
     { label: "Buyback and burn", address: buybackBurner() },
     { label: "Mirror burn pot (Base payments)", address: mirrorPot() },
+    { label: "Splitter factory on Base", address: baseSplitterFactory(), explorer: "https://basescan.org" },
     { label: "Dead address", address: BURN_DEAD },
   ];
 
@@ -79,10 +81,12 @@ export default async function BurnPage() {
         <>
           <h2 className="heading mt-12 text-2xl">Payments on Base</h2>
           <p className="mt-4 text-muted">
-            Official APIs also take USDC on Base. It goes straight to Autonomo&apos;s Safe there, and there&apos;s no {TOKEN.symbol} pool on
-            Base to burn in. So the same {burn}% is burned here instead: once a day, that share in USDG goes from a pot Autonomo
-            keeps filled to the buyback contract, which buys {TOKEN.symbol} and burns it. Those burns show below as USDG
-            buybacks. If the pot runs short, the rest stays owed and goes out after the next refill.
+            {baseCoverage() === "all" ? "APIs" : "Official APIs"} also take USDC on Base, where there&apos;s no {TOKEN.symbol} pool to burn in.
+            So the same {burn}% is burned here instead: once a day, that share in USDG goes from a pot Autonomo keeps filled to
+            the buyback contract, which buys {TOKEN.symbol} and burns it. Those burns show below as USDG buybacks. If the pot
+            runs short, the rest stays owed and goes out after the next refill.
+            {baseCoverage() === "all" &&
+              ` A creator's Base payments go to their splitter on Base, which sends them 95% and keeps ${burn}% for the pot, so the burn on Base pays for itself.`}
           </p>
           <div className="mt-6 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
             <Stat label="Paid in USDC on Base" value={fmtUsdg(mirror.paidOnBase)} note={`${burn}% of it is burned`} />
@@ -137,7 +141,7 @@ export default async function BurnPage() {
             c.address && (
               <li key={c.label}>
                 <span className="text-muted">{c.label}: </span>
-                <a href={`${TOKEN.explorer}/address/${c.address}`} className="font-mono break-all underline hover:text-ink">
+                <a href={`${c.explorer ?? TOKEN.explorer}/address/${c.address}`} className="font-mono break-all underline hover:text-ink">
                   {c.address}
                 </a>
               </li>

@@ -26,9 +26,17 @@ const SIGNERS = ["0x8E451DF31669Fa84246529de1E2C601632C1aEa2", "0xeFaA9bc262cd45
 const chains: Record<"base" | "robinhood", Map<string, SafeAt>> = { base: new Map(), robinhood: new Map() };
 const SAFE_ABI = parseAbi(["function getOwners() view returns (address[])", "function getThreshold() view returns (uint256)"]);
 const rpcCalls = { base: 0, robinhood: 0 };
+// Code on Robinhood Chain at addresses that aren't Safes (an EIP-7702 delegation, some other contract).
+const codes = new Map<string, string>();
 
 function rpcAnswer(chain: "base" | "robinhood", body: { id: number; method: string; params: [{ to: string; data: string }] }) {
   rpcCalls[chain]++;
+  if (body.method === "eth_getCode") {
+    const at = String(body.params[0]).toLowerCase();
+    // A Safe has code; otherwise whatever the test set, or none (a plain wallet).
+    const code = codes.get(at) ?? (chains[chain].get(at) ? "0x6080604052" : "0x");
+    return { jsonrpc: "2.0", id: body.id, result: code };
+  }
   if (body.method !== "eth_call") return { jsonrpc: "2.0", id: body.id, error: { code: -32601, message: "not in this test" } };
   const { to, data } = body.params[0];
   const safe = chains[chain].get(to.toLowerCase()) ?? null;
@@ -60,7 +68,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-11-16T12:00:00Z") });
 
 const payments = await import("@/lib/payments");
-const { acceptsFor, baseReady, baseSafeOk, offers, railForAsset, x402Server, USDC_BASE } = payments;
+const { acceptsFor, baseReady, basePayeeOk, baseSafeOk, offers, railForAsset, x402Server, USDC_BASE } = payments;
 const PRICE = { priceUsd: "0.01", acceptUsdg: true, autonomoAmount: "59" };
 
 test("Base is off for an API that isn't given a Base payee, even with everything set", () => {
@@ -131,6 +139,25 @@ const twoOfTwo = { owners: SIGNERS, threshold: 2n };
 test("the same Safe on both chains can be paid on Base", async () => {
   both(addr(1), twoOfTwo, { owners: [...SIGNERS].reverse(), threshold: 2n });
   assert.equal(await baseSafeOk(addr(1)), true, "signer order doesn't matter");
+});
+
+test("a creator's plain wallet can be paid on Base, an EIP-7702 one too", async () => {
+  both(addr(20), null, null);
+  assert.equal(await basePayeeOk(addr(20)), true, "no code");
+  codes.set(addr(21), "0xef0100" + "ab".repeat(20));
+  assert.equal(await basePayeeOk(addr(21)), true, "7702 delegation");
+});
+
+test("a creator's Safe can be paid on Base only if it's the same Safe there", async () => {
+  both(addr(22), twoOfTwo, twoOfTwo);
+  assert.equal(await basePayeeOk(addr(22)), true);
+  both(addr(23), null, twoOfTwo);
+  assert.equal(await basePayeeOk(addr(23)), false, "no Safe on Base");
+});
+
+test("any other contract wallet is not paid on Base", async () => {
+  codes.set(addr(24), "0x6080604052");
+  assert.equal(await basePayeeOk(addr(24)), false);
 });
 
 test("an address with no Safe on Base is never paid there", async () => {

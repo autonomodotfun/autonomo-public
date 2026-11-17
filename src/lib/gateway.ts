@@ -6,7 +6,7 @@ import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { getDb, schema } from "@/db";
 import type { Gateway } from "@/db/schema";
-import { offers } from "@/lib/payments";
+import { offers, platform } from "@/lib/payments";
 import { OFFICIAL_OWNER } from "@/lib/track-record";
 
 const { gateways, gatewayCalls } = schema;
@@ -252,8 +252,20 @@ export async function ownerPayTo(owner: string) {
   return g?.payTo ?? null;
 }
 
-/** Only Autonomo's official APIs take USDC on Base for now. Creator APIs stay on Robinhood Chain. */
-export const baseEligible = (g: Pick<Gateway, "owner">) => g.owner === OFFICIAL_OWNER;
+/** Autonomo's own APIs. They carry Bazaar listings and are paid on Base straight to Autonomo's Safe there. */
+export const isOfficial = (g: Pick<Gateway, "owner">) => g.owner === OFFICIAL_OWNER;
+
+/**
+ * Whether an API can take USDC on Base. Official APIs always can. Creator APIs can once Base splitters are set up
+ * (BASE_SPLITTER_FACTORY, see src/lib/burn.ts), since that's where their Base payments go.
+ */
+export const baseEligible = (g: Pick<Gateway, "owner">) => isOfficial(g) || Boolean(process.env.BASE_SPLITTER_FACTORY?.trim());
+
+/** Which APIs take USDC on Base on this deployment, for pages to say so: every API, official ones only, or none. */
+export function baseCoverage(): "all" | "official" | "none" {
+  if (!platform.base) return "none";
+  return process.env.BASE_SPLITTER_FACTORY?.trim() ? "all" : "official";
+}
 
 /**
  * A gateway's payment options. `basePayTo` is where USDC on Base is paid when it can be offered right now: the

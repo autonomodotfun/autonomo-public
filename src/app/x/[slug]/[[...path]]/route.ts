@@ -3,19 +3,37 @@ import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
 import { updating } from "@/lib/api";
 import { bazaarRouteFields } from "@/lib/bazaar";
-import { BURN_BPS, noteBurnCall, payToFor } from "@/lib/burn";
-import { baseEligible, forward, gatewayOffers, getGateway, recordCall, payeeOf } from "@/lib/gateway";
+import { BURN_BPS, baseSplitterFor, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/burn";
+import { baseEligible, forward, gatewayOffers, getGateway, isOfficial, recordCall, payeeOf } from "@/lib/gateway";
 import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/gloam";
 import { GLOAM_USDG, GLOAM_VAULT } from "@/lib/gloam-check";
-import { acceptsFor, baseReady, baseSafeOk, railForAsset, x402Server } from "@/lib/payments";
+import { acceptsFor, baseReady, basePayeeOk, baseSafeOk, railForAsset, x402Server } from "@/lib/payments";
 
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
 // Payments go to the owner's wallet, or to its burn splitter when burning is on (src/lib/burn.ts); the upstream is
 // only called after the payment verifies, and the payment only settles when the upstream answers below 400.
 // Gateways that accept USDG also offer a Gloam cash-out (src/lib/gloam.ts), where the payment lands
 // before the call; its transaction is only marked used once the upstream answers below 400.
-// Official APIs also take USDC on Base, settled by Coinbase's facilitator and paid straight to their Safe on Base,
-// so nothing of it is burned on the way (src/lib/payments.ts).
+// APIs also take USDC on Base, settled by Coinbase's facilitator (src/lib/payments.ts). Official APIs are paid
+// straight to Autonomo's Safe there; creator APIs to the creator's splitter on Base, which keeps 5% for the mirror
+// burn (src/lib/burn.ts). The burn itself happens on Robinhood Chain, from the mirror burn pot.
+
+/**
+ * Where this API's USDC on Base is paid, or null when Base isn't offered right now: Autonomo's own Safe for official
+ * APIs, otherwise the creator's splitter on Base, once their wallet is one that can be paid there.
+ */
+async function basePayToFor(g: Gateway): Promise<string | null> {
+  if (!baseEligible(g) || !(await baseReady())) return null;
+  const payee = payeeOf(g);
+  if (isOfficial(g)) return (await baseSafeOk(payee)) ? payee : null;
+  if (!(await basePayeeOk(payee))) return null;
+  try {
+    return await baseSplitterFor(payee);
+  } catch (e) {
+    console.error("base splitter lookup failed; Base not offered", e);
+    return null;
+  }
+}
 
 // Upstream calls may take up to 25 s (see forward()); leave headroom for payment verification and settlement.
 export const maxDuration = 60;
@@ -62,7 +80,7 @@ function paidHandler(g: Gateway, payTo: string, basePayTo: string | null) {
         description: g.description || g.name,
         mimeType: "application/json",
         // Official APIs carry their Bazaar listing: description, how to call them and an example answer.
-        ...(baseEligible(g) ? bazaarRouteFields(g.slug) : {}),
+        ...(isOfficial(g) ? bazaarRouteFields(g.slug) : {}),
       },
       x402Server()!,
     );
@@ -103,8 +121,7 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
   const gloam = gloamEnabledFor(g) ? gloamPaymentOf(request) : null;
   if (gloam) return withHeaders(await gloamCall(request, g, payTo, path, gloam, started), slug);
 
-  // USDC on Base pays the API's own Safe directly (there is no splitter on Base), once it's checked on Base.
-  const basePayTo = baseEligible(g) && (await baseReady()) && (await baseSafeOk(payeeOf(g))) ? payeeOf(g) : null;
+  const basePayTo = await basePayToFor(g);
   let res = await paidHandler(g, payTo, basePayTo)(request);
   if (res.status === 402 && gloamEnabledFor(g)) res = await withGloamOption(res, request, g, payTo, path);
 
@@ -116,8 +133,9 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
     const auth = payment.payload?.authorization ?? payment.payload?.permit2Authorization ?? {};
     const settled = settlement?.success === true;
     const rail = railForAsset(accepted.asset, accepted.network);
-    // USDC on Base goes straight to the Base Safe, past the burn splitter, so none of it is burned here.
-    const burnBps = rail === "usdc_base" || payTo === payeeOf(g) ? 0 : BURN_BPS;
+    // What the payee keeps: 5% less when the payment went to a splitter, on either chain. Official APIs on Base are
+    // paid to the Safe itself, and the mirror burn covers them.
+    const burnBps = (rail === "usdc_base" ? basePayTo !== payeeOf(g) : payTo !== payeeOf(g)) ? BURN_BPS : 0;
     after(async () => {
       await recordCall({
         gatewayId: g.id,
@@ -133,7 +151,10 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
         settled,
         tx: typeof settlement?.transaction === "string" ? settlement.transaction : null,
       }).catch((e) => console.error("gateway call log failed", e));
-      if (settled && burnBps > 0) await noteBurnCall(payeeOf(g)).catch((e) => console.error("burn flush failed", e));
+      if (settled && burnBps > 0) {
+        const note = rail === "usdc_base" ? noteBaseBurnCall : noteBurnCall;
+        await note(payeeOf(g)).catch((e) => console.error("burn flush failed", e));
+      }
     });
   }
   return withHeaders(res, slug);

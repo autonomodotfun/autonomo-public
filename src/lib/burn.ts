@@ -15,9 +15,10 @@ import {
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { base } from "viem/chains";
 import { getDb, schema } from "@/db";
 import { TOKEN } from "@/lib/constants";
-import { USDG } from "@/lib/payments";
+import { USDC_BASE, USDG } from "@/lib/payments";
 
 // Burn on paid calls. Each payee gets its own BurnSplitter contract (contracts/src/BurnSplitter.sol), and gateways are
 // paid there instead of to the payee. Flushing a splitter sends 5% of $AUTONOMO to the dead address and 5% of USDG
@@ -33,6 +34,8 @@ import { USDG } from "@/lib/payments";
 //   BURN_KEEPER_PRIVATE_KEY The BuybackBurner's keeper: a gas-only wallet that flushes and runs buybacks.
 //   BURN_START_BLOCK        The block the contracts were deployed in, where the search for burn receipts starts.
 //   MIRROR_BURN_POT         The deployed MirrorBurnPot, for the mirror burn of payments on Base (see below).
+//   BASE_SPLITTER_FACTORY   The BurnSplitterFactory deployed on Base, for creator APIs paid in USDC there (see below).
+//                           Without it, only official APIs take Base.
 
 export const BURN_BPS = 500;
 export const BURN_DEAD = "0x000000000000000000000000000000000000dEaD";
@@ -113,6 +116,7 @@ const BUYBACK_SLIPPAGE_BPS = 200n;
 
 export type BurnRun = {
   flushed: { payee: string; splitter: string; tx: string }[];
+  baseFlushed: { payee: string; splitter: string; tx: string }[];
   mirror: { usdgSent: string; paidOnBase: string; stillOwed: string; tx: string } | null;
   buyback: { usdgIn: string; quotedBurn: string; tx: string } | null;
   receipts: number;
@@ -171,7 +175,7 @@ async function runBuyback(k: Keeper) {
 /** The daily backup: flushes every splitter holding enough, then buys back. Catches creators with few calls. */
 export async function runBurnKeeper(): Promise<BurnRun> {
   const k = keeper();
-  const run: BurnRun = { flushed: [], mirror: null, buyback: null, receipts: 0, errors: [] };
+  const run: BurnRun = { flushed: [], baseFlushed: [], mirror: null, buyback: null, receipts: 0, errors: [] };
 
   for (const payee of await payees()) {
     try {
@@ -179,6 +183,17 @@ export async function runBurnKeeper(): Promise<BurnRun> {
       if (flushed) run.flushed.push(flushed);
     } catch (e) {
       run.errors.push(`flush ${payee}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  if (baseSplitterFactory()) {
+    for (const payee of await payees()) {
+      try {
+        const flushed = await flushBasePayee(payee);
+        if (flushed) run.baseFlushed.push(flushed);
+      } catch (e) {
+        run.errors.push(`base flush ${payee}: ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
   }
 
@@ -219,9 +234,55 @@ export async function noteBurnCall(payee: string) {
   revalidateTag(BURNS_TAG, { expire: 0 });
 }
 
+// ---------- splitters on Base ----------
+// Creator APIs paid in USDC on Base are paid to the creator's splitter there, from the same BurnSplitterFactory
+// contract deployed on Base (contracts/test/BaseSplitter.t.sol): USDC in the USDG slot, no $AUTONOMO, and Autonomo's
+// Base Safe in the buyback slot. A flush sends 95% to the creator and 5% to that Safe, which refills the mirror burn
+// pot below, so the burn on creators' Base payments pays for itself. Official APIs on Base are paid to the Safe itself.
+// The keeper flushes with the same key on Base, so it needs a little ETH there.
+
+export const baseSplitterFactory = () => envAddress("BASE_SPLITTER_FACTORY");
+const baseTransport = () => http(process.env.BASE_RPC_URL?.trim() || "https://mainnet.base.org", { timeout: 15_000 });
+const baseClient = createPublicClient({ chain: base, transport: baseTransport() });
+const baseSplitters = new Map<string, Address>();
+// A Base payment flushes its creator's splitter once it holds this much, and the daily run anything from it.
+const FLUSH_AT_USDC = 100_000n; // 0.10 USDC
+
+/** The creator's splitter on Base, where their API's USDC on Base is paid. Null while Base splitters are off. */
+export async function baseSplitterFor(payee: string): Promise<Address | null> {
+  const factory = baseSplitterFactory();
+  if (!factory) return null;
+  const key = `${factory}:${payee.toLowerCase()}`;
+  const hit = baseSplitters.get(key);
+  if (hit) return hit;
+  const splitter = await baseClient.readContract({ address: factory, abi: factoryAbi, functionName: "splitterOf", args: [getAddress(payee)] });
+  baseSplitters.set(key, splitter);
+  return splitter;
+}
+
+async function flushBasePayee(payee: Address) {
+  const factory = baseSplitterFactory();
+  const key = process.env.BURN_KEEPER_PRIVATE_KEY?.trim();
+  if (!factory || !key) return null;
+  const splitter = await baseSplitterFor(payee);
+  if (!splitter) return null;
+  const held = await baseClient.readContract({ address: USDC_BASE.address as Address, abi: balanceAbi, functionName: "balanceOf", args: [splitter] });
+  if (held < FLUSH_AT_USDC) return null;
+  const wallet = createWalletClient({ account: privateKeyToAccount(key as Hex), chain: base, transport: baseTransport() });
+  const hash = await wallet.writeContract({ address: factory, abi: factoryAbi, functionName: "flush", args: [payee, [USDC_BASE.address as Address]] });
+  const receipt = await baseClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`base flush reverted in ${hash}`);
+  return { payee, splitter, tx: hash };
+}
+
+/** Called after each settled Base payment to a creator's splitter: flushes it once it holds 0.10 USDC. */
+export async function noteBaseBurnCall(payee: string) {
+  if (!baseSplitterFactory() || !process.env.BURN_KEEPER_PRIVATE_KEY?.trim()) return;
+  await flushBasePayee(getAddress(payee));
+}
+
 // ---------- mirror burn for Base ----------
-// USDC paid on Base goes straight to the official Safe there: there's no splitter on Base, and no $AUTONOMO pool to
-// burn in. So the MirrorBurnPot (contracts/src/MirrorBurnPot.sol) holds a float of USDG on Robinhood Chain, and the
+// USDC paid on Base can't be burned there: there's no $AUTONOMO pool on Base. So the MirrorBurnPot (contracts/src/MirrorBurnPot.sol) holds a float of USDG on Robinhood Chain, and the
 // daily run sends 5% of all Base payments so far from it to the BuybackBurner, which buys and burns with it like any
 // other USDG. The pot keeps the running totals on-chain and refuses to send more than 5% of the total it's given, so
 // what the pot couldn't cover stays owed and goes out after the next refill.

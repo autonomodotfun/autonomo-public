@@ -288,6 +288,32 @@ export async function baseSafeOk(payTo: string): Promise<boolean> {
   return ok;
 }
 
+const payeeChecks = new Map<string, { ok: boolean; until: number }>();
+
+/**
+ * Whether a creator's wallet can be paid on Base, through their splitter there. A plain wallet can: the same key
+ * controls it on every chain, an EIP-7702 delegation on Robinhood Chain included. A Safe can when baseSafeOk() finds
+ * it on Base with the same signers. Any other contract wallet may not exist on Base, or be someone else's there, so
+ * it isn't offered Base. Kept like baseSafeOk(): an hour once it passes, two minutes after a failure.
+ */
+export async function basePayeeOk(payee: string): Promise<boolean> {
+  if (!isAddress(payee)) return false;
+  const key = payee.toLowerCase();
+  const hit = payeeChecks.get(key);
+  if (hit && hit.until > Date.now()) return hit.ok;
+  let ok = false;
+  try {
+    const client = createPublicClient({ chain: robinhood, transport: http(env("ROBINHOOD_RPC_URL")) });
+    const code = (await client.getCode({ address: getAddress(payee) }))?.toLowerCase();
+    ok = !code || code === "0x" || code.startsWith("0xef0100") ? true : await baseSafeOk(payee);
+  } catch (e) {
+    console.error("Base payee check failed; Base not offered", e);
+  }
+  if (payeeChecks.size > 500) payeeChecks.clear();
+  payeeChecks.set(key, { ok, until: Date.now() + (ok ? SAFE_OK_TTL_MS : SAFE_RETRY_MS) });
+  return ok;
+}
+
 /**
  * Whether USDC on Base can be offered right now: it's configured, and Coinbase's facilitator says it settles exact
  * payments on Base. Offering it without that would break the whole 402, not just the Base option.
