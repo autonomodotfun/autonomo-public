@@ -69,8 +69,8 @@ export const badChain = { error: "bad_chain", message: "chain can be robinhood (
 export const chainReady = (chain) => chain !== CHAINS.base || Boolean(process.env.BASE_RPC_URL?.trim());
 export const chainNotReady = { error: "not_configured", message: "Base isn't set up for this API yet." };
 
-/** For a token Robinhood Chain doesn't know: whether it's a token on Base, so the 404 can say to add chain=base.
- * One read of its supply. Never throws, and stays quiet when Base isn't set up, since chain=base couldn't answer. */
+/** For a token Robinhood Chain doesn't know: whether it's a token on Base. One read of its supply. Never throws, and
+ * says no when Base isn't set up, since nothing could be read there. */
 export async function isBaseToken(token) {
   if (!chainReady(CHAINS.base)) return false;
   try {
@@ -80,13 +80,32 @@ export async function isBaseToken(token) {
   }
 }
 
-/** A Robinhood Chain "not found" answer, pointing to chain=base when the token is there. */
-export async function withBaseHint(result, token) {
+/** Which chain a request reads. `chain` given: that chain only. Left out: Robinhood Chain, and Base when Robinhood
+ * Chain has no token at the address but Base does (`fallback`). Null for an unknown chain. */
+export function chainRequest(query) {
+  const chain = chainOf(query);
+  if (!chain) return null;
+  const given = String(query?.chain ?? "").trim() !== "";
+  return { chain, fallback: !given, key: (token) => (given ? `${chain.key}:${token}` : token) };
+}
+
+const PICKED = "No token at this address on Robinhood Chain, so this is the token at it on Base. Pass chain=robinhood to look on Robinhood Chain only.";
+
+/** Runs a check on the asked chain; with the chain left out, falls back to Base when Robinhood Chain has no such
+ * token. A fallback answer says which chain it read (chain: "base") and why (chainNote). When Base has no answer
+ * either, the Robinhood Chain 404 goes out as it was. Asked for chain=robinhood, a Base token's 404 says so. */
+export async function checkOnChain(req, token, checks) {
+  const { chain, fallback } = req;
+  if (chain === CHAINS.base) return checks.base(token);
+  const result = await checks.robinhood(token);
   if (result.status !== 404 || result.body?.error !== "not_found" || !(await isBaseToken(token))) return result;
-  return {
-    ...result,
-    body: { ...result.body, message: `${result.body.message} This token is on Base: add ?chain=base.`, hint: { chain: "base" } },
-  };
+  if (!fallback) {
+    return { ...result, body: { ...result.body, message: `${result.body.message} This token is on Base: pass chain=base.`, hint: { chain: "base" } } };
+  }
+  const onBase = await checks.base(token);
+  if (onBase.status === 404 && onBase.body?.error === "not_found") return result;
+  const { chain: _, ...rest } = onBase.body ?? {};
+  return { ...onBase, body: { chain: "base", chainNote: PICKED, ...rest } };
 }
 
 // Launchpads on Base whose launch event names the creator, checked on Base's Blockscout (Nov 2026). The creator is

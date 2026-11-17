@@ -19,7 +19,7 @@
 
 import { isAddress, pad } from "viem";
 import {
-  addr, authorized, badChain, chainNotReady, chainReady, withBaseHint, baseLaunchesBy, baseOrigin, blockscout, blockscoutList, chainOf, CHAINS, erc20, FACTORY, findLaunch,
+  addr, authorized, badChain, chainNotReady, chainReady, chainRequest, checkOnChain, baseLaunchesBy, baseOrigin, blockscout, blockscoutList, CHAINS, erc20, FACTORY, findLaunch,
   fullHistory, LAUNCHED, LAUNCHPAD_START, logsBetween, rh, sendJson, tokenMeta, TRANSFER, transferRow,
 } from "./_lib.js";
 
@@ -315,15 +315,15 @@ export default async function handler(req, res) {
   if (!isAddress(token)) {
     return sendJson(res, 400, { error: "bad_token", message: "Pass a token contract address: /v1/dev/0x…" });
   }
-  const chain = chainOf(req.query);
-  if (!chain) return sendJson(res, 400, badChain);
-  if (!chainReady(chain)) return sendJson(res, 503, chainNotReady);
-  const key = chain === CHAINS.robinhood ? token : `${chain.key}:${token}`;
+  const asked = chainRequest(req.query);
+  if (!asked) return sendJson(res, 400, badChain);
+  if (!chainReady(asked.chain)) return sendJson(res, 503, chainNotReady);
+  const key = asked.key(token);
   try {
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_MS) return sendJson(res, hit.status, hit.body);
-    // A Base token asked for without chain=base gets a 404 that says so. A 404 is never charged.
-    const result = chain === CHAINS.base ? await checkBase(token) : await withBaseHint(await checkRobinhood(token), token);
+    // Left out, the chain is Robinhood Chain, or Base when the token is only there (src: _lib.js checkOnChain).
+    const result = await checkOnChain(asked, token, { robinhood: checkRobinhood, base: checkBase });
     if (cache.size > 2000) cache.clear();
     cache.set(key, { at: Date.now(), ...result });
     return sendJson(res, result.status, result.body);
