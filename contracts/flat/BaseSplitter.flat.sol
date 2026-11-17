@@ -50,59 +50,59 @@ library SafeTransfer {
     }
 }
 
-// src/BurnSplitter.sol
+// src/BaseSplitter.sol
 
-/// Where one API creator's payments arrive. Flushing sends 5% of $AUTONOMO to the dead address and 5% of USDG to the
-/// buyback contract, which buys $AUTONOMO with it and burns that; everything else goes to the creator. Other tokens
-/// go to the creator in full. Anyone can flush; nothing here can be changed after deployment.
-contract BurnSplitter {
+/// Where one API creator's USDC payments on Base arrive. Flushing sends 5% of the USDC to Autonomo's reserve on Base
+/// and the rest to the creator. Nothing is burned on Base, which has no $AUTONOMO: the reserve refills the mirror burn
+/// pot on Robinhood Chain (MirrorBurnPot), which burns the same 5% there. Other tokens go to the creator in full.
+/// Anyone can flush; nothing here can be changed after deployment.
+///
+/// The same logic as BurnSplitter on Robinhood Chain, with names that say what happens on Base.
+contract BaseSplitter {
     using SafeTransfer for address;
 
-    uint256 public constant BURN_BPS = 500; // 5%
-    address public constant DEAD = 0x000000000000000000000000000000000000dEaD;
+    uint256 public constant RESERVE_BPS = 500; // 5%
 
     address public immutable recipient;
-    address public immutable autonomo;
-    address public immutable usdg;
-    address public immutable buyback;
+    address public immutable usdc;
+    address public immutable reserve;
 
-    event Flushed(address indexed token, uint256 toRecipient, uint256 toBurn);
+    event Flushed(address indexed token, uint256 toRecipient, uint256 toReserve);
 
-    constructor(address recipient_, address autonomo_, address usdg_, address buyback_) {
+    constructor(address recipient_, address usdc_, address reserve_) {
         recipient = recipient_;
-        autonomo = autonomo_;
-        usdg = usdg_;
-        buyback = buyback_;
+        usdc = usdc_;
+        reserve = reserve_;
     }
 
-    function flush(address token) public returns (uint256 toRecipient, uint256 toBurn) {
+    function flush(address token) public returns (uint256 toRecipient, uint256 toReserve) {
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance == 0) return (0, 0);
-        if (token == autonomo || token == usdg) {
-            toBurn = balance * BURN_BPS / 10_000;
-            if (toBurn > 0) token.safeTransfer(token == autonomo ? DEAD : buyback, toBurn);
+        if (token == usdc) {
+            toReserve = balance * RESERVE_BPS / 10_000;
+            if (toReserve > 0) token.safeTransfer(reserve, toReserve);
         }
-        toRecipient = balance - toBurn;
+        toRecipient = balance - toReserve;
         token.safeTransfer(recipient, toRecipient);
-        emit Flushed(token, toRecipient, toBurn);
+        emit Flushed(token, toRecipient, toReserve);
     }
 }
 
-/// Deploys one BurnSplitter per creator at an address known in advance, so gateways can be paid there before it exists.
-contract BurnSplitterFactory {
-    address public immutable autonomo;
-    address public immutable usdg;
-    address public immutable buyback;
+/// Deploys one BaseSplitter per creator at an address known in advance, so gateways can be paid there before it exists.
+contract BaseSplitterFactory {
+    address public immutable usdc;
+    address public immutable reserve;
 
     event SplitterDeployed(address indexed recipient, address splitter);
 
+    error ZeroAddress();
     error ZeroRecipient();
     error DeployFailed();
 
-    constructor(address autonomo_, address usdg_, address buyback_) {
-        autonomo = autonomo_;
-        usdg = usdg_;
-        buyback = buyback_;
+    constructor(address usdc_, address reserve_) {
+        if (usdc_ == address(0) || reserve_ == address(0)) revert ZeroAddress();
+        usdc = usdc_;
+        reserve = reserve_;
     }
 
     function splitterOf(address recipient) public view returns (address) {
@@ -129,7 +129,7 @@ contract BurnSplitterFactory {
     function flush(address recipient, address[] calldata tokens) external returns (address splitter) {
         splitter = deploy(recipient);
         for (uint256 i; i < tokens.length; i++) {
-            BurnSplitter(splitter).flush(tokens[i]);
+            BaseSplitter(splitter).flush(tokens[i]);
         }
     }
 
@@ -138,6 +138,6 @@ contract BurnSplitterFactory {
     }
 
     function _initCode(address recipient) private view returns (bytes memory) {
-        return abi.encodePacked(type(BurnSplitter).creationCode, abi.encode(recipient, autonomo, usdg, buyback));
+        return abi.encodePacked(type(BaseSplitter).creationCode, abi.encode(recipient, usdc, reserve));
     }
 }

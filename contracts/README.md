@@ -54,15 +54,16 @@ Then set `MIRROR_BURN_POT` in the app's environment and send the pot its first U
 
 ## Splitters on Base
 
-Creator APIs paid in USDC on Base are paid to the creator's splitter there, from the same `BurnSplitterFactory`, deployed on Base unchanged. A flush sends 95% of USDC to the creator and 5% to Autonomo's Base Safe, which refills the mirror burn pot above. Official APIs on Base are still paid straight to the Safe. `test/BaseSplitter.t.sol` checks this on a fork of Base: `BASE_RPC_URL=https://mainnet.base.org forge test --match-contract BaseSplitterForkTest -vv`.
+Creator APIs paid in USDC on Base are paid to the creator's **`BaseSplitter`** there, deployed by the **`BaseSplitterFactory`** at an address known in advance. A flush sends 95% of the USDC to the creator and 5% to the `reserve`, Autonomo's Base Safe, which refills the mirror burn pot above. Nothing is burned on Base, which has no $AUTONOMO. Other tokens go to the creator in full; anyone can flush; nothing can be changed. Official APIs on Base are still paid straight to the Safe.
 
-Deploy it on Base from [Remix](https://remix.ethereum.org) with [`flat/BurnSplitter.flat.sol`](flat/BurnSplitter.flat.sol), contract `BurnSplitterFactory`, same compiler settings:
+It is `BurnSplitter`'s logic with names that say what happens on Base (`usdc`, `reserve`, `Flushed(token, toRecipient, toReserve)`), and `splitterOf` and `flush` are the same calls. `test/BaseSplitter.t.sol` checks it on a fork of Base: `BASE_RPC_URL=https://mainnet.base.org forge test --match-path test/BaseSplitter.t.sol -vv`.
+
+Deploy it on Base from [Remix](https://remix.ethereum.org) with [`flat/BaseSplitter.flat.sol`](flat/BaseSplitter.flat.sol), contract `BaseSplitterFactory`, same compiler settings:
 
 | Constructor value | What it is |
 | --- | --- |
-| `autonomo_` | `0x0000000000000000000000000000000000000000` (there's no $AUTONOMO on Base) |
-| `usdg_` | USDC on Base, `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (the token 5% is taken from) |
-| `buyback_` | Autonomo's Base Safe, `0x92a99FBD386F87277b6009BFF4C56728Ec5f7354` (where the 5% goes) |
+| `usdc_` | USDC on Base, `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| `reserve_` | Autonomo's Base Safe, `0x92a99FBD386F87277b6009BFF4C56728Ec5f7354` (where the 5% goes) |
 
 Then set `BASE_SPLITTER_FACTORY` in the app's environment: every API then offers USDC on Base. The burn keeper flushes Base splitters with the same key, so send it a little ETH on Base first.
 
