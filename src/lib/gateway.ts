@@ -7,6 +7,7 @@ import { connection } from "next/server";
 import { getDb, schema } from "@/db";
 import type { Gateway } from "@/db/schema";
 import { offers } from "@/lib/payments";
+import { OFFICIAL_OWNER } from "@/lib/track-record";
 
 const { gateways, gatewayCalls } = schema;
 
@@ -251,8 +252,18 @@ export async function ownerPayTo(owner: string) {
   return g?.payTo ?? null;
 }
 
-export function gatewayOffers(g: Pick<Gateway, "priceUsd" | "acceptUsdg" | "autonomoAmount">) {
-  return offers({ priceUsd: String(Number(g.priceUsd)), acceptUsdg: g.acceptUsdg, autonomoAmount: g.autonomoAmount });
+/** Only Autonomo's official APIs take USDC on Base for now. Creator APIs stay on Robinhood Chain. */
+export const baseEligible = (g: Pick<Gateway, "owner">) => g.owner === OFFICIAL_OWNER;
+
+/**
+ * A gateway's payment options. `basePayTo` is where USDC on Base is paid when it can be offered right now: the
+ * gateway's own pay-to, once Coinbase and the Safe are checked (see baseReady() and baseSafeOk()).
+ */
+export function gatewayOffers(g: Pick<Gateway, "owner" | "priceUsd" | "acceptUsdg" | "autonomoAmount">, basePayTo: string | null = null) {
+  return offers(
+    { priceUsd: String(Number(g.priceUsd)), acceptUsdg: g.acceptUsdg, autonomoAmount: g.autonomoAmount },
+    { basePayTo: baseEligible(g) ? basePayTo : null },
+  );
 }
 
 // Every gateway call (paid or not) looks its gateway up, so rows are kept in memory for a short while. Kept per
@@ -297,9 +308,10 @@ const revenueCols = {
   settled: sql<number>`count(*) filter (where ${gatewayCalls.settled})::int`,
   usdg: sql<string>`coalesce(sum(${earned}) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'usdg'), 0)::text`,
   autonomo: sql<string>`coalesce(sum(${earned}) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'autonomo'), 0)::text`,
+  usdcBase: sql<string>`coalesce(sum(${earned}) filter (where ${gatewayCalls.settled} and ${gatewayCalls.rail} = 'usdc_base'), 0)::text`,
 };
 
-export type RevenueTotals = { calls: number; settled: number; usdg: string; autonomo: string };
+export type RevenueTotals = { calls: number; settled: number; usdg: string; autonomo: string; usdcBase: string };
 
 export async function listOwnerGateways(owner: string) {
   await connection();

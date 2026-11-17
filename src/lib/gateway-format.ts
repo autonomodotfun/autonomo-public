@@ -27,7 +27,13 @@ export function afterBurn(atomic: string | null, burnBps: number) {
 export function fmtRail(rail: string | null, atomic: string | null) {
   if (rail === "usdg") return fmtUsdg(atomic);
   if (rail === "autonomo") return fmtAutonomo(atomic);
+  if (rail === "usdc_base") return `${fmtUsdg(atomic)} USDC on Base`;
   return "—";
+}
+
+/** Where a call's payment transaction can be looked up: Base payments on Basescan, the rest on Robinhood Chain. */
+export function txUrl(rail: string | null, tx: string) {
+  return rail === "usdc_base" ? `https://basescan.org/tx/${tx}` : `${TOKEN.explorer}/tx/${tx}`;
 }
 
 export function shortAddr(a: string | null | undefined) {
