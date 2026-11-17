@@ -30,7 +30,7 @@ const low = (a) => String(a ?? "").toLowerCase();
 const isAddr = (a) => /^0x[0-9a-f]{40}$/.test(a);
 
 /** The token's pools on DexScreener, deepest first, with what each can pay out. Null when DexScreener can't answer. */
-async function dexPools(token, ethPrice) {
+export async function dexPools(token, ethPrice) {
   try {
     const res = await fetch(`https://api.dexscreener.com/tokens/v1/base/${token}`, { signal: AbortSignal.timeout(6_000), headers: { accept: "application/json" } });
     if (!res.ok) return null;
