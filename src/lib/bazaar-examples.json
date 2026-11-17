@@ -1,0 +1,482 @@
+{
+  "token-price": {
+    "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "name": "Autonomopad",
+    "symbol": "AUTONOMO",
+    "chain": "Robinhood Chain",
+    "priceUsd": 0.0001235184195783782,
+    "priceEth": 6.677429307022863e-8,
+    "marketCapUsd": 123518.4195783782,
+    "ethUsd": 1849.79,
+    "lastTrade": {
+      "side": "sell",
+      "time": "2026-11-16T14:38:44.000Z",
+      "tx": "0x1e219819d8f1f1ba5f7b30c67877cb6f4cb9e9b7edf9a667a70173f1c6fa7a48"
+    },
+    "explorer": "https://robinhoodchain.blockscout.com/token/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "venue": "uniswap-v4",
+    "updatedAt": "2026-11-16T14:54:48.414Z"
+  },
+  "token-lookup": {
+    "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "name": "Autonomopad",
+    "symbol": "AUTONOMO",
+    "chain": "Robinhood Chain",
+    "priceUsd": 0.0001235184195783782,
+    "priceEth": 6.677429307022863e-8,
+    "marketCapUsd": 123518.4195783782,
+    "ethUsd": 1849.79,
+    "lastTrade": {
+      "side": "sell",
+      "time": "2026-11-16T14:38:44.000Z",
+      "tx": "0x1e219819d8f1f1ba5f7b30c67877cb6f4cb9e9b7edf9a667a70173f1c6fa7a48"
+    },
+    "explorer": "https://robinhoodchain.blockscout.com/token/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "venue": "uniswap-v4",
+    "updatedAt": "2026-11-16T14:54:48.414Z"
+  },
+  "new-launches": {
+    "chain": "Robinhood Chain",
+    "launchpad": "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+    "count": 3,
+    "launches": [
+      {
+        "token": "0x2a2ccb56ed8fc0dd0a2d3cc168b7afdde61caf9e",
+        "name": "Stray Cucks",
+        "symbol": "STRAYCUCKS",
+        "launchedAt": "2026-11-16T14:54:29.000Z",
+        "ageMinutes": 0,
+        "creator": "0x59d46f950020e2a6344f6d530119fbf681c2bffc",
+        "curve": "0x4f25abb85ad16062566464738d227561186423ed",
+        "trades": {
+          "buys": 5,
+          "sells": 0,
+          "uniqueBuyers": 5,
+          "volumeEth": 0.04878038227519681
+        },
+        "priceEth": 1.8243636355949727e-9,
+        "priceUsd": 0.0000033746896094872243,
+        "marketCapUsd": 3374.6896094872245,
+        "curveProgress": {
+          "netEth": 0.04878038227519681,
+          "targetEth": 4.2,
+          "percent": 1.1614376732189715
+        },
+        "explorer": "https://robinhoodchain.blockscout.com/token/0x2a2ccb56ed8fc0dd0a2d3cc168b7afdde61caf9e",
+        "launchTx": "0xc6f4e86aad453e2ea5d1511ded884cace5869798cb56f2a956e6c8d0efd91861"
+      }
+    ],
+    "ethUsd": 1849.79,
+    "updatedAt": "2026-11-16T14:54:50.665Z"
+  },
+  "token-risk": {
+    "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "name": "Autonomopad",
+    "symbol": "AUTONOMO",
+    "chain": "Robinhood Chain",
+    "risk": {
+      "level": "low",
+      "score": 0,
+      "flags": [
+        {
+          "severity": "info",
+          "text": "No major red flags in holder or trading data"
+        }
+      ]
+    },
+    "launch": {
+      "launchedAt": "2026-10-28T08:10:16.000Z",
+      "creator": "0x46a84847300b93c147cb47e6bd9eac3eb3477616",
+      "curve": "0x28b4bb34f4d84552a0f4aac4355da9c3fa929d65",
+      "launchTx": "0x4584a8397ac28201d8369769617d199f1a59c053a819fa2e3ae42ca4c592fae1"
+    },
+    "holders": {
+      "count": 359,
+      "largestPercent": 4.3197,
+      "top10Percent": 33.3045,
+      "top": [
+        {
+          "address": "0x4d356f15a97a2bc6978780f7a105d7806b413be6",
+          "percent": 4.3197,
+          "tokens": 34323646.040218554
+        }
+      ]
+    },
+    "supply": {
+      "total": 1000000000,
+      "inCurvePercent": 0,
+      "inPoolPercent": 11.3384,
+      "burnedPercent": 1.0416,
+      "lockedPercent": 8.1632,
+      "creatorPercent": 0.1,
+      "launchBlockBuyers": 1,
+      "launchBlockBuyersPercent": 0.1258
+    },
+    "trading": {
+      "buys": 4096,
+      "sells": 3582,
+      "buys24h": 47,
+      "sells24h": 63,
+      "uniqueBuyers": 678,
+      "stillHolding": 359,
+      "volumeEth": 377.606829505319,
+      "curve": {
+        "buys": 751,
+        "sells": 515,
+        "volumeEth": 41.52270578374468
+      },
+      "pool": {
+        "buys": 3345,
+        "sells": 3067,
+        "volumeEth": 336.0841237215743
+      }
+    },
+    "market": {
+      "priceEth": 6.677429307022863e-8,
+      "priceUsd": 0.0001235184195783782,
+      "priceSource": "uniswap-v4",
+      "graduated": true,
+      "marketCapUsd": 123518.4195783782,
+      "curveProgress": {
+        "netEth": 5.462467150198005,
+        "targetEth": 4.2,
+        "percent": 100
+      }
+    },
+    "explorer": "https://robinhoodchain.blockscout.com/token/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "updatedAt": "2026-11-16T14:54:53.123Z"
+  },
+  "tx-explainer": {
+    "hash": "0x3572d00c16b869fbeec6d267e08108b2d5decdb93d90532114f66390d6099f65",
+    "chain": "Robinhood Chain",
+    "status": "success",
+    "summary": "0x0870…aa7a sent 1.01M $AUTONOMO to 0x92a9…7354.",
+    "actions": [
+      {
+        "type": "transfer",
+        "text": "0x0870…aa7a sent 1.01M $AUTONOMO to 0x92a9…7354.",
+        "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96"
+      }
+    ],
+    "from": "0x0870df267e76ce27f81ea43273e152d0faefaa7a",
+    "to": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "valueEth": 0,
+    "feeEth": 5.94489384e-7,
+    "feeUsd": 0.00109968051762936,
+    "time": "2026-11-03T06:56:37.000Z",
+    "block": 104864389,
+    "transfers": [
+      {
+        "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+        "symbol": "AUTONOMO",
+        "from": "0x0870df267e76ce27f81ea43273e152d0faefaa7a",
+        "to": "0x92a99fbd386f87277b6009bff4c56728ec5f7354",
+        "amount": "1006645.45728664128399232"
+      }
+    ],
+    "contracts": [
+      {
+        "address": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+        "name": "PonsV2LauncherToken"
+      }
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com/tx/0x3572d00c16b869fbeec6d267e08108b2d5decdb93d90532114f66390d6099f65"
+  },
+  "wallet-portfolio": {
+    "wallet": "0x92a99fbd386f87277b6009bff4c56728ec5f7354",
+    "chain": "Robinhood Chain",
+    "totalUsd": 125.28845889579281,
+    "eth": {
+      "amount": 0,
+      "valueUsd": 0
+    },
+    "tokens": [
+      {
+        "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+        "symbol": "AUTONOMO",
+        "name": "Autonomopad",
+        "amount": 1013468.9572866412,
+        "priceUsd": 0.0001235184195783782,
+        "valueUsd": 125.18208389579281,
+        "priceSource": "launchpad Uniswap v4 pool",
+        "warning": null
+      }
+    ],
+    "unpriced": 1,
+    "warnings": 1,
+    "ethUsd": 1849.79,
+    "explorer": "https://robinhoodchain.blockscout.com/address/0x92a99fbd386f87277b6009bff4c56728ec5f7354",
+    "updatedAt": "2026-11-16T14:54:56.633Z"
+  },
+  "dev-wallet": {
+    "token": {
+      "address": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+      "name": "Autonomopad",
+      "symbol": "AUTONOMO"
+    },
+    "creator": {
+      "address": "0x46a84847300b93c147cb47e6bd9eac3eb3477616",
+      "foundFrom": "launchpad launch event",
+      "launchTx": "0x4584a8397ac28201d8369769617d199f1a59c053a819fa2e3ae42ca4c592fae1",
+      "launchedAt": "2026-10-28T08:10:16.000000Z"
+    },
+    "flags": [
+      {
+        "severity": "good",
+        "text": "The creator burned 1.04% of the supply"
+      }
+    ],
+    "supply": {
+      "holdsPercent": 0.1,
+      "holdsTokens": 1000000,
+      "boughtPercent": 1.1415,
+      "mintedPercent": 0,
+      "receivedPercent": 0,
+      "soldPercent": 0,
+      "pooledPercent": 0,
+      "burnedPercent": 1.0415,
+      "lockedPercent": 0,
+      "sentPercent": 0
+    },
+    "tokenMoves": {
+      "count": 9,
+      "list": [
+        {
+          "time": "2026-10-28T08:10:16.000Z",
+          "type": "bought",
+          "counterparty": "0x28b4bb34f4d84552a0f4aac4355da9c3fa929d65",
+          "tx": "0x4584a8397ac28201d8369769617d199f1a59c053a819fa2e3ae42ca4c592fae1",
+          "tokens": 11415793.809579853,
+          "percent": 1.1415
+        }
+      ]
+    },
+    "fees": {
+      "claimedEth": 9.593439406133228,
+      "pendingEth": 0.6966470233206388,
+      "claims": [
+        {
+          "time": "2026-10-29T17:30:22.000Z",
+          "eth": 1.4591527369895358,
+          "tx": "0x056623b454e63005bebfc60d9f51deca83088cf1f66845fc071caa8b1f326bb3"
+        }
+      ]
+    },
+    "ethSent": {
+      "totalEth": 9.625499999999999,
+      "recipients": [
+        {
+          "address": "0xdca1d762f14899ba5a81113ba7b005441ddea03f",
+          "eth": 9.604999999999999,
+          "transactions": 15,
+          "lastTime": "2026-11-14T17:11:14.000Z",
+          "lastTx": "0x7698a2a202140d075db614aafe74c8050127ae8cb6d1d9247fec49ebee77509f"
+        }
+      ]
+    },
+    "funding": {
+      "funder": "0x2cff890f0378a11913b6129b2e97417a2c302680",
+      "eth": 0.05,
+      "time": "2026-10-28T08:04:27.000Z",
+      "tx": "0x1e687a39085a096ce9c204313efd1801f0ff00ffa8e703d368cacfb888b700df",
+      "funderTransactionsSent": 16765,
+      "funderIsContract": false,
+      "funderIsService": true,
+      "funderLaunches": null
+    },
+    "otherLaunches": {
+      "count": 0,
+      "tokens": []
+    },
+    "launchSearch": "the last 13 days or so",
+    "explorer": "https://robinhoodchain.blockscout.com/address/0x46a84847300b93c147cb47e6bd9eac3eb3477616",
+    "updatedAt": "2026-11-16T14:54:58.492Z"
+  },
+  "holders-bundles": {
+    "token": {
+      "address": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+      "name": "Autonomopad",
+      "symbol": "AUTONOMO",
+      "holders": 362
+    },
+    "creator": "0x46a84847300b93c147cb47e6bd9eac3eb3477616",
+    "flags": [
+      {
+        "severity": "info",
+        "text": "2 early buyers of the top 2 also sniped other launches"
+      }
+    ],
+    "summary": {
+      "poolLaunchBurnPercent": 20.5432,
+      "unknownContractsPercent": 33.3811,
+      "largestWalletPercent": 2.9254,
+      "top10WalletsPercent": 14.137,
+      "snipersBoughtPercent": 6.777,
+      "snipersStillHoldPercent": 0,
+      "linkedGroupsPercent": 0
+    },
+    "topHolders": [
+      {
+        "address": "0x8366a39cc670b4001a1121b8f6a443a643e40951",
+        "name": "PoolManager",
+        "percent": 11.3384,
+        "kind": "pool"
+      }
+    ],
+    "linkedGroups": [],
+    "snipers": {
+      "windowSeconds": 15,
+      "count": 2,
+      "boughtPercent": 6.777,
+      "stillHoldPercent": 0,
+      "buyers": [
+        {
+          "address": "0x2422fe8a1ccb19189d9536583452cda95acbc7b6",
+          "firstTx": "0xe78336759400237369b0e6f05de0b031ad2d723f58391d8b81e64e17aa365257",
+          "secondsAfterLaunch": 11,
+          "boughtPercent": 5.1159,
+          "stillHoldsPercent": 0,
+          "otherLaunchesSniped": [
+            {
+              "token": "0xf8761d171dbd9f138c8ec81ea5ab869c1008b004",
+              "symbol": "MIRREN",
+              "secondsAfterLaunch": 6,
+              "tx": "0x8380fbe43c964783636385955154d5d59f374ff24c66de3dd6460c8337574956"
+            }
+          ]
+        }
+      ],
+      "windowFullyRead": true
+    },
+    "sameBlockBuyers": [],
+    "repeatSnipersChecked": true,
+    "explorer": "https://robinhoodchain.blockscout.com/token/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+    "updatedAt": "2026-11-16T14:55:03.810Z"
+  },
+  "payment-check": {
+    "hash": "0xfd8a1c8c76410ec259ae171fe21a4438657ae579642c4ec2cd38966565dc574e",
+    "chain": "Robinhood Chain",
+    "status": "success",
+    "paid": true,
+    "x402Settlement": true,
+    "time": "2026-11-03T07:00:23.000Z",
+    "block": 104866602,
+    "confirmations": 10979933,
+    "method": {
+      "kind": "x402-permit2",
+      "text": "An x402 payment through Permit2: the payer signed, and someone else submitted it"
+    },
+    "submittedBy": "0x68aa21699247a5f0b90661c50004e426507fe9f8",
+    "submittedByAutonomo": true,
+    "feeEth": 0.000001668001192,
+    "payments": [
+      {
+        "asset": "$AUTONOMO",
+        "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
+        "amount": 100,
+        "amountRaw": "100000000000000000000",
+        "from": "0x1234567890abcdef1234567890abcdef12345678",
+        "to": "0x92a99fbd386f87277b6009bff4c56728ec5f7354",
+        "splitter": null
+      }
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com/tx/0xfd8a1c8c76410ec259ae171fe21a4438657ae579642c4ec2cd38966565dc574e",
+    "summary": "Settled: 0x1234567890abcdef1234567890abcdef12345678 paid 100 $AUTONOMO to 0x92a99fbd386f87277b6009bff4c56728ec5f7354; Autonomo's facilitator submitted it and paid the gas."
+  },
+  "gas-now": {
+    "chain": "Robinhood Chain",
+    "gasPriceGwei": 0.020692,
+    "ethUsd": 1849.79,
+    "costs": [
+      {
+        "action": "Send ETH",
+        "gas": 21000,
+        "feeEth": 4.34532e-7,
+        "feeUsd": 0.00080379294828,
+        "basedOn": "the chain's own estimate"
+      }
+    ],
+    "block": 115846534,
+    "updatedAt": "2026-11-16T14:55:07.873Z"
+  },
+  "endpoint-health": {
+    "url": "https://autonomo.fun/x/gas-now/gas",
+    "method": "GET",
+    "checkedAt": "2026-11-16T14:55:08.902Z",
+    "verdict": "healthy",
+    "up": true,
+    "payable": true,
+    "httpStatus": 402,
+    "ms": 1018,
+    "summary": "Healthy: answered in 1018 ms with a payment request a client can pay, 0.005 USD on Robinhood Chain, with 3 options in all.",
+    "x402Version": 2,
+    "requestIn": "PAYMENT-REQUIRED header",
+    "description": "Gas now: the current gas price on Robinhood Chain and what it costs in ETH and USD to send ETH, send USDG, buy on a launchpad curve or launch a token, measured from recent real transactions.",
+    "options": [
+      {
+        "scheme": "exact",
+        "network": "eip155:4663",
+        "networkName": "Robinhood Chain",
+        "asset": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "assetName": "Global Dollar",
+        "amount": "5000",
+        "price": {
+          "amount": 0.005,
+          "unit": "USD"
+        },
+        "payTo": "0xc66181e50aF128ffEe6048E8d4097bDC84776313",
+        "payable": true,
+        "problems": []
+      }
+    ],
+    "problems": []
+  },
+  "website-check": {
+    "host": "autonomo.fun",
+    "domain": "autonomo.fun",
+    "caution": "medium",
+    "summary": "Look closer at autonomo.fun: the domain was registered 19 days ago.",
+    "flags": [
+      {
+        "severity": "warn",
+        "text": "The domain was registered 19 days ago"
+      }
+    ],
+    "registration": {
+      "registered": "2026-10-28T04:51:44.205Z",
+      "expires": "2027-10-28T04:51:44.205Z",
+      "changed": "2026-11-02T04:52:10.606Z",
+      "registrar": "Spaceship, Inc.",
+      "ageDays": 19,
+      "expiresInDays": 346
+    },
+    "certificate": {
+      "valid": true,
+      "problem": null,
+      "issuer": "Let's Encrypt",
+      "validFrom": "2026-11-10T13:18:19.000Z",
+      "validTo": "2027-02-08T13:18:18.000Z",
+      "daysLeft": 84
+    },
+    "site": {
+      "answers": true,
+      "httpStatus": 200,
+      "finalUrl": "https://autonomo.fun/",
+      "redirects": 0,
+      "movedToDomain": null,
+      "title": "Autonomo: the agentic x402 launchpad and directory"
+    },
+    "similarTo": null,
+    "receivesEmail": true,
+    "checkedAt": "2026-11-16T14:55:10.992Z"
+  },
+  "page-reader": {
+    "url": "https://example.com/",
+    "title": "Example Domain",
+    "description": null,
+    "text": "This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.",
+    "words": 25,
+    "truncated": false,
+    "fetchedAt": "2026-11-16T14:55:30.873Z"
+  }
+}

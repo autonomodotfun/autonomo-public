@@ -2,6 +2,7 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
 import { updating } from "@/lib/api";
+import { bazaarRouteFields } from "@/lib/bazaar";
 import { BURN_BPS, noteBurnCall, payToFor } from "@/lib/burn";
 import { baseEligible, forward, gatewayOffers, getGateway, recordCall, payeeOf } from "@/lib/gateway";
 import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/gloam";
@@ -60,6 +61,8 @@ function paidHandler(g: Gateway, payTo: string, basePayTo: string | null) {
         accepts: acceptsFor(payTo, gatewayOffers(g, basePayTo)),
         description: g.description || g.name,
         mimeType: "application/json",
+        // Official APIs carry their Bazaar listing: description, how to call them and an example answer.
+        ...(baseEligible(g) ? bazaarRouteFields(g.slug) : {}),
       },
       x402Server()!,
     );
