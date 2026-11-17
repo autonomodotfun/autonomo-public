@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {BaseSplitter, BaseSplitterFactory} from "../src/BaseSplitter.sol";
-import {IERC20} from "../src/Interfaces.sol";
+import {IERC20} from "shared/Interfaces.sol";
 
 // The splitters for creator APIs paid in USDC on Base: 95% to the creator, 5% to Autonomo's Base Safe, which refills
 // the mirror burn pot on Robinhood Chain. Against Base's real USDC; skipped unless BASE_RPC_URL is set.

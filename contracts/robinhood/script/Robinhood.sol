@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {PoolKey} from "../src/Interfaces.sol";
+import {PoolKey} from "shared/Interfaces.sol";
 
 /// Robinhood Chain (4663) addresses the burn contracts are deployed with.
 library Robinhood {

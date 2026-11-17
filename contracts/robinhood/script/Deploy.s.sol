@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {Script, console} from "forge-std/Script.sol";
 import {BuybackBurner} from "../src/BuybackBurner.sol";
 import {BurnSplitterFactory} from "../src/BurnSplitter.sol";
-import {IPoolManager} from "../src/Interfaces.sol";
+import {IPoolManager} from "shared/Interfaces.sol";
 import {Robinhood} from "./Robinhood.sol";
 
 /// Deploys the BuybackBurner and the BurnSplitterFactory that pays into it.

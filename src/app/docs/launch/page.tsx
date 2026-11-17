@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description: "Step by step: put your API behind an Autonomo gateway, set a price per call, test it and get it listed so AI agents find it.",
 };
 
-// The share a creator's splitter on Base keeps for the burn, fixed in contracts/src/BaseSplitter.sol (RESERVE_BPS).
+// The share a creator's splitter on Base keeps for the burn, fixed in contracts/base/src/BaseSplitter.sol (RESERVE_BPS).
 const BASE_RESERVE_PERCENT = 5;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun").replace(/\/+$/, "");

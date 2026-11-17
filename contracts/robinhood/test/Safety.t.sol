@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {BuybackBurner} from "../src/BuybackBurner.sol";
 import {BurnSplitterFactory} from "../src/BurnSplitter.sol";
-import {IPoolManager, PoolKey} from "../src/Interfaces.sol";
+import {IPoolManager, PoolKey} from "shared/Interfaces.sol";
 
 contract OwnershipTest is Test {
     address constant OWNER = address(0x0A11CE);
