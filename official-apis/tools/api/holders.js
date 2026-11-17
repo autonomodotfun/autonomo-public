@@ -21,10 +21,10 @@
 
 import { isAddress } from "viem";
 import {
-  authorized, badChain, chainNotReady, chainReady, chainRequest, checkOnChain, baseOrigin, blockscout, blockscoutList, CHAINS, contractName, erc20, findLaunch, firstLog,
+  authorized, badChain, chainNotReady, chainReady, chainRequest, checkOnChain, baseOrigin, blockscout, blockscoutList, CHAINS, contractName, erc20, findLaunch, firstLog, isPoolOf,
   hasBlockscout, logsBetween, rh, sendJson, tokenMeta, TRANSFER, transferRow,
 } from "./_lib.js";
-import { pad, parseAbi } from "viem";
+import { pad } from "viem";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEAD = "0x000000000000000000000000000000000000dead";
@@ -42,15 +42,6 @@ const CACHE_MS = 10 * 60_000;
 const cache = new Map(); // token -> { at, status, body }
 const firstTransferAt = new Map(); // token -> time of its first transfer, which never changes
 const BASE_SNIPE_BLOCKS = 10n; // Base makes a block every 2 seconds, so 10 blocks cover the snipe window
-const pairAbi = parseAbi(["function token0() view returns (address)", "function token1() view returns (address)"]);
-
-/** Whether a contract is a Uniswap-style pool of the token: it answers token0() and token1() and one of them is it. */
-async function isPoolOf(address, token, client) {
-  const [t0, t1] = await Promise.all(
-    ["token0", "token1"].map((fn) => client.readContract({ address, abi: pairAbi, functionName: fn }).catch(() => null)),
-  );
-  return [t0, t1].some((t) => t && t.toLowerCase() === token);
-}
 
 const iso = (ts) => new Date(Number(ts) * 1000).toISOString();
 const low = (a) => String(a ?? "").toLowerCase();

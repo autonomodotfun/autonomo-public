@@ -104,8 +104,8 @@ export async function checkOnChain(req, token, checks) {
   }
   const onBase = await checks.base(token);
   if (onBase.status === 404 && onBase.body?.error === "not_found") return result;
-  const { chain: _, ...rest } = onBase.body ?? {};
-  return { ...onBase, body: { chain: "base", chainNote: PICKED, ...rest } };
+  const { chain: label, ...rest } = onBase.body ?? {};
+  return { ...onBase, body: { chain: label ?? "base", chainNote: PICKED, ...rest } };
 }
 
 // Launchpads on Base whose launch event names the creator, checked on Base's Blockscout (Nov 2026). The creator is
@@ -470,6 +470,36 @@ export async function baseOrigin(token) {
   if (origins.size > 5000) origins.clear();
   origins.set(key, origin);
   return { ...origin, latest };
+}
+
+/** All logs like logsBetween, but gives up once there are more than `max`, or after `seen.deadline`: throws an
+ * error with `tooMany` set, so a busy token's history is never read halfway. */
+export async function logsCapped(filter, from, to, chain, max, seen = { logs: 0 }) {
+  if (seen.deadline && Date.now() > seen.deadline) throw Object.assign(new Error("log reading ran out of time"), { tooMany: true });
+  let logs;
+  try {
+    logs = await getLogs({ ...filter, fromBlock: toHex(from), toBlock: toHex(to) }, chain.client);
+  } catch (e) {
+    const said = `${e.details ?? e.message}`;
+    if (e.status === 429 || /too many requests|rate.?limit/i.test(said)) throw e;
+    if (to - from < 500n || !/exceed|limit|too many|spans|allowed/i.test(said)) throw e;
+    const mid = from + (to - from) / 2n;
+    const a = await logsCapped(filter, from, mid, chain, max, seen);
+    return [...a, ...(await logsCapped(filter, mid + 1n, to, chain, max, seen))];
+  }
+  seen.logs += logs.length;
+  if (seen.logs > max) throw Object.assign(new Error(`more than ${max} logs`), { tooMany: true });
+  return logs;
+}
+
+const pairAbi = parseAbi(["function token0() view returns (address)", "function token1() view returns (address)"]);
+
+/** Whether a contract is a Uniswap-style pool of the token: it answers token0() and token1() and one of them is it. */
+export async function isPoolOf(address, token, client) {
+  const [t0, t1] = await Promise.all(
+    ["token0", "token1"].map((fn) => client.readContract({ address, abi: pairAbi, functionName: fn }).catch(() => null)),
+  );
+  return [t0, t1].some((t) => t && t.toLowerCase() === token.toLowerCase());
 }
 
 /** A Transfer log as an Etherscan-style row, the shape the Blockscout lists use. */

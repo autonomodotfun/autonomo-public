@@ -7,7 +7,7 @@ All gateways use the same upstream base, `https://tools.autonomo.fun/v1`, and th
 | --- | --- | --- |
 | `token-price` | `/v1/price/autonomo` | The live $AUTONOMO price (same as token-lookup for $AUTONOMO) |
 | `new-launches` | `/v1/launches?limit=10` | The newest Robinhood Chain launchpad tokens: age, buys, sells, market cap, curve progress |
-| `token-risk` | `/v1/risk/<token>` | Rug-risk score: holder concentration, creator, launch-block buyers, bot volume |
+| `token-risk` | `/v1/risk/<token>?chain=robinhood\|base` | Rug-risk score: holder concentration, creator, launch-block buyers, bot volume. Reads Base too: with `chain=base`, or on its own when the token is only there |
 | `token-lookup` | `/v1/price/<token>` | Live price and market cap of any Robinhood Chain launchpad token, from its bonding curve or, once it has graduated, its launchpad Uniswap v4 pool (USDG and WETH too) |
 | `tx-explainer` | `/v1/tx/<hash>` | A Robinhood Chain transaction in plain English: launches, curve buys and sells (router and bundled buys grouped), transfers, fee |
 | `wallet-portfolio` | `/v1/portfolio/<wallet>?days=2` | ETH, USDG, WETH and $AUTONOMO, plus tokens received in the last 1–7 days, valued in USD; copies of known symbols are flagged as likely impostors |
@@ -52,6 +52,14 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
   Robinhood Chain found nothing, and only once Base is set up). A token on both chains gets the Robinhood Chain
   answer. `chain=robinhood` looks there only, and a Base token's 404 then says to pass `chain=base`. Measured per report: Dev Wallet about 2 to 5 Blockscout and 12 to 14 RPC
   requests; Holders about 2 to 10 Blockscout requests for a new token and about 50 for a large one like Brett.
+- Token Risk on Base (`api/_riskbase.js`): there's no bonding curve, so holders and trades come from every transfer
+  since the mint when there are at most 40,000 of them (read within 9 s), otherwise from the top holders Base's
+  Blockscout lists, with 24 hour trades from DexScreener. Pools (the v4 PoolManager, DexScreener's pairs, contracts
+  answering `token0`/`token1` with the token) and launch contracts (whatever the launch transaction handed supply
+  to, and Clanker-style names) are set apart from holders. Price, market cap and the main pool come from
+  DexScreener, and liquidity is judged by the ETH or USDC side of the main pool: under $1,000 is a high-risk flag,
+  under $10,000 a low one. Same thresholds as Robinhood Chain otherwise. Measured: 4 to 13 s, 2 to 30 Blockscout and
+  7 to 70 RPC requests.
 - `BLOCKSCOUT_RPS` (optional, default 13): requests a second sent to Blockscout. The Builder plan allows 15; set 4
   on the free plan.
 - Portfolio discovery scans incoming transfers within a time budget so answers stay well inside the gateway's 25 s.

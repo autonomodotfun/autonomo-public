@@ -9,11 +9,15 @@
 // then turns those into plain-English flags and a low / medium / high score. Everything is read from the chain.
 //
 // This is a heuristic, not advice: a low score doesn't make a token safe.
+//
+// ?chain=base checks a token on Base instead (_riskbase.js). Left out, it's Robinhood Chain, or Base when Robinhood
+// Chain has no launch of the token but Base has the token (_lib.js checkOnChain).
 
 import { timingSafeEqual } from "node:crypto";
 import { createPublicClient, defineChain, http, isAddress, parseAbi, toHex } from "viem";
 import { base } from "viem/chains";
-import { findPool, findsOldLaunches, launchLog } from "./_lib.js";
+import { badChain, chainNotReady, chainReady, chainRequest, checkOnChain, findPool, findsOldLaunches, launchLog } from "./_lib.js";
+import { checkBaseRisk } from "./_riskbase.js";
 
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const BUY = "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455"; // data: ethIn, tokensOut, fee, fee
@@ -311,11 +315,16 @@ export default async function handler(req, res) {
   if (!isAddress(token)) {
     return res.status(400).json({ error: "bad_token", message: "Pass a token contract address: /v1/risk/0x…" });
   }
+  const asked = chainRequest(req.query);
+  if (!asked) return res.status(400).json(badChain);
+  if (!chainReady(asked.chain)) return res.status(503).json(chainNotReady);
+  const key = asked.key(token);
   try {
-    const hit = cache.get(token);
+    const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_MS) return res.status(hit.status).json(hit.body);
-    const result = await check(token);
-    cache.set(token, { at: Date.now(), ...result });
+    const result = await checkOnChain(asked, token, { robinhood: check, base: checkBaseRisk });
+    if (cache.size > 2000) cache.clear();
+    cache.set(key, { at: Date.now(), ...result });
     return res.status(result.status).json(result.body);
   } catch (e) {
     console.error(e);
