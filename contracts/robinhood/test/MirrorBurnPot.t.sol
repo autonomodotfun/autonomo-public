@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {MirrorBurnPot} from "../src/MirrorBurnPot.sol";
 import {BuybackBurner} from "../src/BuybackBurner.sol";
-import {IERC20} from "../src/Interfaces.sol";
+import {IERC20} from "shared/Interfaces.sol";
 import {Robinhood} from "../script/Robinhood.sol";
 
 contract MockUsdg {

@@ -31,7 +31,7 @@ const EMPTY: GatewayDefaults = {
   acceptBase: true,
 };
 
-// The share a creator's splitter on Base keeps for the burn, fixed in contracts/src/BaseSplitter.sol (RESERVE_BPS).
+// The share a creator's splitter on Base keeps for the burn, fixed in contracts/base/src/BaseSplitter.sol (RESERVE_BPS).
 const BASE_RESERVE_PERCENT = 5;
 
 // A new API is launched in three steps. Editing one shows every field at once.

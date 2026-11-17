@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {IERC20, SafeTransfer} from "./Interfaces.sol";
+import {IERC20, SafeTransfer} from "shared/Interfaces.sol";
 
 /// Where one API creator's payments arrive. Flushing sends 5% of $AUTONOMO to the dead address and 5% of USDG to the
 /// buyback contract, which buys $AUTONOMO with it and burns that; everything else goes to the creator. Other tokens

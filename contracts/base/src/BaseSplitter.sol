@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {IERC20, SafeTransfer} from "./Interfaces.sol";
+import {IERC20, SafeTransfer} from "shared/Interfaces.sol";
 
 /// Where one API creator's USDC payments on Base arrive. Flushing sends 5% of the USDC to Autonomo's reserve on Base
 /// and the rest to the creator. Nothing is burned on Base, which has no $AUTONOMO: the reserve refills the mirror burn

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {IERC20, IPoolManager, IUnlockCallback, PoolKey, SafeTransfer, SwapParams} from "./Interfaces.sol";
+import {IERC20, IPoolManager, IUnlockCallback, PoolKey, SafeTransfer, SwapParams} from "shared/Interfaces.sol";
 
 /// Buys $AUTONOMO with the USDG it holds and sends it to the dead address, in one Uniswap v4 unlock:
 /// USDG -> ETH in the ETH/USDG pool, then ETH -> $AUTONOMO in the token's pool. The bought tokens go straight from the

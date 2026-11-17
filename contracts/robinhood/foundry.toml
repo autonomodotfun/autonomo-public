@@ -1,0 +1,21 @@
+# Robinhood Chain contracts: the burn splitters, the buyback, the mirror burn pot and the rewards vesting.
+# Libraries are installed once in ../lib and the small shared interfaces live in ../shared (see ../README.md).
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["../lib"]
+allow_paths = ["../shared", "../lib"]
+remappings = [
+  "@openzeppelin/contracts/=../lib/openzeppelin-contracts/contracts/",
+  "forge-std/=../lib/forge-std/src/",
+  "shared/=../shared/",
+]
+solc = "0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10000
+
+[rpc_endpoints]
+robinhood = "${ROBINHOOD_RPC_URL}"

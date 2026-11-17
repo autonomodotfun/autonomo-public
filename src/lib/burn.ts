@@ -20,7 +20,7 @@ import { getDb, schema } from "@/db";
 import { TOKEN } from "@/lib/constants";
 import { USDC_BASE, USDG } from "@/lib/payments";
 
-// Burn on paid calls. Each payee gets its own BurnSplitter contract (contracts/src/BurnSplitter.sol), and gateways are
+// Burn on paid calls. Each payee gets its own BurnSplitter contract (contracts/robinhood/src/BurnSplitter.sol), and gateways are
 // paid there instead of to the payee. Flushing a splitter sends 5% of $AUTONOMO to the dead address and 5% of USDG
 // to the BuybackBurner, which buys $AUTONOMO with it and burns that; the payee gets the rest. Verified still checks
 // the payee, since the splitter holds nothing for long.
@@ -236,7 +236,7 @@ export async function noteBurnCall(payee: string) {
 
 // ---------- splitters on Base ----------
 // Creator APIs paid in USDC on Base are paid to the creator's splitter there, from the BaseSplitterFactory
-// (contracts/src/BaseSplitter.sol: BurnSplitter's logic, named for Base). A flush sends 95% to the creator and 5% to
+// (contracts/base/src/BaseSplitter.sol: BurnSplitter's logic, named for Base). A flush sends 95% to the creator and 5% to
 // its reserve, Autonomo's Base Safe, which refills the mirror burn pot below, so the burn on creators' Base payments
 // pays for itself. Official APIs on Base are paid to the Safe itself. The factory's splitterOf and flush match
 // BurnSplitterFactory's, so factoryAbi serves both.
@@ -283,7 +283,7 @@ export async function noteBaseBurnCall(payee: string) {
 }
 
 // ---------- mirror burn for Base ----------
-// USDC paid on Base can't be burned there: there's no $AUTONOMO pool on Base. So the MirrorBurnPot (contracts/src/MirrorBurnPot.sol) holds a float of USDG on Robinhood Chain, and the
+// USDC paid on Base can't be burned there: there's no $AUTONOMO pool on Base. So the MirrorBurnPot (contracts/robinhood/src/MirrorBurnPot.sol) holds a float of USDG on Robinhood Chain, and the
 // daily run sends 5% of all Base payments so far from it to the BuybackBurner, which buys and burns with it like any
 // other USDG. The pot keeps the running totals on-chain and refuses to send more than 5% of the total it's given, so
 // what the pot couldn't cover stays owed and goes out after the next refill.

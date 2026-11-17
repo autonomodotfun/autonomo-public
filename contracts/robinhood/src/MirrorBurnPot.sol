@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {IERC20, SafeTransfer} from "./Interfaces.sol";
+import {IERC20, SafeTransfer} from "shared/Interfaces.sol";
 
 interface IBuybackBurner {
     function keeper() external view returns (address);

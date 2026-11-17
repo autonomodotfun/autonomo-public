@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {BuybackBurner} from "../src/BuybackBurner.sol";
 import {BurnSplitter, BurnSplitterFactory} from "../src/BurnSplitter.sol";
-import {IERC20, IPoolManager, PoolKey} from "../src/Interfaces.sol";
+import {IERC20, IPoolManager, PoolKey} from "shared/Interfaces.sol";
 import {Robinhood} from "../script/Robinhood.sol";
 
 // Runs against Robinhood Chain's real tokens and pools. Skipped unless ROBINHOOD_RPC_URL is set.
