@@ -3,6 +3,22 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 17, 2026
+
+- **Official APIs take USDC on Base.** All 13 official APIs now accept USDC on Base, at the same dollar price, next
+  to USDG and $AUTONOMO on Robinhood Chain. Base payments are settled by Coinbase's x402 facilitator and paid to
+  the same 2-of-2 payment Safe on Base, which is checked before Base is offered (same owners and threshold on both
+  chains). They aren't burned yet: a mirror burn for Base payments is next, and will cover payments made from today.
+- **Nine official APIs read Base too.** Token Risk, Dev Wallet Tracker, Holders & Bundles, Wallet Portfolio, Tx
+  Explainer, Payment Check and Token Lookup take `chain=base`. Left out, they read Robinhood Chain exactly as before,
+  or Base when the token, transaction or wallet is only there; the answer then says it's Base. New Launches and Gas
+  Now take `chain=base` for Base's Clanker and Zora launches and Base's fees. On Base they recognize
+  Clanker and Zora launches, read new tokens straight from the chain (Base's explorer misses many of them), and take
+  prices and pools from DexScreener. Payment Check checks USDC payments on Base.
+- **Listed in Coinbase's x402 Bazaar.** Each official API describes itself to the Bazaar, Coinbase's directory of
+  x402 APIs: what it does, its inputs, and a real example answer. Coinbase lists an API after its first payment on
+  Base.
+
 ## November 16, 2026
 
 - **Explore's chain counts read correctly.** A project that accepts several chains is counted under each of them, so

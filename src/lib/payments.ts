@@ -6,6 +6,7 @@ import type { Network } from "@x402/core/types";
 import { toFacilitatorEvmSigner } from "@x402/evm";
 import { ExactEvmScheme as ExactEvmServer } from "@x402/evm/exact/server";
 import { ExactEvmScheme as ExactEvmFacilitator } from "@x402/evm/exact/facilitator";
+import { bazaarResourceServerExtension } from "@x402/extensions/bazaar";
 import { createPublicClient, createWalletClient, defineChain, getAddress, http, isAddress, parseAbi, parseUnits, publicActions, type Hex } from "viem";
 import { base as baseChain } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
@@ -226,6 +227,8 @@ export function x402Server() {
   const facilitators = [localFacilitator()];
   if (platform.base) facilitators.push((cdp = cdpFacilitator()));
   server = new x402ResourceServer(facilitators);
+  // Fills in each request's method on the Bazaar listings official APIs declare (src/lib/bazaar.ts).
+  server.registerExtension(bazaarResourceServerExtension);
   server.register(TOKEN.network, new ExactEvmServer());
   if (platform.base) server.register(USDC_BASE.network, new ExactEvmServer());
   return server;
