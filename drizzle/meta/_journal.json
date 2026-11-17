@@ -92,6 +92,13 @@
       "when": 1794621477536,
       "tag": "0012_admin_events",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794927461193,
+      "tag": "0013_gateway_accept_base",
+      "breakpoints": true
     }
   ]
 }

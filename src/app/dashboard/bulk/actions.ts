@@ -143,6 +143,8 @@ export async function launchMany(shared: BulkShared, apis: BulkApi[], askListing
         priceUsd: a.priceUsd,
         acceptUsdg: a.acceptUsdg,
         autonomoAmount: a.acceptAutonomo && tokenUsd ? autonomoAmountFor(Number(a.priceUsd), tokenUsd) : null,
+        // USDC on Base follows USDG here; each API's own settings page can change it.
+        acceptBase: a.acceptUsdg,
         owner,
         payTo,
         ...(askListing ? { listing: "pending" as const } : {}),

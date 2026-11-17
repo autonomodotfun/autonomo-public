@@ -157,6 +157,9 @@ export const gateways = pgTable(
     acceptUsdg: boolean("accept_usdg").notNull().default(true),
     // Whole $AUTONOMO tokens per call; null means $AUTONOMO is not accepted.
     autonomoAmount: text("autonomo_amount"),
+    // USDC on Base at priceUsd, paid to the creator's splitter on Base. Only offered while Base is set up and the
+    // payee can be paid there (see basePayToFor in the gateway route).
+    acceptBase: boolean("accept_base").notNull().default(true),
     status: text("status").$type<GatewayStatus>().notNull().default("active"),
     listing: text("listing").$type<GatewayListing>().notNull().default("unlisted"),
     projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),

@@ -6,7 +6,8 @@ import { lastRejectionNote } from "@/lib/admin-log";
 import { notFound, redirect } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { TOKEN } from "@/lib/constants";
-import { gatewayOffers, gatewayStats, getOwnedGateway, payeeOf, secretsEnabled } from "@/lib/gateway";
+import { BASE_OFF_TEXT, baseStatus } from "@/lib/base-pay";
+import { baseCoverage, gatewayOffers, gatewayStats, getOwnedGateway, isOfficial, payeeOf, secretsEnabled } from "@/lib/gateway";
 import { afterBurn, fmtAutonomo, fmtRail, fmtUsdg, shortAddr, txUrl } from "@/lib/gateway-format";
 import { burnPercent } from "@/lib/burn";
 import { dayPriceOrNull } from "@/lib/pool-price";
@@ -38,6 +39,7 @@ export default async function GatewayDashboard({
     g.listing === "rejected" ? lastRejectionNote(g.id) : null,
   ]);
   const live = gatewayOffers(g);
+  const base = await baseStatus(g);
   const url = `${SITE}/x/${g.slug}`;
 
   const days = Array.from({ length: 14 }, (_, i) => {
@@ -146,6 +148,22 @@ export default async function GatewayDashboard({
           : "no payment option available"}{" "}
         per call
       </p>
+      {base.off !== "not_available" && (
+        <p className="mt-1 text-xs text-faint">
+          USDC on Base:{" "}
+          {base.off === undefined ? (
+            <>
+              on, ${Number(g.priceUsd)} per call, paid to{" "}
+              <a href={`https://basescan.org/address/${base.payTo}`} className="font-mono underline hover:text-ink">
+                {shortAddr(base.payTo)}
+              </a>
+              {base.payTo.toLowerCase() !== payeeOf(g).toLowerCase() ? ", your splitter on Base" : ""}
+            </>
+          ) : (
+            <>off. {BASE_OFF_TEXT[base.off]}</>
+          )}
+        </p>
+      )}
       {!platform.robinhood && (
         <p className="mt-3 rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted">
           Payments aren&apos;t switched on for this deployment yet, so this gateway answers <code>503</code> for now.
@@ -243,6 +261,7 @@ export default async function GatewayDashboard({
               site={SITE}
               secretsEnabled={secretsEnabled()}
               secretSet={Boolean(g.upstreamAuthSecret)}
+              baseOffered={baseCoverage() === "all" || (baseCoverage() === "official" && isOfficial(g))}
               defaults={{
                 id: g.id,
                 name: g.name,
@@ -253,6 +272,7 @@ export default async function GatewayDashboard({
                 priceUsd: Number(g.priceUsd) > 0 ? String(Number(g.priceUsd)) : "0.01",
                 acceptUsdg: g.acceptUsdg,
                 acceptAutonomo: g.autonomoAmount !== null,
+                acceptBase: g.acceptBase,
               }}
             />
           </div>

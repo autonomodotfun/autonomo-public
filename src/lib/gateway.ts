@@ -255,23 +255,27 @@ export async function ownerPayTo(owner: string) {
 /** Autonomo's own APIs. They carry Bazaar listings and are paid on Base straight to Autonomo's Safe there. */
 export const isOfficial = (g: Pick<Gateway, "owner">) => g.owner === OFFICIAL_OWNER;
 
+/** Whether creator APIs can take USDC on Base on this deployment: Base splitters are set up (src/lib/burn.ts). */
+export const baseForCreators = () => Boolean(process.env.BASE_SPLITTER_FACTORY?.trim());
+
 /**
- * Whether an API can take USDC on Base. Official APIs always can. Creator APIs can once Base splitters are set up
- * (BASE_SPLITTER_FACTORY, see src/lib/burn.ts), since that's where their Base payments go.
+ * Whether an API takes USDC on Base: its owner left it switched on (acceptBase), and it's official or Base splitters
+ * are set up, since that's where a creator's Base payments go. Whether the payee can be paid on Base is checked
+ * when the 402 is built (basePayToFor in the gateway route).
  */
-export const baseEligible = (g: Pick<Gateway, "owner">) => isOfficial(g) || Boolean(process.env.BASE_SPLITTER_FACTORY?.trim());
+export const baseEligible = (g: Pick<Gateway, "owner" | "acceptBase">) => g.acceptBase && (isOfficial(g) || baseForCreators());
 
 /** Which APIs take USDC on Base on this deployment, for pages to say so: every API, official ones only, or none. */
 export function baseCoverage(): "all" | "official" | "none" {
   if (!platform.base) return "none";
-  return process.env.BASE_SPLITTER_FACTORY?.trim() ? "all" : "official";
+  return baseForCreators() ? "all" : "official";
 }
 
 /**
  * A gateway's payment options. `basePayTo` is where USDC on Base is paid when it can be offered right now: the
  * gateway's own pay-to, once Coinbase and the Safe are checked (see baseReady() and baseSafeOk()).
  */
-export function gatewayOffers(g: Pick<Gateway, "owner" | "priceUsd" | "acceptUsdg" | "autonomoAmount">, basePayTo: string | null = null) {
+export function gatewayOffers(g: Pick<Gateway, "owner" | "priceUsd" | "acceptUsdg" | "autonomoAmount" | "acceptBase">, basePayTo: string | null = null) {
   return offers(
     { priceUsd: String(Number(g.priceUsd)), acceptUsdg: g.acceptUsdg, autonomoAmount: g.autonomoAmount },
     { basePayTo: baseEligible(g) ? basePayTo : null },

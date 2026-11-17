@@ -16,6 +16,7 @@ export type GatewayDefaults = {
   priceUsd: string;
   acceptUsdg: boolean;
   acceptAutonomo: boolean;
+  acceptBase: boolean;
 };
 
 const EMPTY: GatewayDefaults = {
@@ -27,7 +28,11 @@ const EMPTY: GatewayDefaults = {
   priceUsd: "0.01",
   acceptUsdg: true,
   acceptAutonomo: false,
+  acceptBase: true,
 };
+
+// The share a creator's splitter on Base keeps for the burn, fixed in contracts/src/BaseSplitter.sol (RESERVE_BPS).
+const BASE_RESERVE_PERCENT = 5;
 
 // A new API is launched in three steps. Editing one shows every field at once.
 const STEPS = ["Your API", "Your price", "Review and launch"];
@@ -105,12 +110,15 @@ export function GatewayForm({
   secretsEnabled,
   burnPercent,
   tokenUsd,
+  baseOffered = false,
 }: {
   defaults?: GatewayDefaults;
   site: string;
   secretSet?: boolean;
   secretsEnabled: boolean;
   burnPercent?: number;
+  /** Whether creator APIs can take USDC on Base on this deployment, so the form shows the Base box. */
+  baseOffered?: boolean;
   /** Today's $AUTONOMO price in USD (the previous day's average), or null when it couldn't be read. */
   tokenUsd: number | null;
 }) {
@@ -135,6 +143,7 @@ export function GatewayForm({
   // Controlled so they survive a failed submit: React resets uncontrolled fields after a form action, and the
   // server never sends the secret back.
   const [acceptUsdg, setAcceptUsdg] = useState(v ? v.acceptUsdg === "on" : defaults.acceptUsdg);
+  const [acceptBase, setAcceptBase] = useState(v ? v.acceptBase === "on" : defaults.acceptBase);
   const [priceUsd, setPriceUsd] = useState(v?.priceUsd ?? defaults.priceUsd);
   const [secret, setSecret] = useState("");
 
@@ -433,6 +442,25 @@ export function GatewayForm({
           </div>
           {err.acceptUsdg && <p className="text-sm text-warn" role="alert">{err.acceptUsdg}</p>}
           </div>
+          {baseOffered && (
+            <div className="space-y-2 rounded-md border border-line p-4">
+              <input type="hidden" name="baseShown" value="1" />
+              <ChainHead name="Base" />
+              <label className="flex items-center gap-3">
+                <input type="checkbox" name="acceptBase" checked={acceptBase} onChange={(e) => setAcceptBase(e.target.checked)} />
+                <span className="text-sm font-medium">USDC</span>
+                <span className="text-xs text-faint">same dollar price, for agents on Base</span>
+              </label>
+              {acceptBase && (
+                <p className="ml-7 text-sm text-muted">
+                  <span className="font-mono">{usdPriceValid(priceUsd.trim()) ? `$${Number(priceUsd)}` : "—"}</span> per call, paid to your own
+                  splitter on Base. You get {100 - BASE_RESERVE_PERCENT}% in USDC on Base, at the same wallet address;{" "}
+                  {BASE_RESERVE_PERCENT}% goes to the burn, which happens on Robinhood Chain. If your wallet is a Safe, it needs
+                  to exist on Base with the same signers.
+                </p>
+              )}
+            </div>
+          )}
 
         </fieldset>
       </div>
@@ -467,7 +495,7 @@ export function GatewayForm({
               label="Price per call"
               value={`${[review.acceptUsdg === "on" && `$${review.priceUsd} in USDG`, review.acceptAutonomo === "on" && autonomoReview(review.priceUsd, tokenUsd)]
                 .filter(Boolean)
-                .join(", or ")}, on Robinhood Chain`}
+                .join(", or ")}, on Robinhood Chain${baseOffered && review.acceptBase === "on" ? `, or $${review.priceUsd} in USDC on Base` : ""}`}
             />
             {tested && <Row label="Test call" value={verdict(tested.result).text} />}
             {review.acceptUsdg === "on" && burnPercent ? (

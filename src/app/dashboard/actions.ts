@@ -91,6 +91,9 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
     priceUsd: str(form, "priceUsd", 20),
     acceptUsdg: form.get("acceptUsdg") === "on" ? "on" : "",
     acceptAutonomo: form.get("acceptAutonomo") === "on" ? "on" : "",
+    acceptBase: form.get("acceptBase") === "on" ? "on" : "",
+    // Set when the form showed the Base box. Without it, the API's Base setting is left as it was.
+    baseShown: form.get("baseShown") === "1" ? "1" : "",
   };
   const secret = String(form.get("authSecret") ?? "").slice(0, 2000);
   const clearSecret = form.get("clearSecret") === "on";
@@ -151,6 +154,9 @@ export async function saveGateway(_prev: GatewayFormState, form: FormData): Prom
     priceUsd: values.priceUsd,
     acceptUsdg,
     autonomoAmount,
+    // Only changed from the form when it offered Base. A new API launched while Base wasn't offered starts with
+    // Base on if it takes USDG, so a token-only API never gets USDC added later on its own.
+    acceptBase: values.baseShown ? values.acceptBase === "on" : (existing?.acceptBase ?? acceptUsdg),
     updatedAt: new Date(),
   };
 
