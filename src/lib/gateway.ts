@@ -6,6 +6,7 @@ import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { connection } from "next/server";
 import { getDb, schema } from "@/db";
 import type { Gateway } from "@/db/schema";
+import { TOKEN } from "@/lib/constants";
 import { offers, platform } from "@/lib/payments";
 import { OFFICIAL_OWNER } from "@/lib/track-record";
 
@@ -264,6 +265,29 @@ export const baseForCreators = () => Boolean(process.env.BASE_SPLITTER_FACTORY?.
  * when the 402 is built (basePayToFor in the gateway route).
  */
 export const baseEligible = (g: Pick<Gateway, "owner" | "acceptBase">) => g.acceptBase && (isOfficial(g) || baseForCreators());
+
+/**
+ * Whether pages should say this API takes USDC on Base: Base is set up here and the API qualifies. The live 402 also
+ * needs Coinbase answering and a payee that can be paid on Base (src/lib/base-pay.ts), which pages don't wait for.
+ */
+export const offersBase = (g: Pick<Gateway, "owner" | "acceptBase">) => platform.base && baseEligible(g);
+
+/** The chains a listed gateway's directory entry is filed under: Robinhood Chain, plus Base when it takes Base. */
+export const gatewayNetworks = (g: Pick<Gateway, "owner" | "acceptBase">) =>
+  offersBase(g) ? [TOKEN.network, "base"] : [TOKEN.network];
+
+/**
+ * Files a listed gateway's directory entry under the chains it takes now, so Explore's chain filter finds it. Called
+ * when a listing is approved and when its settings are saved; drizzle/0014 did it once for the APIs already listed.
+ */
+export async function syncGatewayNetworks(g: Pick<Gateway, "projectId" | "owner" | "acceptBase">) {
+  if (!g.projectId) return;
+  const db = await getDb();
+  await db
+    .update(schema.projects)
+    .set({ networks: gatewayNetworks(g), updatedAt: new Date() })
+    .where(and(eq(schema.projects.id, g.projectId), eq(schema.projects.source, "gateway")));
+}
 
 /** Which APIs take USDC on Base on this deployment, for pages to say so: every API, official ones only, or none. */
 export function baseCoverage(): "all" | "official" | "none" {
