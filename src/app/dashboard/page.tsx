@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { VerifiedBadge } from "@/components/verified";
 import { verifiedStatus } from "@/lib/verified";
-import { listOwnerGateways, payeeOf } from "@/lib/gateway";
+import { baseCoverage, listOwnerGateways, payeeOf } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 import { burnPercent } from "@/lib/burn";
 import { platform } from "@/lib/payments";
@@ -32,7 +32,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <h2 className="heading mt-2 text-2xl">I have a normal API</h2>
             <p className="mt-2 text-sm text-muted">
               It works with an API key, or with no key at all. We give it a paid address, you set a price per call, and
-              agents pay you in USDG or $AUTONOMO. You don&apos;t change any code.
+              agents pay you in USDG or $AUTONOMO{baseCoverage() === "all" ? ", or USDC on Base" : ""}. You don&apos;t change
+              any code.
             </p>
             <Flow steps={["Agent", "Autonomo collects the payment", "Your API"]} highlight={1} />
             <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-sm text-muted">

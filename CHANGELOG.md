@@ -19,6 +19,10 @@ repo gets a copy of each release.
   on Base, which sends them 95% and keeps 5% for Autonomo's Base Safe; that 5% refills the mirror burn pot, so the
   burn on Base pays for itself and Autonomo never holds creators' money. Plain wallets, and Safes with the same
   signers on Base, can be paid there.
+- **Creators choose whether their API takes Base.** The launch and settings form has a USDC on Base box next to
+  Robinhood Chain, on by default, and an API's dashboard says whether Base is on, where it's paid, and why if it's
+  off. APIs that only take $AUTONOMO keep Base off. Explore shows the Base price on Autonomo API cards and lists them
+  under the Base chain filter, and the launch, Safe and official APIs guides explain Base payments.
 - **Nine official APIs read Base too.** Token Risk, Dev Wallet Tracker, Holders & Bundles, Wallet Portfolio, Tx
   Explainer, Payment Check and Token Lookup take `chain=base`. Left out, they read Robinhood Chain exactly as before,
   or Base when the token, transaction or wallet is only there; the answer then says it's Base. New Launches and Gas

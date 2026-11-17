@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { burnPercent } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
+import { baseCoverage } from "@/lib/gateway";
 import { privyEnabled } from "@/lib/privy";
 import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
 import { Shot } from "../ui";
@@ -11,11 +12,16 @@ export const metadata: Metadata = {
   description: "Step by step: put your API behind an Autonomo gateway, set a price per call, test it and get it listed so AI agents find it.",
 };
 
+// The share a creator's splitter on Base keeps for the burn, fixed in contracts/src/BaseSplitter.sol (RESERVE_BPS).
+const BASE_RESERVE_PERCENT = 5;
+
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun").replace(/\/+$/, "");
 const HOST = SITE.replace(/^https?:\/\//, "");
 
 export default function LaunchGuidePage() {
   const burn = burnPercent();
+  // Creator APIs take USDC on Base on this deployment (Base splitters are set up).
+  const base = baseCoverage() === "all";
   return (
     <article className="min-w-0 max-w-3xl">
       <p className="font-mono text-xs tracking-wide text-accent uppercase">Guide</p>
@@ -24,8 +30,8 @@ export default function LaunchGuidePage() {
       <div className="docs-body mt-6 space-y-4">
         <p>
           You already have an API. Autonomo puts a gateway in front of it: agents call the gateway, pay per call in USDG
-          or {TOKEN.symbol} on {TOKEN.chainName}, and the gateway forwards each paid request to your API. You don&apos;t
-          change your code, and launching is free.
+          or {TOKEN.symbol} on {TOKEN.chainName}{base ? ", or in USDC on Base" : ""}, and the gateway forwards each paid
+          request to your API. You don&apos;t change your code, and launching is free.
         </p>
         <div className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
           <Card title="Launch" body="Sign in, paste your API's URL and set a price. Takes a few minutes." />
@@ -44,6 +50,7 @@ export default function LaunchGuidePage() {
               {privyEnabled()
                 ? "An email address, a Google or X account, or a wallet to sign in with. If you don't have a wallet, one is created for your earnings."
                 : `A wallet that works on ${TOKEN.chainName}. You sign in with it and it gets paid.`}
+              {base && " The same wallet address is paid on Base too, so there's nothing extra to set up for Base."}
             </li>
             <li>A price in mind. The official Autonomo APIs charge 0.01 USDG per call, for comparison.</li>
           </ul>
@@ -105,15 +112,31 @@ export default function LaunchGuidePage() {
                 The form shows the amount as you type, and it&apos;s worked out again every day, so it never drifts from
                 your dollar price. Agents approve Permit2 once before their first {TOKEN.symbol} payment.
               </li>
+              {base && (
+                <li>
+                  <b>USDC on Base:</b> agents on Base pay the same dollar price in USDC. It&apos;s ticked for you. You get{" "}
+                  {100 - BASE_RESERVE_PERCENT}% in USDC on Base, at the same wallet address, and {BASE_RESERVE_PERCENT}% goes to
+                  the burn, which happens on {TOKEN.chainName}. If your wallet is a Safe, it needs to exist on Base with the
+                  same signers, or Base is left off. See <a href="#base">how Base payments work</a>.
+                </li>
+              )}
             </ul>
             <p>
-              Accept one or both. Accepting both lets more agents pay you. Both are on Robinhood Chain. The 20% off on
-              $AUTONOMO comes out of what you earn on those calls.
+              Accept USDG, {TOKEN.symbol} or both on {TOKEN.chainName}. Accepting both lets more agents pay you.
+              {base ? " USDC on Base comes on top, for agents that hold USDC on Base." : ""} The 20% off on $AUTONOMO
+              comes out of what you earn on those calls.
               {burn
                 ? ` ${burn}% of each payment is burned and you get the other ${100 - burn}%. Autonomo keeps none of it.`
                 : " Payments go straight to your wallet, and Autonomo takes no cut."}
             </p>
-            <Shot src="/docs/launch/3-launch-form.png" width={656} height={976} narrow alt="The launch form filled in for an example Weather Forecasts API priced at $0.005 USDG or 50 $AUTONOMO per call" caption="The launch form, filled in for an example API." />
+            <Shot
+              src="/docs/launch/3-price-step.png"
+              width={704}
+              height={577}
+              narrow
+              alt="The price step of the launch form: $0.005 per call, with USDG and $AUTONOMO ticked under Robinhood Chain and USDC ticked under Base"
+              caption="The price step, filled in for an example API at $0.005 a call."
+            />
           </Step>
           <Step n={6} title="Step 3: review and choose Launch API">
             <p>
@@ -128,6 +151,7 @@ export default function LaunchGuidePage() {
             You enter the address and key once, then list the APIs, each with its own paid address and price: type them
             in, or paste a list. &ldquo;Check all&rdquo; applies the same rules as above and makes one free test call to
             each. Nothing launches unless all of them pass, and you can ask for all of them to be listed in the same go.
+            {base ? " USDC on Base is switched on for each API that takes USDG; change it in that API's Settings." : ""}
           </p>
         </Section>
 
@@ -197,6 +221,7 @@ export default function LaunchGuidePage() {
             <li>
               Your API&apos;s page shows paid calls, USDG and {TOKEN.symbol} earned over 30 days and all time, how many paid
               attempts settled, a 14-day chart and every recent payment.
+              {base ? " A line under your prices says whether USDC on Base is on, where it's paid, and why if it's off." : ""}
             </li>
             <li>
               Want your earnings in a multisig? See <Link href="/docs/safe">Get paid at a Safe</Link>.
@@ -231,12 +256,41 @@ export default function LaunchGuidePage() {
               </ul>
             </div>
           )}
+          {base && (
+            <div id="base" className="scroll-mt-6 space-y-2 rounded-lg border border-line bg-surface p-4">
+              <h3 className="font-medium">How Base payments work</h3>
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                <li>
+                  Agents on Base pay your own <b>splitter on Base</b>, in USDC. Coinbase&apos;s facilitator settles the
+                  payment, so neither you nor the agent pays gas for it.
+                </li>
+                <li>
+                  When it splits, {100 - BASE_RESERVE_PERCENT}% goes to your wallet on Base and {BASE_RESERVE_PERCENT}% to
+                  Autonomo&apos;s Safe on Base. It splits as soon as it holds 0.10 USDC, and a daily run catches the rest.
+                </li>
+                <li>
+                  Base has no {TOKEN.symbol} to burn, so the same {BASE_RESERVE_PERCENT}% is burned on {TOKEN.chainName}{" "}
+                  instead, from a pot of USDG that the {BASE_RESERVE_PERCENT}% collected on Base refills. The{" "}
+                  <Link href="/burn">burn page</Link> shows Base payments and what was burned for them.
+                </li>
+                <li>
+                  Your wallet can be paid on Base if it&apos;s a normal wallet, or a Safe with the same signers on Base. Other
+                  contract wallets aren&apos;t, since they may not exist there.
+                </li>
+                <li>
+                  To take Base payments, keep <b>USDC on Base</b> ticked under <b>Settings</b> on your API&apos;s page. Untick it
+                  to stop; it applies within a minute.
+                </li>
+              </ul>
+            </div>
+          )}
         </Section>
 
         <Section title="Managing your API">
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <b>Edit:</b> change the name, description, your API&apos;s address, key or price under <b>Settings</b> on your API&apos;s page.
+              <b>Edit:</b> change the name, description, your API&apos;s address, key, price or payment options under{" "}
+              <b>Settings</b> on your API&apos;s page.
               Changes apply to the very next call. Leave the key blank to keep the saved one.
             </li>
             <li>
