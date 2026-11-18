@@ -21,7 +21,7 @@ import { listAutonomoGateways } from "@/lib/queries";
 //
 // Env:
 //   ANTHROPIC_API_KEY   Without it the report has no written summary; everything else works.
-//   AGENT_MODEL         Optional, shared with the Ask agent (default claude-haiku-5-5).
+//   AGENT_MODEL         Optional, shared with the Ask agent (default claude-haiku-5-5). Set to claude-opus-5-5 in production.
 
 const RISK_SLUG = "token-risk";
 const DEV_SLUG = "dev-wallet";
@@ -30,9 +30,9 @@ const TX_SLUG = "tx-explainer";
 const PORTFOLIO_SLUG = "wallet-portfolio";
 /**
  * Past this, a report skips the checks it hasn't started and goes to the summary, so it finishes inside the route's
- * 120 seconds: a paid call can take up to 45 seconds before it gives up, and the summary up to 20.
+ * 120 seconds: a paid call can take up to 45 seconds before it gives up, and the summary up to 30.
  */
-const REPORT_DEADLINE_MS = 80_000;
+const REPORT_DEADLINE_MS = 70_000;
 /** A creator holding this many other launchpad tokens gets a flag: often someone who launches token after token. */
 const SERIAL_LAUNCHES = 3;
 /** Most top holders a report lists. The largest is checked as part of the report; the others on request. */
@@ -41,8 +41,11 @@ const TOP_HOLDERS = 5;
 export const MAX_REPORT_PAYMENTS = 6;
 
 const DEFAULT_MODEL = "claude-haiku-5-5";
-const SUMMARY_TIMEOUT_MS = 20_000;
-const SUMMARY_MAX_TOKENS = 600;
+// Medium effort, set explicitly: Opus 5.5 always thinks, and its thinking counts toward SUMMARY_MAX_TOKENS, so the
+// cap leaves room for it as well as the 3 to 5 sentences. Only what's used is billed.
+const SUMMARY_EFFORT = "medium";
+const SUMMARY_TIMEOUT_MS = 30_000;
+const SUMMARY_MAX_TOKENS = 4_000;
 
 export type Verdict = "okay" | "careful" | "high";
 
@@ -481,6 +484,7 @@ async function modelSummary(facts: string) {
   const message = await client.messages.create({
     model: process.env.AGENT_MODEL?.trim() || DEFAULT_MODEL,
     max_tokens: SUMMARY_MAX_TOKENS,
+    output_config: { effort: SUMMARY_EFFORT },
     system: SUMMARY_SYSTEM,
     messages: [{ role: "user", content: facts }],
   });

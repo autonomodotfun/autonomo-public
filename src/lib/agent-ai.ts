@@ -16,13 +16,18 @@ import { listAutonomoGateways } from "@/lib/queries";
 //
 // Env:
 //   ANTHROPIC_API_KEY   Without it the keyword agent (agent.ts) answers instead.
-//   AGENT_MODEL         Optional: the model to use (default claude-haiku-5-5).
+//   AGENT_MODEL         Optional: the model to use (default claude-haiku-5-5). Set to claude-opus-5-5 in production.
 
 const DEFAULT_MODEL = "claude-haiku-5-5";
+// How hard the model thinks before each step. Thinking is always on with Opus 5.5 and counts toward MAX_TOKENS.
+const EFFORT = "medium";
 const MAX_MODEL_TURNS = 5;
-const MAX_TOKENS = 4_000;
+// Room for medium-effort thinking plus the answer or tool calls; only what's used is billed.
+const MAX_TOKENS = 8_000;
 const MAX_RESULT_CHARS = 8_000;
-const MODEL_TIMEOUT_MS = 30_000;
+// One model turn at medium effort. Five turns still fit QUESTION_TIMEOUT_MS only when most are quick, which the
+// question limit enforces either way.
+const MODEL_TIMEOUT_MS = 45_000;
 const QUOTE_TIMEOUT_MS = 12_000;
 const PAYMENT_TIMEOUT_MS = 50_000;
 const DATABASE_TIMEOUT_MS = 10_000;
@@ -198,7 +203,7 @@ export async function runAiAgent(question: string, send: (e: AgentEvent) => void
       const stream = deps.streamMessage({
         model,
         max_tokens: MAX_TOKENS,
-        output_config: { effort: "low" },
+        output_config: { effort: EFFORT },
         system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
         tools,
         // The last turn has to answer with what it has.
