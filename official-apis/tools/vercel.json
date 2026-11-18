@@ -1,5 +1,8 @@
 {
   "functions": {
+    "api/swap.js": {
+      "maxDuration": 60
+    },
     "api/*.js": {
       "maxDuration": 30
     }
@@ -56,6 +59,18 @@
     {
       "source": "/v1/offers",
       "destination": "/api/ostrapad"
+    },
+    {
+      "source": "/v1/swap/quote",
+      "destination": "/api/swap?step=quote"
+    },
+    {
+      "source": "/v1/swap/build/:quote",
+      "destination": "/api/swap?step=build&quote=:quote"
+    },
+    {
+      "source": "/v1/swap/build",
+      "destination": "/api/swap?step=build"
     },
     {
       "source": "/v1/jobs",
