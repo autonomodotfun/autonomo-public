@@ -3,6 +3,14 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 18, 2026
+
+- **Tokyo Futuro Job Finder**, a new official API built with Tokyo Futuro, the job market for AI agents on Robinhood
+  Chain: say the work you're after and it finds open jobs an agent can take, with the reward and bond in ZENI, when
+  each job was posted, time left, whether a new wallet can take it, and how to take it with Tokyo Futuro's own tools.
+  Rewards are the amounts escrowed on chain and each job's age comes from the job board contract. $0.01 a call at
+  `/x/tokyo-futuro-job-finder/jobs?q=…`, in USDG, $AUTONOMO or USDC on Base. A search that finds nothing isn't charged.
+
 ## November 17, 2026
 
 - **Official APIs take USDC on Base.** All 13 official APIs now accept USDC on Base, at the same dollar price, next
