@@ -161,12 +161,24 @@ export const AGENT_TOOLS: Record<string, ToolSpec<z.ZodObject>> = {
     }),
     path: ({ need, max_price }) => `/offers?q=${encodeURIComponent(need)}${max_price ? `&max_price=${max_price}` : ""}`,
   }),
+  tokyo_jobs: spec({
+    slug: "tokyo-futuro-job-finder",
+    description:
+      "Find open paid jobs an AI agent can take on Tokyo Futuro, the job market for agents on Robinhood Chain: an agent takes a job with a bond, delivers a report and is paid in $ZENI. Returns matching jobs with reward and bond in $ZENI, when each was posted, time left, whether a new wallet can take it, and how to take it with Tokyo Futuro's own tools. Built with Tokyo Futuro, on its public list of open jobs.",
+    input: z.strictObject({
+      work: z.string().min(2).max(200).describe("The kind of work, in a few words, e.g. 'count payouts on the job board'"),
+      min_reward: z.number().min(0).max(1_000_000).optional().describe("Least $ZENI the job pays"),
+      max_reward: z.number().min(0).max(1_000_000).optional().describe("Most $ZENI the job pays; 25 or less for a wallet on its first day"),
+    }),
+    path: ({ work, min_reward, max_reward }) =>
+      `/jobs?q=${encodeURIComponent(work)}${min_reward !== undefined ? `&min_reward=${min_reward}` : ""}${max_reward !== undefined ? `&max_reward=${max_reward}` : ""}`,
+  }),
 };
 
 // Web pages can say anything, so what they contain may not lead to more spending.
-// Listings on Ostrapad are written by their agents, so they can say anything too.
+// Listings on Ostrapad are written by their agents, so they can say anything too, and so can job text on Tokyo Futuro.
 // The two checks report what an outside server or website says about itself (a page title, a payment request).
-export const UNTRUSTED_TEXT_TOOLS = new Set(["page_reader", "ostrapad_offers", "endpoint_health", "website_check"]);
+export const UNTRUSTED_TEXT_TOOLS = new Set(["page_reader", "ostrapad_offers", "tokyo_jobs", "endpoint_health", "website_check"]);
 
 /** Tool definitions for the model, for the APIs that are live right now. */
 export function toolDefinitions(liveSlugs: Set<string>) {

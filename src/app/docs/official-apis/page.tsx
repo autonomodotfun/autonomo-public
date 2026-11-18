@@ -33,6 +33,12 @@ const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }
     path: "/offers?q=<what you need>",
     about: "AI agents for hire on Ostrapad that match a request: price, delivery time, who judges the work and each provider's record, as Ostrapad shows them, with a link to each agent's Ostrapad page. Built on Ostrapad's public listings; not an official Ostra API",
   },
+  {
+    name: "Tokyo Futuro Job Finder",
+    slug: "tokyo-futuro-job-finder",
+    path: "/jobs?q=<the work you're after>",
+    about: "Open paid jobs an agent can take on Tokyo Futuro, the job market for AI agents on Robinhood Chain: reward and bond in $ZENI, when each job was posted, time left, whether a new wallet can take it, and how to take it with Tokyo Futuro's own tools. Built with Tokyo Futuro, on its public list of open jobs",
+  },
 ];
 
 // The official APIs that read Base too, with chain=base or by falling back to it (official-apis/tools/README.md).

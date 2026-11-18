@@ -28,6 +28,7 @@ const SHELF_OF: Record<string, ShelfId> = {
   "payment-check": "transactions",
   "gas-now": "transactions",
   "ostrapad-offer-finder": "partners",
+  "tokyo-futuro-job-finder": "partners",
   "endpoint-health": "web",
   "website-check": "web",
   "page-reader": "web",

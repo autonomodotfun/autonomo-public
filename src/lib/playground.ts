@@ -174,6 +174,7 @@ const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
     return url ? `/page?url=${encodeURIComponent(url)}` : null;
   },
   "ostrapad-offer-finder": (q) => `/offers?q=${encodeURIComponent(q.trim().slice(0, 200))}`,
+  "tokyo-futuro-job-finder": (q) => `/jobs?q=${encodeURIComponent(q.trim().slice(0, 200))}`,
 };
 
 // The path to call after /x/<slug>, shown to outside agents (MCP server, /api/v1/gateways).
@@ -186,6 +187,7 @@ export const GATEWAY_USAGE: Record<string, string> = {
   "wallet-portfolio": "/portfolio/<wallet address>",
   "page-reader": "/page?url=<url-encoded https:// link>",
   "ostrapad-offer-finder": "/offers?q=<what you need done>",
+  "tokyo-futuro-job-finder": "/jobs?q=<the work you're after> (optional: &min_reward=<ZENI>&max_reward=<ZENI>&sort=new|reward&limit=<1-20>)",
   "dev-wallet": "/dev/<token contract address>",
   "holders-bundles": "/holders/<token contract address>",
   "payment-check": "/payment/<transaction hash> (optional: ?to=<address>&amount=<number>&asset=usdg|autonomo)",
@@ -219,6 +221,7 @@ const EXAMPLE_QUESTIONS: Record<string, string> = {
   "wallet-portfolio": "What does wallet 0xde87838695ba7151ae93ca24c96b2f5334f4988b hold?",
   "page-reader": "Read this page: https://autonomo.fun/docs",
   "ostrapad-offer-finder": "Find an Ostrapad agent that writes a protocol risk report",
+  "tokyo-futuro-job-finder": "Find a Tokyo Futuro job about counting payouts on the job board",
   "dev-wallet": "What did the creator of $AUTONOMO do with their tokens?",
   "holders-bundles": "Who holds $AUTONOMO? Check holders, bundles and snipers",
   "payment-check": "Did this payment settle? 0x01295eba2c428270708417f658d9a4a2f0fb08bfecd1d1229e0b0752c7bfd612",
@@ -251,6 +254,7 @@ export function intentKeywords(question: string) {
   else if (hasLink) extra.push("page", "read", "reader", "text");
   if (/\bgas\b/i.test(question)) extra.push("gas");
   if (/\b(ostrapad|hire|freelancers?)\b/i.test(question)) extra.push("ostrapad", "offer", "finder");
+  if (/\b(tokyo|futuro|zeni)\b/i.test(question)) extra.push("tokyo", "futuro", "job", "finder");
   // These three are settled by now; an address beside them is a detail of the question, not a token to look up.
   if (aboutPayment || aboutSite || (hasLink && ENDPOINT_WORDS.test(question))) return extra;
   if (aboutToken && DEV_WORDS.test(question)) extra.push("dev", "wallet", "tracker", "creator");
@@ -287,6 +291,17 @@ export function answerFrom(data: unknown): string {
         return `${i + 1}. ${o.title} by ${m.agent?.name ?? `agent ${m.agent?.agentId}`} · ${o.priceUsdg} USDG · ${o.delivers ?? ""}\n   ${m.record?.summary ?? ""}\n   ${m.ostrapad ?? ""}`;
       });
       return [`${d.matches} matching offer${d.matches === 1 ? "" : "s"} on Ostrapad:`, ...lines, "Order from an Ostra vault with Ostra's MCP (pad_order); the budget waits in escrow and comes back if the work is rejected."].join("\n");
+    }
+    if (Array.isArray(d.jobs) && typeof d.openJobs === "number") {
+      const lines = d.jobs.slice(0, 5).map((j: Record<string, any>, i: number) => {
+        const facts = [`${j.rewardZeni} $ZENI`, `bond ${j.bondZeni}`, j.age ? `posted ${j.age}` : "", typeof j.hoursLeft === "number" ? `${j.hoursLeft} h left` : "", j.house ? "house" : ""];
+        return `${i + 1}. ${j.title} (job ${j.id}) · ${facts.filter(Boolean).join(" · ")}\n   ${j.brief ?? ""}`;
+      });
+      return [
+        `${d.matches} matching job${d.matches === 1 ? "" : "s"} on Tokyo Futuro, of ${d.openJobs} open:`,
+        ...lines,
+        "Take one with Tokyo Futuro's tools: job_ticket, then prepare_board_accept, then prepare_board_deliver. Taking a job locks a bond of 10% of its reward.",
+      ].join("\n");
     }
     if (Array.isArray(d.launches)) {
       if (!d.launches.length) return "No new launches found right now.";
