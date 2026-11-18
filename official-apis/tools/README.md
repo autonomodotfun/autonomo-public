@@ -18,6 +18,7 @@ All gateways use the same upstream base, `https://tools.autonomo.fun/v1`, and th
 | `endpoint-health` | `/v1/endpoint?url=https://…&method=GET\|POST` | Is an x402 API up and payable right now: one unpaid call, the answer time, and whether each payment option it offers is complete enough to pay. Never pays |
 | `website-check` | `/v1/site?url=https://…` | A trust check for a website: domain age and registrar, certificate, where the site ends up, and whether the name resembles a well-known one, with a caution level |
 | `page-reader` | `/v1/page?url=https://…` | Title, description and readable text of a public web page |
+| `safe-swap` | `/v1/swap/quote?token_in=<address\|ETH>&token_out=<address\|ETH>&amount_in=<base units>&taker=<wallet>&slippage_bps=100`, then `/v1/swap/build/<quote_id>` | Check a Robinhood Chain token, then swap it. The quote runs Holders & Bundles, Dev Wallet Tracker and the Risk Checker on the token being bought, gets KyberSwap's best route and the route back, and answers a verdict (ok, caution, block) with the price, the minimum out and a `quote_id` valid 60 seconds. The build answers unsigned transactions for that quote (an exact approval when one is missing, then the swap) for the agent to sign. Needs `BLOCKSCOUT_KEY` |
 | `ostrapad-offer-finder` | `/v1/offers?q=<what you need>&max_price=<USDG>&limit=<1-20>` | Matching offers from AI agents for hire on Ostrapad: price, delivery time, who judges the work and each provider's record, as Ostrapad shows them, with a link to each agent's Ostrapad page. Read from Ostrapad's public listings (approved by their provider vaults, records from Ostrapad's contract). An Autonomo API, not an official Ostra one. No match is a 404, so it isn't charged |
 | `tokyo-futuro-job-finder` | `/v1/jobs?q=<the work you're after>&min_reward=<ZENI>&max_reward=<ZENI>&sort=new\|reward&limit=<1-20>` | Open jobs an agent can take on Tokyo Futuro, the job market for AI agents on Robinhood Chain: reward and bond in $ZENI, when each job was posted (from the job board contract), time left, whether a new wallet can take it, and how to take it with Tokyo Futuro's own tools. Read from Tokyo Futuro's public list at most once a minute; rewards are the amounts escrowed on chain, never numbers from job text. Jobs posted by Tokyo Futuro's own Citizens are marked house. Built with Tokyo Futuro. No match is a 404, so it isn't charged |
 
@@ -70,6 +71,40 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
   through IANA's list (data.iana.org/rdap/dns.json).
 - Page reader safety: https only, no credentials, every hop (redirects included) must resolve to a public address,
   max 3 redirects, 2 MB, 10 s, HTML or plain text only.
+- Safe Swap (`api/swap.js`) never holds funds or sees a key: it answers unsigned transactions.
+  - **Verdict.** Only the token being bought is checked; selling is never blocked, and ETH, WETH and USDG (plus
+    `SWAP_TRUSTED_TOKENS`, comma-separated) are never checked. Thresholds, caution then block: largest wallet 8% / 15%,
+    top 10 wallets 25% / 40%, wallets with a shared funder 5% / 15%, snipers still holding 3% / 10%, price impact 10% /
+    25%, round-trip loss 15% / 35%. A high Risk Checker score blocks and a medium one cautions. No route back blocks.
+    Cautions only: unnamed contracts from 20% (smart wallets count there), under 50 holders, under an hour old, a creator
+    who sold or sent at least half of what they bought, and a token that isn't a launchpad token. Any block blocks; two
+    cautions make a caution.
+  - **Quote id.** The quote, signed with `SWAP_QUOTE_SECRET`, which must be set: a random value of its own, never the
+    gateway key, so nobody who can call the API can sign a verdict. Without it the API answers 503. Nothing is kept
+    between the two calls, so any instance builds it. It expires after 60 seconds.
+  - **Fails closed.** A check that couldn't run answers 503 rather than a caution. That covers a Dev Wallet 404 from
+    failed reads (only "no creator found" is a caution), a launchpad token the Risk Checker couldn't find, and a route
+    back that errored, timed out or was malformed. The taker can't be the zero or dead address, either token, or the
+    router.
+  - **Build.** A fresh route that must still meet the quoted minimum. Slippage defaults to 1% and is capped at 5%. The
+    swap has a 2-minute deadline. Approvals are for the exact amount, to the router the swap goes to. The router must
+    be on the list: KyberSwap's `0x6131b5fae19ea4f9d964eac0408e4408b66337b5`, or `SWAP_ROUTERS` to replace the list.
+    - KyberSwap's calldata is decoded and must match the quote: the same tokens and amount, parts adding up to the
+      amount (none for ETH in), the taker receives, a minimum at least the quoted one, router flags `0x200` only (all
+      it sends today), no fee and no permit. Anything else answers 502 with no transaction.
+    - KyberSwap prices the route again when building, often a unit lower, so when its minimum lands under the quoted
+      one the swap is built once more with the slippage from its own figure.
+    - Every transaction carries `from` (the taker) and `chainId` 4663, so a wallet library refuses another account or
+      chain. `min_out` is the one in the calldata.
+  - **Charges.** Nothing is charged unless the answer is useful: no route (404), checks that couldn't run or ran past
+    21 s (503), and expired, blocked or moved quotes (410, 403, 409) all fail.
+  - **Load.** A first quote on a token takes about 10 to 13 s (the three reports, then cached), a sell about 1.5 s
+    and a build about 1.5 to 5 s. The three checks read the chain heavily, so on the public RPC (no `ROBINHOOD_RPC_URL`)
+    a quote can come back 503 when it rate-limits.
+  - **Gateway.** One gateway, `safe-swap`, with this API's usual upstream and key. Each call, quote or build, is one
+    paid call at the same price, so it doesn't matter which of the two a caller's query string ends up running.
+    `KYBER_CLIENT_ID` defaults to `autonomo`.
+  - **Tests.** `node --test test/` from this folder. They are offline: KyberSwap and the chain are stubbed.
 
 ## Deploy
 
