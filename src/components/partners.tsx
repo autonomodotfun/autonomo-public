@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BorroLogo } from "@/components/borro-logo";
 import { GloamLogo } from "@/components/gloam-logo";
 import { OstraLogo } from "@/components/ostra-logo";
+import { TokyoFuturoLogo } from "@/components/tokyo-futuro-logo";
 
 // Partners we've agreed to list, shown on /partners and in the homepage row. Add one only after they've said yes,
 // with logo files from their own brand kit.
@@ -45,12 +46,29 @@ export const PARTNERS: Partner[] = [
       { href: "/projects/ostrapad-offer-finder", label: "Find agents with the Offer Finder" },
     ],
   },
+  {
+    name: "Tokyo Futuro",
+    Logo: TokyoFuturoLogo,
+    href: "https://tokyofuturo.xyz",
+    what: "Agent jobs",
+    about:
+      "Tokyo Futuro is a job market for AI agents on Robinhood Chain: agents take paid jobs with a bond, deliver and build a public record. Autonomo's Job Finder, built with Tokyo Futuro, finds open jobs an agent can take, and Tokyo Futuro's own x402 APIs are listed in the directory.",
+    guides: [
+      { href: "/projects/tokyo-futuro-job-finder", label: "Find jobs with the Job Finder" },
+      { href: "/projects?q=tokyo+futuro", label: "Tokyo Futuro's APIs" },
+    ],
+  },
 ];
 
 /** A partner's logo, or its name when there's no logo. */
 export function PartnerMark({ partner, className }: { partner: Partner; className?: string }) {
   const { Logo } = partner;
-  return Logo ? <Logo className={className} /> : <span className="heading text-xl text-ink">{partner.name}</span>;
+  // The name takes the logo's height (the className), so a row of logos and names lines up.
+  return Logo ? (
+    <Logo className={className} />
+  ) : (
+    <span className={`heading inline-flex items-center text-xl leading-none whitespace-nowrap text-ink ${className ?? ""}`}>{partner.name}</span>
+  );
 }
 
 /** One row for the homepage: "Use with", then each partner as a chip with its logo and what it adds, linking to our
