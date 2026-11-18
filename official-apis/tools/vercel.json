@@ -58,6 +58,10 @@
       "destination": "/api/ostrapad"
     },
     {
+      "source": "/v1/jobs",
+      "destination": "/api/tokyojobs"
+    },
+    {
       "source": "/v1/health",
       "destination": "/api/health"
     }
