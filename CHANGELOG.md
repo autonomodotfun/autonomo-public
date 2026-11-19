@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 19, 2026
 
+- **Directory listings can show their paid endpoints.** An x402 API listed from a submission used to show only a
+  description and links. Its endpoints can now be added from each endpoint's own 402 answer, so the listing shows the
+  price, the chains, how to pay and what each endpoint does, the same as APIs imported from the Coinbase and PayAI
+  catalogs. Prices in USDG now show in dollars too.
 - **The official APIs have an ERC-8004 agent identity**: agent 26170 in the identity registry on Robinhood Chain,
   owned by Autonomo. Its registration file is at
   [autonomo.fun/.well-known/agent-registration.json](https://autonomo.fun/.well-known/agent-registration.json): what
