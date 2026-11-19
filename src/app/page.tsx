@@ -4,7 +4,7 @@ import { CATEGORY_INFO } from "@/lib/categories";
 import { networkLabel } from "@/lib/networks";
 import { getFeatured, getStats, searchProjects } from "@/lib/queries";
 import { compact, ProjectList } from "@/components/project-row";
-import { PartnersRow } from "@/components/partners";
+import { PartnersGrid } from "@/components/partners";
 
 const LAUNCH_STEPS = [
   {
@@ -31,7 +31,7 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
-      <section className="flex min-h-[calc(80svh-4.5rem)] flex-col pt-16 sm:pt-24">
+      <section className="pt-16 pb-12 sm:pt-24">
         <p className="font-mono text-xs tracking-wide text-accent uppercase">The agentic x402 launchpad and directory</p>
         <h1 className="heading mt-3 max-w-3xl text-5xl leading-[0.95] text-balance sm:text-7xl">
           Launch your API. Let <span className="underline decoration-brand decoration-[0.14em] underline-offset-[0.1em]">agents</span> pay.
@@ -46,11 +46,6 @@ export default async function Home() {
             Connect your agent
           </Link>
         </div>
-        {/* Any spare height splits evenly above and below, so the row sits midway between the buttons and the next
-            section. pb-4 plus that section's own pt-8 matches pt-12. */}
-        <div className="flex flex-1 items-center pt-12 pb-4">
-          <PartnersRow />
-        </div>
       </section>
 
       <section className="py-8">
@@ -64,6 +59,11 @@ export default async function Home() {
             </li>
           ))}
         </ol>
+      </section>
+
+      <section className="py-8">
+        <SectionHead title="Use with" href="/partners" />
+        <PartnersGrid />
       </section>
 
       <section className="py-8">
