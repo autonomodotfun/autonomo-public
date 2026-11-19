@@ -93,38 +93,3 @@ textarea:focus-visible {
     @apply rounded-sm bg-surface px-1 py-0.5 font-mono text-[0.85em];
   }
 }
-
-/* The homepage partners ticker: two identical halves slide left by one half, so the loop has no seam. It pauses while
-   hovered or focused, and stands still as a plain wrapping row for visitors who turn motion off. */
-@keyframes ticker {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-.ticker {
-  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
-}
-.ticker-track {
-  animation: ticker var(--ticker-duration, 40s) linear infinite;
-}
-.ticker:hover .ticker-track,
-.ticker:focus-within .ticker-track {
-  animation-play-state: paused;
-}
-@media (prefers-reduced-motion: reduce) {
-  .ticker {
-    mask-image: none;
-  }
-  .ticker-track {
-    animation: none;
-    width: auto;
-    flex-wrap: wrap;
-    row-gap: 0.75rem;
-  }
-  .ticker-copy {
-    display: none;
-  }
-}
