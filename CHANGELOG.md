@@ -5,6 +5,14 @@ repo gets a copy of each release.
 
 ## November 19, 2026
 
+- **Burn splitter v2 is deployed on Robinhood Chain**, at
+  [`0x8691…2C37`](https://robinhoodchain.blockscout.com/address/0x8691b73eBE4064FbAaeF05Ea893cD2e5584b2C37). It splits
+  payments exactly like v1: 5% of USDG to the buyback, 5% of $AUTONOMO burned, the rest to the API's payee. What's new
+  is that a v2 splitter can be declared as an agent's wallet in the ERC-8004 identity registry, so the USDG payments it
+  receives count toward that agent's record, for example on Priors. It approves only that one registry message and
+  nothing else, so no signature can move funds out of it before the split. APIs move to their v2 splitters when the
+  app switches factories; v1 splitters keep being flushed and their burns stay on [/burn](https://autonomo.fun/burn).
+  Source and tests are in `contracts/robinhood`. Not audited.
 - **All 16 official APIs describe themselves to Coinbase's x402 Bazaar.** Ostrapad Offer Finder, Tokyo Futuro Job
   Finder and Safe Swap now carry a Bazaar listing too: what they do, their inputs and a real example answer. Safe
   Swap is listed at its quote, where every swap starts. As before, Coinbase lists an API after a payment for it
