@@ -58,6 +58,18 @@ export const PARTNERS: Partner[] = [
       { href: "/projects?q=tokyo+futuro", label: "Tokyo Futuro's APIs" },
     ],
   },
+  {
+    // No logo until Stoa sends one from its brand kit: the name stands in.
+    name: "Stoa",
+    href: "https://stoadex.com",
+    what: "Swaps and safety checks",
+    about:
+      "Stoa is a DEX aggregator on Robinhood Chain. Agents can check a token before buying and get a quote with ready-to-sign swap calldata, paid per call through Autonomo.",
+    guides: [
+      { href: "/projects/stoa-swap-quote-robinhood-chain", label: "Get a swap quote" },
+      { href: "/projects/stoa-token-safety-check-robinhood-chain", label: "Check a token before buying" },
+    ],
+  },
 ];
 
 /** A partner's logo, or its name when there's no logo. */

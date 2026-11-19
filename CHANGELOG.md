@@ -5,6 +5,13 @@ repo gets a copy of each release.
 
 ## November 19, 2026
 
+- **Stoa joins the partners**, on [/partners](https://autonomo.fun/partners) and in the homepage's "Use with" row.
+  Stoa is a DEX aggregator on Robinhood Chain, and it launched two of its APIs on Autonomo: a token safety check that
+  simulates a buy and a sell before an agent buys, and a swap quote that can come with ready-to-sign calldata.
+- **A Creator APIs shelf.** APIs that other teams built and run on Autonomo's gateways now have their own shelf on the
+  Explore page's Autonomo tab, in the Playground and in [/llms.txt](https://autonomo.fun/llms.txt), after Autonomo's
+  own APIs, instead of sharing "Other tools" with them. Safe Swap moves to the Tokens shelf, and /llms.txt and
+  `/api/v1/gateways` show how to call Safe Swap and Stoa's two APIs.
 - **Burn splitter v2 is deployed on Robinhood Chain**, at
   [`0x8691…2C37`](https://robinhoodchain.blockscout.com/address/0x8691b73eBE4064FbAaeF05Ea893cD2e5584b2C37). It splits
   payments exactly like v1: 5% of USDG to the buyback, 5% of $AUTONOMO burned, the rest to the API's payee. What's new

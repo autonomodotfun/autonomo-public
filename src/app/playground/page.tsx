@@ -52,8 +52,11 @@ export default async function PlaygroundPage() {
     onchain: shelf.onchain,
     apis: apis.map(toApi),
   }));
-  // One example per shelf: the shelf's preferred API when it's live, else its first.
-  const examples = shelves.map((s) => (s.apis.find((a) => a.slug === SHELF_EXAMPLE[s.id]) ?? s.apis[0]).question);
+  // One example per shelf: the shelf's preferred API when it's live, else its first. Creator APIs have no example
+  // question the agent can fill in (only Autonomo's own have paths in GATEWAY_PATHS), so their shelf gets none.
+  const examples = shelves
+    .filter((s) => s.id !== "creators")
+    .map((s) => (s.apis.find((a) => a.slug === SHELF_EXAMPLE[s.id]) ?? s.apis[0]).question);
 
   const bySlug = new Map(gateways.filter((g) => g.autonomoAmount).map((g) => [g.slug, g]));
   const prices: ResearchPrice[] = REPORT_CALLS.flatMap(({ step, slug }) => {
