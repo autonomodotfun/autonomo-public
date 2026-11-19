@@ -194,6 +194,10 @@ export const GATEWAY_USAGE: Record<string, string> = {
   "gas-now": "/gas",
   "endpoint-health": "/endpoint?url=<url-encoded https:// link> (optional: &method=POST)",
   "website-check": "/site?url=<website link or domain>",
+  "safe-swap": "/swap/quote?token_in=<token contract address>&token_out=<token contract address>&amount_in=<amount in the token's smallest unit>&taker=<the wallet that will swap> (optional: &slippage_bps=<basis points, 100 when left out, at most 500>; then build it with /swap/build/<quote_id>)",
+  // Creator APIs, from their listing and a paid test call.
+  "stoa-safety": "/<token contract address>",
+  "stoa-quote": "/quote?chain=robinhood&sellToken=<token contract address, or native for ETH>&buyToken=<token contract address>&amount=<amount in the sell token's smallest unit> (optional: &taker=<wallet> for ready-to-sign swap calldata)",
 };
 
 // What each gateway needs when the question doesn't include it.
