@@ -15,9 +15,9 @@ const SOURCES = [
 const PAGE = 1000;
 
 // Hosts that are tunnels, previews or local addresses: not real listings.
-const JUNK_HOST = /(^localhost$|^\d+\.\d+\.\d+\.\d+$|ngrok|trycloudflare\.com$|loca\.lt$|localtunnel|\.local$|webhook\.site$|example\.(com|org)$)/i;
+export const JUNK_HOST = /(^localhost$|^\d+\.\d+\.\d+\.\d+$|ngrok|trycloudflare\.com$|loca\.lt$|localtunnel|\.local$|webhook\.site$|example\.(com|org)$)/i;
 
-type Accept = {
+export type Accept = {
   network?: string;
   asset?: string;
   amount?: string;
@@ -29,7 +29,7 @@ type Accept = {
   outputSchema?: { input?: { method?: string } };
 };
 
-type Item = {
+export type Item = {
   resource: string;
   type?: string;
   x402Version?: number;
@@ -69,7 +69,7 @@ async function* pages(base: string, max: number, log: (s: string) => void) {
 }
 
 // `network` is the first payment option, which the price and payment details come from. `networks` is every option.
-type EndpointRow = Omit<typeof schema.endpoints.$inferInsert, "projectId"> & {
+export type EndpointRow = Omit<typeof schema.endpoints.$inferInsert, "projectId"> & {
   host: string;
   serviceName: string | null;
   networks: string[];
@@ -85,7 +85,7 @@ function clean<T>(value: T): T {
   return value;
 }
 
-function toRow(raw: Item, facilitator: string): EndpointRow | null {
+export function toRow(raw: Item, facilitator: string): EndpointRow | null {
   const item = clean(raw);
   let url: URL;
   try {

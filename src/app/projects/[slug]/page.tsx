@@ -29,7 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const FACILITATOR_LABELS: Record<string, string> = { cdp: "Coinbase CDP", payai: "PayAI" };
+// "direct": read from the endpoint's own 402 when it was added to the listing, not from a facilitator's catalog.
+const FACILITATOR_LABELS: Record<string, string> = { cdp: "Coinbase CDP", payai: "PayAI", direct: "—" };
 
 export default async function ProjectPage({ params }: Props) {
   const data = await getProject((await params).slug);

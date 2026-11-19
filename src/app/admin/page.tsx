@@ -8,6 +8,7 @@ import { payeeOf } from "@/lib/gateway";
 import { isContractWallet, safeInfo, verifiedStatus } from "@/lib/verified";
 import { approvePayToRequest, rejectPayToRequest, setCreatorPayTo, switchCreatorWallet } from "./actions";
 import { ApisTab, type ApiFilter } from "./apis";
+import { DirectoryTab } from "./directory";
 import { HistoryTab } from "./history";
 import { ReviewTab } from "./review";
 
@@ -25,9 +26,11 @@ type SearchParams = Promise<{
   payTo?: string;
   payToNote?: string;
   requestNote?: string;
+  listing?: string;
+  listingNote?: string;
 }>;
 
-const TABS = { review: "Review", apis: "All APIs", payouts: "Payouts", history: "History" } as const;
+const TABS = { review: "Review", apis: "All APIs", directory: "Directory", payouts: "Payouts", history: "History" } as const;
 type Tab = keyof typeof TABS;
 const API_FILTERS: ApiFilter[] = ["all", "listed", "pending", "unlisted", "rejected", "paused"];
 
@@ -88,6 +91,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
             <SwitchWallet from={params.from} to={params.to} message={params.switch} switches={await db.select().from(schema.walletSwitches).orderBy(desc(schema.walletSwitches.createdAt)).limit(20)} />
           </>
         )}
+        {tab === "directory" && <DirectoryTab listing={params.listing} message={params.listingNote} />}
         {tab === "history" && <HistoryTab group={params.group ?? "all"} />}
       </div>
     </div>

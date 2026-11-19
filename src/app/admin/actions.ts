@@ -8,6 +8,7 @@ import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
 import { isAuthorized } from "@/lib/admin-auth";
 import { logAdmin } from "@/lib/admin-log";
+import { attachEndpoint as attach, detachEndpoint as detach } from "@/lib/attach-endpoint";
 import { TOKEN } from "@/lib/constants";
 import { gatewayNetworks, gatewayOffers, payeeOf, syncGatewayNetworks } from "@/lib/gateway";
 import { applyPayTo } from "@/lib/pay-to";
@@ -277,4 +278,31 @@ export async function setApiStatus(form: FormData) {
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   revalidateCatalog();
+}
+
+// Adds an x402 endpoint to a directory listing from its own 402 answer (see src/lib/attach-endpoint.ts).
+export async function attachListingEndpoint(form: FormData) {
+  await requireAdmin();
+  const slug = String(form.get("slug") ?? "").trim();
+  const url = String(form.get("url") ?? "").trim();
+  const method = String(form.get("method") ?? "GET");
+  const result = await attach(slug, url, method);
+  if (result.ok) {
+    await logAdmin({ kind: "endpoint_attached", subject: `/projects/${slug}`, detail: result.message });
+    revalidateCatalog();
+  }
+  const listingNote = result.ok ? result.message : result.error;
+  redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#endpoints`);
+}
+
+export async function detachListingEndpoint(form: FormData) {
+  await requireAdmin();
+  const slug = String(form.get("slug") ?? "").trim();
+  const result = await detach(slug, Number(form.get("id")));
+  if (result.ok) {
+    await logAdmin({ kind: "endpoint_detached", subject: `/projects/${slug}`, detail: result.message });
+    revalidateCatalog();
+  }
+  const listingNote = result.ok ? result.message : result.error;
+  redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#endpoints`);
 }

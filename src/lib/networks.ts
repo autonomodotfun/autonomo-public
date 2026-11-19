@@ -68,6 +68,7 @@ export function isTestnet(key: string): boolean {
 // Stablecoins we can price in USD. Keyed by lowercased asset address.
 const STABLES: Record<string, number> = {
   "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": 6, // USDC Base
+  "0x5fc5360d0400a0fd4f2af552add042d716f1d168": 6, // USDG Robinhood Chain
   "0x036cbd53842c5426634e7929541ec2318f3dcf7e": 6, // USDC Base Sepolia
   "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359": 6, // USDC Polygon
   "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e": 6, // USDC Avalanche
