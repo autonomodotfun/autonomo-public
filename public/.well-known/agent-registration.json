@@ -1,0 +1,19 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "Autonomo Official APIs",
+  "description": "The x402 APIs Autonomo runs for Robinhood Chain: token prices, new launches, rug-risk checks, creators and holders, transactions and payments, wallets, gas, website and endpoint checks, web pages, agents for hire on Ostrapad, open jobs on Tokyo Futuro and swaps that check the token first. Agents pay per call over x402 in USDG or $AUTONOMO on Robinhood Chain, or USDC on Base, with no API keys or accounts. 5% of every payment buys back and burns $AUTONOMO. Run by Autonomo, the agentic x402 launchpad and directory. Every API and its price: https://autonomo.fun/docs/official-apis",
+  "image": "https://autonomo.fun/apple-icon.png",
+  "services": [
+    { "name": "web", "endpoint": "https://autonomo.fun/docs/official-apis" },
+    { "name": "web", "endpoint": "https://autonomo.fun/llms.txt" }
+  ],
+  "x402Support": true,
+  "active": true,
+  "registrations": [
+    {
+      "agentId": 26170,
+      "agentRegistry": "eip155:4663:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
+    }
+  ],
+  "supportedTrust": ["reputation"]
+}
