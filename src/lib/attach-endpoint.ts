@@ -115,7 +115,8 @@ async function refreshListing(projectId: number, add: string[] = []) {
     .where(eq(schema.projects.id, projectId));
 }
 
-export type AttachResult = { ok: true; message: string } | { ok: false; error: string };
+// `move` is set when the endpoint was added to another listing here, so it can be moved to this one instead.
+export type AttachResult = { ok: true; message: string } | { ok: false; error: string; move?: { url: string; method: string } };
 
 /** Reads the endpoint's 402 and adds it to the listing, or refreshes it if it's already there. */
 export async function attachEndpoint(slug: string, probe: string, method = "GET"): Promise<AttachResult> {
@@ -129,12 +130,19 @@ export async function attachEndpoint(slug: string, probe: string, method = "GET"
   const { host, serviceName: _s, networks: _n, ...row } = read.row;
 
   const [taken] = await db
-    .select({ projectId: schema.endpoints.projectId, slug: schema.projects.slug })
+    .select({ projectId: schema.endpoints.projectId, slug: schema.projects.slug, facilitator: schema.endpoints.facilitator })
     .from(schema.endpoints)
     .innerJoin(schema.projects, eq(schema.projects.id, schema.endpoints.projectId))
     .where(and(eq(schema.endpoints.url, row.url), eq(schema.endpoints.method, row.method!), ne(schema.endpoints.projectId, project.id)))
     .limit(1);
-  if (taken) return { ok: false, error: `${row.method} ${row.url} is already listed under /projects/${taken.slug}.` };
+  if (taken) {
+    const movable = taken.facilitator === DIRECT;
+    return {
+      ok: false,
+      error: `${row.method} ${row.url} is already listed under /projects/${taken.slug}.${movable ? " If it belongs here, move it." : ""}`,
+      move: movable ? { url: row.url, method: row.method! } : undefined,
+    };
+  }
 
   const now = new Date();
   await db
@@ -166,6 +174,39 @@ export async function attachEndpoint(slug: string, probe: string, method = "GET"
 
   const price = read.priceUsd === null ? "price not in dollars" : `$${Number(read.priceUsd)}`;
   return { ok: true, message: `${read.method} ${read.url} attached to /projects/${project.slug}: ${price}, paid to ${read.payTo ?? "?"} on ${read.networks.map(networkLabel).join(", ")}.` };
+}
+
+/** Moves an endpoint added here from the listing it's on to `slug`, for one filed under the wrong listing. The domain
+ * goes with it when the old listing has nothing else left on that domain. */
+export async function moveEndpoint(slug: string, url: string, method: string): Promise<AttachResult> {
+  const db = await getDb();
+  const [project] = await db.select().from(schema.projects).where(eq(schema.projects.slug, slug.trim())).limit(1);
+  if (!project) return { ok: false, error: `No listing at /projects/${slug}.` };
+  if (project.source === "gateway") return { ok: false, error: "That's an Autonomo gateway: its endpoint is managed by the gateway itself." };
+  const [endpoint] = await db
+    .select({ id: schema.endpoints.id, projectId: schema.endpoints.projectId, network: schema.endpoints.network })
+    .from(schema.endpoints)
+    .where(and(eq(schema.endpoints.url, url), eq(schema.endpoints.method, method), eq(schema.endpoints.facilitator, DIRECT)))
+    .limit(1);
+  if (!endpoint) return { ok: false, error: "That endpoint isn't one added here." };
+  if (endpoint.projectId === project.id) return { ok: true, message: `${method} ${url} is already on /projects/${project.slug}.` };
+  const [from] = await db.select({ slug: schema.projects.slug, host: schema.projects.host }).from(schema.projects).where(eq(schema.projects.id, endpoint.projectId));
+
+  await db.update(schema.endpoints).set({ projectId: project.id, updatedAt: new Date() }).where(eq(schema.endpoints.id, endpoint.id));
+  const host = new URL(url).hostname.toLowerCase();
+  if (from?.host === host) {
+    const left = await db.select({ url: schema.endpoints.url }).from(schema.endpoints).where(eq(schema.endpoints.projectId, endpoint.projectId));
+    if (!left.some((e) => new URL(e.url).hostname.toLowerCase() === host)) {
+      await db.update(schema.projects).set({ host: null }).where(eq(schema.projects.id, endpoint.projectId));
+      if (!project.host) await db.update(schema.projects).set({ host }).where(eq(schema.projects.id, project.id));
+    }
+  }
+  // An endpoint row keeps only its first chain, so ask the endpoint again for all of them. If it won't answer without
+  // example values, its first chain is used.
+  const again = await readEndpoint(url, method);
+  await refreshListing(endpoint.projectId);
+  await refreshListing(project.id, again.ok ? again.networks : endpoint.network ? [endpoint.network] : []);
+  return { ok: true, message: `${method} ${url} moved from /projects/${from?.slug ?? "?"} to /projects/${project.slug}.` };
 }
 
 /** Removes one endpoint from a listing. Only endpoints read from a 402 here, so imported ones stay with their import. */

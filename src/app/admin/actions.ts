@@ -8,7 +8,7 @@ import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
 import { isAuthorized } from "@/lib/admin-auth";
 import { logAdmin } from "@/lib/admin-log";
-import { attachEndpoint as attach, detachEndpoint as detach } from "@/lib/attach-endpoint";
+import { attachEndpoint as attach, detachEndpoint as detach, moveEndpoint as move } from "@/lib/attach-endpoint";
 import { TOKEN } from "@/lib/constants";
 import { gatewayNetworks, gatewayOffers, payeeOf, syncGatewayNetworks } from "@/lib/gateway";
 import { applyPayTo } from "@/lib/pay-to";
@@ -292,7 +292,8 @@ export async function attachListingEndpoint(form: FormData) {
     revalidateCatalog();
   }
   const listingNote = result.ok ? result.message : result.error;
-  redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#endpoints`);
+  const moveable: Record<string, string> = !result.ok && result.move ? { moveUrl: result.move.url, moveMethod: result.move.method } : {};
+  redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote, ...moveable })}#endpoints`);
 }
 
 export async function detachListingEndpoint(form: FormData) {
@@ -301,6 +302,19 @@ export async function detachListingEndpoint(form: FormData) {
   const result = await detach(slug, Number(form.get("id")));
   if (result.ok) {
     await logAdmin({ kind: "endpoint_detached", subject: `/projects/${slug}`, detail: result.message });
+    revalidateCatalog();
+  }
+  const listingNote = result.ok ? result.message : result.error;
+  redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#endpoints`);
+}
+
+// Moves an endpoint added here to another listing, for one filed under the wrong listing.
+export async function moveListingEndpoint(form: FormData) {
+  await requireAdmin();
+  const slug = String(form.get("slug") ?? "").trim();
+  const result = await move(slug, String(form.get("url") ?? ""), String(form.get("method") ?? "GET"));
+  if (result.ok) {
+    await logAdmin({ kind: "endpoint_moved", subject: `/projects/${slug}`, detail: result.message });
     revalidateCatalog();
   }
   const listingNote = result.ok ? result.message : result.error;
