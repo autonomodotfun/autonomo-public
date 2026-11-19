@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TOKEN } from "@/lib/constants";
-import { BURN_BPS, BURN_DEAD, baseSplitterFactory, burnEnabled, burnFactory, buybackBurner, getBurns, getMirror, mirrorPot } from "@/lib/burn";
+import { BURN_BPS, BURN_DEAD, baseSplitterFactory, burnEnabled, burnFactory, buybackBurner, getBurns, getMirror, mirrorPot, previousBurnFactory } from "@/lib/burn";
 import { baseCoverage } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
 
@@ -24,6 +24,7 @@ export default async function BurnPage() {
   const burn = BURN_BPS / 100;
   const contracts = [
     { label: "Splitter factory", address: burnFactory() },
+    { label: "Previous splitter factory", address: previousBurnFactory() },
     { label: "Buyback and burn", address: buybackBurner() },
     { label: "Mirror burn pot (Base payments)", address: mirrorPot() },
     { label: "Splitter factory on Base", address: baseSplitterFactory(), explorer: "https://basescan.org" },

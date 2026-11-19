@@ -23,6 +23,65 @@ BURN_OWNER=<Autonomo Safe> BURN_KEEPER=<a dedicated gas-only wallet> forge scrip
 
 Check that both contracts show verified source on the explorer: the docs send holders there to read the code. If `--verify` can't reach the explorer, verify through its web form with [`flat/BurnSplitter.flat.sol`](flat/BurnSplitter.flat.sol) and [`flat/BuybackBurner.flat.sol`](flat/BuybackBurner.flat.sol). Then set `BUYBACK_BURNER`, `BURN_SPLITTER_FACTORY`, `BURN_START_BLOCK` (the deployment block shown on the explorer) and `BURN_KEEPER_PRIVATE_KEY` in the app's environment.
 
+## BurnSplitter v2: declarable as an agent wallet
+
+**`BurnSplitterV2`** splits exactly like v1: its `flush()` is the same code. What it adds is that it can be declared as an
+agent's wallet in the ERC-8004 identity registry ([`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://robinhoodchain.blockscout.com/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432)).
+Then the USDG it receives counts for that agent on Priors (Score v2 counts payments into the declared wallet).
+
+The registry asks the new wallet to approve one EIP-712 message, `AgentWalletSet(agentId, newWallet, owner, deadline)`, through
+ERC-1271. The splitter approves that one message and nothing else:
+
+| Function | Who | What it does |
+| --- | --- | --- |
+| `approveAgentWallet(agentId, deadline)` | Recipient only | Builds the registry's exact digest (this splitter, the agent's current owner read from the registry, the deadline) and stores it. The deadline must be within 1 day. |
+| `isValidSignature(hash, sig)` | Anyone (the registry) | Yes only for that stored digest, until its deadline. The signature bytes are ignored. Anything else gets `0xffffffff`. |
+| `clearAgentWalletApproval()` | Recipient only | Withdraws the approval. |
+| `agentWalletDigest(agentId, owner, deadline)` | Anyone | Shows the digest before declaring. |
+
+Why only one message: USDG accepts ERC-1271 approvals for `transferWithAuthorization` and `permit`. A splitter that said yes
+to signatures in general could be emptied with a junk signature, skipping the burn. The fork test
+`test_naive_splitter_is_drained` shows that happening to a careless splitter, and `test_usdg_cannot_be_signed_out_of_the_splitter`
+shows v2 blocking it, even while an approval is live.
+
+**`BurnSplitterFactoryV2`** works like v1's factory (`splitterOf`, `deploy`, `flush`). Its constructor takes, in order:
+
+| Constructor value | What it is |
+| --- | --- |
+| `autonomo_` | `0xE83C85E1eaD16FCFe85401E2b337Fb4FB5B5cC96` |
+| `usdg_` | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` |
+| `buyback_` | The `BuybackBurner`, `0x4d0D18a0EcbA457a4A8DB093553EaDEC37D08464` |
+| `registry_` | The ERC-8004 identity registry, `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
+
+Deploy it from Remix with [`flat/BurnSplitterV2.flat.sol`](flat/BurnSplitterV2.flat.sol): Solidity 0.8.26, optimizer on with
+10000 runs, EVM version cancun. The same file and settings verify it on Blockscout. It is **not deployed and not audited** yet.
+
+Switching to it gives every payee a new splitter address, because the factory is new. The app moves all APIs at once when
+`BURN_SPLITTER_FACTORY` changes, and `BURN_SPLITTER_FACTORY_PREVIOUS` (set to the v1 factory) keeps the daily run flushing
+the v1 splitters and `/burn` counting their past burns.
+
+Declaring a splitter as an agent's wallet:
+
+1. The agent's owner registers the agent on the registry and notes its id.
+2. The splitter's recipient calls `approveAgentWallet(agentId, deadline)`. For a Safe, pick a deadline a few hours ahead so
+   every signer has time. The `AgentWalletApproved` event must name the agent's owner.
+3. In the last 5 minutes before the deadline, the owner calls `setAgentWallet(agentId, splitter, deadline, 0x)` on the
+   registry. It refuses earlier ("deadline too far") and after ("expired").
+4. `getAgentWallet(agentId)` on the registry returns the splitter.
+
+Limits:
+
+- One agent per splitter. The recipient could approve a second agent later, and both would stay declared. To move to
+  another agent, call `unsetAgentWallet` on the old one first.
+- If the agent changes hands, the registry clears its wallet and the old approval no longer matches: approve again.
+- The registry is upgradeable. If its EIP-712 domain or message changes, declarations fail (never a wrong yes), and a new
+  splitter version would be needed.
+- Never borrow with a splitter as the loan's `to`: the loan would be split and 5% burned.
+- Only USDG on Robinhood Chain counts for the score.
+
+The fork tests run against the real registry, USDG, $AUTONOMO and `BuybackBurner`:
+`ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com forge test --match-path test/BurnSplitterV2.t.sol -vv`.
+
 ## Mirror burn for Base payments
 
 APIs also take USDC on Base, where there's no $AUTONOMO pool to burn in. So **`MirrorBurnPot`** burns the same 5% on Robinhood Chain instead:

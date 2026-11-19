@@ -30,6 +30,10 @@ import { USDC_BASE, USDG } from "@/lib/payments";
 //
 // Env:
 //   BURN_SPLITTER_FACTORY   The deployed BurnSplitterFactory. Without it, payments go straight to payees as before.
+//   BURN_SPLITTER_FACTORY_PREVIOUS
+//                           The factory used before the current one, after a switch (v1 to BurnSplitterFactoryV2). New
+//                           payments go to the current factory's splitters; the daily run still flushes the previous
+//                           ones, which can hold payments from before the switch, and their burns still count on /burn.
 //   BUYBACK_BURNER          The deployed BuybackBurner.
 //   BURN_KEEPER_PRIVATE_KEY The BuybackBurner's keeper: a gas-only wallet that flushes and runs buybacks.
 //   BURN_START_BLOCK        The block the contracts were deployed in, where the search for burn receipts starts.
@@ -68,6 +72,11 @@ function envAddress(name: string) {
 }
 
 export const burnFactory = () => envAddress("BURN_SPLITTER_FACTORY");
+/** The factory before the current one, while its splitters may still hold payments. Null when unset or the same. */
+export const previousBurnFactory = () => {
+  const previous = envAddress("BURN_SPLITTER_FACTORY_PREVIOUS");
+  return previous && previous !== burnFactory() ? previous : null;
+};
 export const buybackBurner = () => envAddress("BUYBACK_BURNER");
 export const burnEnabled = () => burnFactory() !== null;
 /** The share of each payment that's burned, for pages to show; undefined while burning is off. */
@@ -76,16 +85,19 @@ export const burnPercent = () => (burnEnabled() ? BURN_BPS / 100 : undefined);
 // A splitter's address only depends on the factory and the payee, so a lookup never goes stale.
 const splitters = new Map<string, Address>();
 
-/** The address a payee's gateways are paid at: its splitter when burning is on, otherwise the payee itself. */
-export async function payToFor(payee: string): Promise<string> {
-  const factory = burnFactory();
-  if (!factory) return payee;
+async function splitterFrom(factory: Address, payee: string): Promise<Address> {
   const key = `${factory}:${payee.toLowerCase()}`;
   const hit = splitters.get(key);
   if (hit) return hit;
   const splitter = await publicClient.readContract({ address: factory, abi: factoryAbi, functionName: "splitterOf", args: [getAddress(payee)] });
   splitters.set(key, splitter);
   return splitter;
+}
+
+/** The address a payee's gateways are paid at: its splitter when burning is on, otherwise the payee itself. */
+export async function payToFor(payee: string): Promise<string> {
+  const factory = burnFactory();
+  return factory ? splitterFrom(factory, payee) : payee;
 }
 
 /**
@@ -133,9 +145,12 @@ function keeper() {
 
 type Keeper = ReturnType<typeof keeper>;
 
-/** Flushes a payee's splitter if it holds enough to be worth it, or with `atThreshold`, only once it reaches a threshold. */
-async function flushPayee(k: Keeper, payee: Address, atThreshold = false) {
-  const splitter = await payToFor(payee);
+/**
+ * Flushes a payee's splitter if it holds enough to be worth it, or with `atThreshold`, only once it reaches a threshold.
+ * The splitter is the current factory's unless `factory` names the previous one.
+ */
+async function flushPayee(k: Keeper, payee: Address, atThreshold = false, factory: Address = k.factory) {
+  const splitter = await splitterFrom(factory, payee);
   const [autonomo, usdg] = await Promise.all(
     [TOKEN.address, USDG.address].map((token) =>
       publicClient.readContract({ address: token as Address, abi: balanceAbi, functionName: "balanceOf", args: [splitter as Address] }),
@@ -146,7 +161,7 @@ async function flushPayee(k: Keeper, payee: Address, atThreshold = false) {
   if (autonomo >= MIN_FLUSH_AUTONOMO) tokens.push(TOKEN.address as Address);
   if (usdg >= MIN_FLUSH_USDG) tokens.push(USDG.address);
   if (!tokens.length) return null;
-  const hash = await k.wallet.writeContract({ address: k.factory, abi: factoryAbi, functionName: "flush", args: [payee, tokens] });
+  const hash = await k.wallet.writeContract({ address: factory, abi: factoryAbi, functionName: "flush", args: [payee, tokens] });
   await publicClient.waitForTransactionReceipt({ hash });
   return { payee, splitter, tx: hash };
 }
@@ -177,12 +192,22 @@ export async function runBurnKeeper(): Promise<BurnRun> {
   const k = keeper();
   const run: BurnRun = { flushed: [], baseFlushed: [], mirror: null, buyback: null, receipts: 0, errors: [] };
 
+  const previous = previousBurnFactory();
   for (const payee of await payees()) {
     try {
       const flushed = await flushPayee(k, payee);
       if (flushed) run.flushed.push(flushed);
     } catch (e) {
       run.errors.push(`flush ${payee}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    // The splitter from before the switch, for payments that reached it before (or a quote issued just before).
+    if (previous) {
+      try {
+        const flushed = await flushPayee(k, payee, false, previous);
+        if (flushed) run.flushed.push(flushed);
+      } catch (e) {
+        run.errors.push(`flush ${payee} (previous factory): ${e instanceof Error ? e.message : String(e)}`);
+      }
     }
   }
 
@@ -398,7 +423,9 @@ async function syncBurnReceipts() {
   if (last === null && !startBlock) throw new Error("BURN_START_BLOCK is not set");
   let from = BigInt(last ?? startBlock!);
 
-  const splitterAddresses = (await Promise.all((await payees()).map((p) => payToFor(p)))) as Address[];
+  const factories = [burnFactory(), previousBurnFactory()].filter((f): f is Address => f !== null);
+  const everyPayee = await payees();
+  const splitterAddresses = await Promise.all(factories.flatMap((f) => everyPayee.map((p) => splitterFrom(f, p))));
 
   // Not cached: viem otherwise reuses the block number for a few seconds and would miss a flush that just landed.
   const latest = await publicClient.getBlockNumber({ cacheTime: 0 });
