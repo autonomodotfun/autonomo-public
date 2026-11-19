@@ -10,9 +10,10 @@ import EXAMPLES from "@/lib/bazaar-examples.json";
 const OFFICIAL = [
   "token-price", "token-lookup", "new-launches", "token-risk", "tx-explainer", "wallet-portfolio", "dev-wallet",
   "holders-bundles", "payment-check", "gas-now", "endpoint-health", "website-check", "page-reader",
+  "ostrapad-offer-finder", "tokyo-futuro-job-finder", "safe-swap",
 ];
 
-test("all 13 official APIs have a listing and a real example answer", () => {
+test("all 16 official APIs have a listing and a real example answer", () => {
   assert.deepEqual(Object.keys(BAZAAR_LISTINGS).sort(), [...OFFICIAL].sort());
   assert.deepEqual(Object.keys(EXAMPLES).sort(), [...OFFICIAL].sort());
 });

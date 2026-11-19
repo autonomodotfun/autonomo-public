@@ -163,6 +163,60 @@ export const BAZAAR_LISTINGS: Record<keyof typeof EXAMPLES, Listing> = {
     query: { url: "https://example.com" },
     querySchema: { properties: { url: { ...HTTPS_URL, description: "The page address" } }, required: ["url"] },
   },
+  "ostrapad-offer-finder": {
+    routeTemplate: "/x/ostrapad-offer-finder/offers",
+    description:
+      "AI agents for hire on Ostrapad, the market on Robinhood Chain where agents are hired for work in USDG through escrow: the offers that match the work described, each with its price, delivery time, how the work is judged and the agent's record read from Ostrapad's contract, linked to the agent's Ostrapad page. Built on Ostrapad's public listings.",
+    tags: ["agents", "hire", "marketplace", "ostrapad", "robinhood-chain"],
+    query: { q: "risk report" },
+    querySchema: {
+      properties: {
+        q: { type: "string", maxLength: 200, description: "The work wanted, in a few words" },
+        max_price: { type: "string", pattern: "^[0-9]+(\\.[0-9]+)?$", description: "Optional: the highest price in USDG" },
+        limit: { type: "string", pattern: "^[0-9]{1,2}$", description: "How many offers, 1 to 20; 5 when left out" },
+      },
+    },
+  },
+  "tokyo-futuro-job-finder": {
+    routeTemplate: "/x/tokyo-futuro-job-finder/jobs",
+    description:
+      "Open paid jobs an AI agent can take on Tokyo Futuro, the job market for agents on Robinhood Chain: the jobs that match the work described, each with its reward and bond in $ZENI as escrowed on chain, its deadline, how long ago it was posted, who posted it and whether a new wallet can take it. Built with Tokyo Futuro, read live from its list of open jobs.",
+    tags: ["jobs", "agents", "bounties", "tokyo-futuro", "robinhood-chain"],
+    query: { q: "cost sheet" },
+    querySchema: {
+      properties: {
+        q: { type: "string", maxLength: 200, description: "The work wanted, in a few words" },
+        min_reward: { type: "string", pattern: "^[0-9]+(\\.[0-9]+)?$", description: "Optional: the lowest reward in $ZENI" },
+        max_reward: { type: "string", pattern: "^[0-9]+(\\.[0-9]+)?$", description: "Optional: the highest reward in $ZENI" },
+        sort: { type: "string", enum: ["new", "reward"], description: "Optional: new (the default) or reward" },
+        limit: { type: "string", pattern: "^[0-9]{1,2}$", description: "How many jobs, 1 to 20; 5 when left out" },
+      },
+    },
+  },
+  // Safe Swap is two paid calls, a quote and then a build of that quote. The Bazaar lists one address per API, so it
+  // lists the quote, where every swap starts; payments for builds keep the same listing current.
+  "safe-swap": {
+    routeTemplate: "/x/safe-swap/swap/quote",
+    description:
+      "A checked swap quote on Robinhood Chain. Before an agent buys a token it checks the holders, the creator's wallet and the rug risk, finds KyberSwap's best route and quotes the way back to see that the token can be sold and at what loss, then answers ok, caution or block with a quote id. Building that quote returns unsigned transactions checked against it. Selling is never blocked.",
+    tags: ["swap", "dex", "token-safety", "kyberswap", "robinhood-chain"],
+    query: {
+      token_in: "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      token_out: AUTONOMO,
+      amount_in: "1000000",
+      taker: "0x92a99fbd386f87277b6009bff4c56728ec5f7354",
+    },
+    querySchema: {
+      properties: {
+        token_in: { type: "string", pattern: "^(0x[0-9a-fA-F]{40}|ETH)$", description: "The token sold: its address on Robinhood Chain, or ETH" },
+        token_out: { type: "string", pattern: "^(0x[0-9a-fA-F]{40}|ETH)$", description: "The token bought: its address on Robinhood Chain, or ETH" },
+        amount_in: { type: "string", pattern: "^[1-9][0-9]{0,77}$", description: "The amount sold in base units (1 USDG = 1000000)" },
+        taker: { ...ADDRESS, description: "The wallet that signs the swap and receives what it buys" },
+        slippage_bps: { type: "string", pattern: "^[0-9]{1,5}$", description: "Optional: the slippage allowed in basis points, 100 (1%) when left out, at most 500" },
+      },
+      required: ["token_in", "token_out", "amount_in", "taker"],
+    },
+  },
 };
 
 /** The Bazaar extension for an official API, or null when it has no listing. */
