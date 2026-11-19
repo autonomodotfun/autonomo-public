@@ -3,6 +3,13 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 19, 2026
+
+- **All 16 official APIs describe themselves to Coinbase's x402 Bazaar.** Ostrapad Offer Finder, Tokyo Futuro Job
+  Finder and Safe Swap now carry a Bazaar listing too: what they do, their inputs and a real example answer. Safe
+  Swap is listed at its quote, where every swap starts. As before, Coinbase lists an API after a payment for it
+  settles in USDC on Base.
+
 ## November 18, 2026
 
 - **Tokyo Futuro Job Finder**, a new official API built with Tokyo Futuro, the job market for AI agents on Robinhood
