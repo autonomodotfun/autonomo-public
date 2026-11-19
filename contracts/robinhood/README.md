@@ -53,8 +53,11 @@ shows v2 blocking it, even while an approval is live.
 | `buyback_` | The `BuybackBurner`, `0x4d0D18a0EcbA457a4A8DB093553EaDEC37D08464` |
 | `registry_` | The ERC-8004 identity registry, `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
 
-Deploy it from Remix with [`flat/BurnSplitterV2.flat.sol`](flat/BurnSplitterV2.flat.sol): Solidity 0.8.26, optimizer on with
-10000 runs, EVM version cancun. The same file and settings verify it on Blockscout. It is **not deployed and not audited** yet.
+Deployed on Nov 19, 2026 from Remix with [`flat/BurnSplitterV2.flat.sol`](flat/BurnSplitterV2.flat.sol) (Solidity 0.8.26, optimizer
+on with 10000 runs, EVM version cancun), in block 118128151, at
+[`0x8691b73eBE4064FbAaeF05Ea893cD2e5584b2C37`](https://robinhoodchain.blockscout.com/address/0x8691b73eBE4064FbAaeF05Ea893cD2e5584b2C37).
+Its code matches this folder's build apart from the four constructor addresses and the metadata stamps. The one-file copy is
+left as Remix compiled it, so its header still says "Not deployed yet". It is **not audited**.
 
 Switching to it gives every payee a new splitter address, because the factory is new. The app moves all APIs at once when
 `BURN_SPLITTER_FACTORY` changes, and `BURN_SPLITTER_FACTORY_PREVIOUS` (set to the v1 factory) keeps the daily run flushing
