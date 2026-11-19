@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BorroLogo } from "@/components/borro-logo";
 import { GloamLogo } from "@/components/gloam-logo";
 import { OstraLogo } from "@/components/ostra-logo";
+import { StoaLogo } from "@/components/stoa-logo";
 import { TokyoFuturoLogo } from "@/components/tokyo-futuro-logo";
 
 // Partners we've agreed to list, shown on /partners and in the homepage row. Add one only after they've said yes,
@@ -59,10 +60,10 @@ export const PARTNERS: Partner[] = [
     ],
   },
   {
-    // No logo until Stoa sends one from its brand kit: the name stands in.
     name: "Stoa",
+    Logo: StoaLogo,
     href: "https://stoadex.com",
-    what: "Swaps and safety checks",
+    what: "Swap router",
     about:
       "Stoa is a DEX aggregator on Robinhood Chain. Agents can check a token before buying and get a quote with ready-to-sign swap calldata, paid per call through Autonomo.",
     guides: [
