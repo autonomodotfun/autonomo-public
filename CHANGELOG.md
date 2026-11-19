@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 19, 2026
 
+- **The official APIs have an ERC-8004 agent identity**: agent 26170 in the identity registry on Robinhood Chain,
+  owned by Autonomo. Its registration file is at
+  [autonomo.fun/.well-known/agent-registration.json](https://autonomo.fun/.well-known/agent-registration.json): what
+  the APIs do, how they're paid and where to find them. It also proves the agent belongs to autonomo.fun.
 - **Stoa joins the partners**, on [/partners](https://autonomo.fun/partners) and in the homepage's "Use with" row.
   Stoa is a DEX aggregator on Robinhood Chain, and it launched two of its APIs on Autonomo: a token safety check that
   simulates a buy and a sell before an agent buys, and a swap quote that can come with ready-to-sign calldata.
