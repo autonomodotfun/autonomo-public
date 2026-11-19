@@ -22,7 +22,11 @@ contracts/
 | `AutonomoRewardsVesting` | Robinhood Chain | [`0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277`](https://robinhoodchain.blockscout.com/address/0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277) | [`robinhood/src/AutonomoRewardsVesting.sol`](robinhood/src/AutonomoRewardsVesting.sol) | [`AutonomoRewardsVesting.flat.sol`](robinhood/flat/AutonomoRewardsVesting.flat.sol) |
 | `BaseSplitterFactory` (and each `BaseSplitter`) | Base | [`0xd15fe8Df1074De6B65fbDb888cEd73531c2100d6`](https://base.blockscout.com/address/0xd15fe8Df1074De6B65fbDb888cEd73531c2100d6) | [`base/src/BaseSplitter.sol`](base/src/BaseSplitter.sol) | [`BaseSplitter.flat.sol`](base/flat/BaseSplitter.flat.sol) |
 
-All five show verified source on Blockscout. Built from these folders, each one's code matches what's on-chain, apart
+Not deployed yet: `BurnSplitterFactoryV2` (and each `BurnSplitterV2`), source
+[`robinhood/src/BurnSplitterV2.sol`](robinhood/src/BurnSplitterV2.sol), one-file copy
+[`BurnSplitterV2.flat.sol`](robinhood/flat/BurnSplitterV2.flat.sol). See [`robinhood/README.md`](robinhood/README.md#burnsplitter-v2-declarable-as-an-agent-wallet).
+
+All five deployed contracts show verified source on Blockscout. Built from these folders, each one's code matches what's on-chain, apart
 from the metadata stamp at its end, which records file names and paths. All use Solidity 0.8.26, optimizer on with
 10000 runs, EVM version cancun.
 
