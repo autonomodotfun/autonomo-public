@@ -28,6 +28,8 @@ type SearchParams = Promise<{
   requestNote?: string;
   listing?: string;
   listingNote?: string;
+  moveUrl?: string;
+  moveMethod?: string;
 }>;
 
 const TABS = { review: "Review", apis: "All APIs", directory: "Directory", payouts: "Payouts", history: "History" } as const;
@@ -91,7 +93,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
             <SwitchWallet from={params.from} to={params.to} message={params.switch} switches={await db.select().from(schema.walletSwitches).orderBy(desc(schema.walletSwitches.createdAt)).limit(20)} />
           </>
         )}
-        {tab === "directory" && <DirectoryTab listing={params.listing} message={params.listingNote} />}
+        {tab === "directory" && <DirectoryTab listing={params.listing} message={params.listingNote} move={params.moveUrl ? { url: params.moveUrl, method: params.moveMethod ?? "GET" } : undefined} />}
         {tab === "history" && <HistoryTab group={params.group ?? "all"} />}
       </div>
     </div>

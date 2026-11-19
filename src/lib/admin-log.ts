@@ -26,6 +26,7 @@ export const ADMIN_EVENT_LABELS = {
   prices_updated: "$AUTONOMO prices updated",
   endpoint_attached: "Endpoint added to a listing",
   endpoint_detached: "Endpoint removed from a listing",
+  endpoint_moved: "Endpoint moved to another listing",
 } as const;
 export type AdminEventKind = keyof typeof ADMIN_EVENT_LABELS;
 export type AdminEvent = typeof adminEvents.$inferSelect;

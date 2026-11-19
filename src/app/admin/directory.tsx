@@ -1,9 +1,9 @@
 import { formatUsd, networkLabel } from "@/lib/networks";
 import { DIRECT, listingEndpoints } from "@/lib/attach-endpoint";
-import { attachListingEndpoint, detachListingEndpoint } from "./actions";
+import { attachListingEndpoint, detachListingEndpoint, moveListingEndpoint } from "./actions";
 
 /** Adds paid endpoints to a directory listing from each endpoint's own 402, for listings that came from a submission. */
-export async function DirectoryTab({ listing, message }: { listing?: string; message?: string }) {
+export async function DirectoryTab({ listing, message, move }: { listing?: string; message?: string; move?: { url: string; method: string } }) {
   const slug = listing?.trim() ?? "";
   const data = slug ? await listingEndpoints(slug) : null;
 
@@ -15,9 +15,22 @@ export async function DirectoryTab({ listing, message }: { listing?: string; mes
         the price, chains, token and pay-to wallet are read from that answer, and nothing is paid. Add example query
         values if the API needs them to ask for payment; they aren&apos;t stored.
       </p>
-      {message && <p className="mt-3 rounded-md border border-line bg-surface p-3 text-sm break-words">{message}</p>}
+      {message && (
+        <div className="mt-3 rounded-md border border-line bg-surface p-3 text-sm break-words">
+          <p>{message}</p>
+          {move && data && (
+            <form action={moveListingEndpoint} className="mt-2">
+              <input type="hidden" name="slug" value={data.project.slug} />
+              <input type="hidden" name="url" value={move.url} />
+              <input type="hidden" name="method" value={move.method} />
+              <button className="btn-brand px-3 py-1.5 text-xs">Move it to {data.project.name}</button>
+            </form>
+          )}
+        </div>
+      )}
 
-      <form className="mt-4 flex flex-wrap items-end gap-3 text-sm">
+      {/* Keyed by the listing shown, so the field always says which listing is open after a form sends you back here. */}
+      <form key={slug} className="mt-4 flex flex-wrap items-end gap-3 text-sm">
         <input type="hidden" name="tab" value="directory" />
         <label className="grid gap-1">
           Listing (the slug in /projects/…)
@@ -80,7 +93,7 @@ export async function DirectoryTab({ listing, message }: { listing?: string; mes
                   <option>POST</option>
                 </select>
               </label>
-              <button className="btn-brand px-3 py-2">Read and add</button>
+              <button className="btn-brand px-3 py-2">Add to {data.project.name}</button>
             </form>
           )}
         </div>
