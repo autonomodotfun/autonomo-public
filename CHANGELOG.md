@@ -5,6 +5,11 @@ repo gets a copy of each release.
 
 ## November 20, 2026
 
+- **"How it works" for both sides.** The homepage's three launch steps now sit next to three steps for agents: give
+  it a wallet, connect Autonomo, and it pays per call.
+- **The homepage shows a paid call.** Next to the headline, one call to Safe Swap plays out line by line: the
+  request for a swap quote, the 402 with its price, the agent paying from its own wallet, the verdict that comes back,
+  and the 5% that buys back and burns $AUTONOMO. The price is the API's live one.
 - **Directory listings can show their logo.** Explore, the Autonomo tab and each listing's page show a project's own
   logo when it has one, and its first letter otherwise.
 
