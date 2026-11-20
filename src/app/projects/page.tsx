@@ -196,7 +196,7 @@ function ApiCard({ g, className = "" }: { g: AutonomoApi; className?: string }) 
   return (
     <li className={className}>
       <Link href={`/projects/${g.projectSlug}`} className="flex h-full gap-3 rounded-md border border-line bg-bg p-3 hover:border-faint">
-        <Avatar name={g.name} />
+        <Avatar name={g.name} src={g.logoUrl} />
         <span className="min-w-0">
           <span className="block truncate font-medium">{g.name}</span>
           <span className="mt-0.5 line-clamp-2 text-xs text-muted">{g.description}</span>

@@ -27,6 +27,7 @@ export const ADMIN_EVENT_LABELS = {
   endpoint_attached: "Endpoint added to a listing",
   endpoint_detached: "Endpoint removed from a listing",
   endpoint_moved: "Endpoint moved to another listing",
+  listing_edited: "Listing edited",
 } as const;
 export type AdminEventKind = keyof typeof ADMIN_EVENT_LABELS;
 export type AdminEvent = typeof adminEvents.$inferSelect;

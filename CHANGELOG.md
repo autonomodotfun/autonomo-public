@@ -3,6 +3,11 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 20, 2026
+
+- **Directory listings can show their logo.** Explore, the Autonomo tab and each listing's page show a project's own
+  logo when it has one, and its first letter otherwise.
+
 ## November 19, 2026
 
 - **A "Use with" section on the homepage.** The partners move out of the hero into their own section under "How a

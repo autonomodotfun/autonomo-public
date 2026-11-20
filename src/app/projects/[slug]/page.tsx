@@ -59,7 +59,7 @@ export default async function ProjectPage({ params }: Props) {
       <header className="mt-6 grid gap-8 border-b border-line pb-8 lg:grid-cols-[1fr_auto]">
         <div className="min-w-0">
           <div className="flex items-center gap-4">
-            <Avatar name={p.name} size="lg" />
+            <Avatar name={p.name} src={p.logoUrl} size="lg" />
             <h1 className="heading min-w-0 text-4xl normal-case break-words sm:text-5xl">{p.name}</h1>
           </div>
           {projectSlugs.includes(p.slug) && (
