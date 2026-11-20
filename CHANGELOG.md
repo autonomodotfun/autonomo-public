@@ -5,6 +5,11 @@ repo gets a copy of each release.
 
 ## November 20, 2026
 
+- **A guide to keeping an agent's savings in a QWallet.** [/docs/qwallet](https://autonomo.fun/docs/qwallet) shows the
+  pattern: the agent's savings sit in a QHooks QWallet on Robinhood Chain, where every withdrawal needs both the
+  owner wallet's key and a post-quantum key the agent keeps, and a small wallet pays for Autonomo APIs and gets topped
+  up from it. Every step uses QHooks' MCP server, which signs on the agent's machine. The independent review of the
+  QWallet contracts is still pending, so the guide says to start with small amounts.
 - **An elizaOS plugin.** `elizaos-plugin-autonomo` gives an elizaOS agent three actions: find an Autonomo API, check
   its price, and pay for a call in USDG or $AUTONOMO on Robinhood Chain. The wallet key and the per-call and daily
   limits go in the agent's settings, and a call over a limit is refused before anything is signed. One package works

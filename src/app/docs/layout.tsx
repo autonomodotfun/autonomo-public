@@ -27,6 +27,7 @@ const NAV: NavGroup[] = [
       { href: "/docs/gloam", label: "Pay privately with Gloam" },
       { href: "/docs/borro", label: "Pay with a Borro credit line" },
       { href: "/docs/ostra", label: "Use Autonomo from Ostra" },
+      { href: "/docs/qwallet", label: "Keep savings in a QWallet" },
       { href: "/api-docs", label: "API reference" },
     ],
   },
