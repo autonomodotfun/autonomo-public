@@ -14,6 +14,7 @@ import { metadata as gloam } from "../docs/gloam/page";
 import { metadata as langchain } from "../docs/langchain/page";
 import { metadata as launch } from "../docs/launch/page";
 import { metadata as officialApis } from "../docs/official-apis/page";
+import { metadata as qwallet } from "../docs/qwallet/page";
 import { metadata as ostra } from "../docs/ostra/page";
 import { metadata as docs } from "../docs/page";
 import { metadata as safe } from "../docs/safe/page";
@@ -49,6 +50,7 @@ const DOCS: Page[] = [
   { path: "/docs/gloam", meta: gloam },
   { path: "/docs/borro", meta: borro },
   { path: "/docs/ostra", meta: ostra },
+  { path: "/docs/qwallet", meta: qwallet },
   { path: "/docs/launch", meta: launch },
   { path: "/docs/self-hosted", meta: selfHosted },
   { path: "/docs/safe", meta: safe },

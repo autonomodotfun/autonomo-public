@@ -78,8 +78,11 @@ export const PARTNERS: Partner[] = [
     href: "https://qhooks.com",
     what: "Token proof",
     about:
-      "QProof by QHooks gives agents the evidence on a token before they buy: a simulated buy and sell, taxes, holder and insider concentration and the pool's hook, with a link behind every value. Checks it couldn't run are reported, never called clear. Paid per call in USDG on Robinhood Chain or USDC on Base.",
-    guides: [{ href: "/projects/qproof", label: "Check a token with QProof" }],
+      "QProof by QHooks gives agents the evidence on a token before they buy: a simulated buy and sell, taxes, holder and insider concentration and the pool's hook, with a link behind every value. Checks it couldn't run are reported, never called clear. Paid per call in USDG on Robinhood Chain, or USDC on Base or Solana. QHooks also makes QWallets, where an agent can keep its savings with every withdrawal needing two keys.",
+    guides: [
+      { href: "/projects/qproof", label: "Check a token with QProof" },
+      { href: "/docs/qwallet", label: "Keep an agent's savings in a QWallet" },
+    ],
   },
 ];
 
