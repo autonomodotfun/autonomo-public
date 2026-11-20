@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 20, 2026
 
+- **An elizaOS plugin.** `elizaos-plugin-autonomo` gives an elizaOS agent three actions: find an Autonomo API, check
+  its price, and pay for a call in USDG or $AUTONOMO on Robinhood Chain. The wallet key and the per-call and daily
+  limits go in the agent's settings, and a call over a limit is refused before anything is signed. One package works
+  on elizaOS 1.x and 2.x. Guide: [autonomo.fun/docs/eliza](https://autonomo.fun/docs/eliza).
 - **"How it works" for both sides.** The homepage's three launch steps now sit next to three steps for agents: give
   it a wallet, connect Autonomo, and it pays per call.
 - **The homepage shows a paid call.** Next to the headline, one call to Safe Swap plays out line by line: the

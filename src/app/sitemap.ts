@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/docs/sdk`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/cli`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/langchain`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/docs/eliza`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/official-apis`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/token`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/docs/self-hosted`, changeFrequency: "monthly", priority: 0.4 },
