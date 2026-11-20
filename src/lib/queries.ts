@@ -30,6 +30,7 @@ export const listColumns = {
   description: projects.description,
   category: projects.category,
   website: projects.website,
+  logoUrl: projects.logoUrl,
   host: projects.host,
   tags: projects.tags,
   networks: projects.networks,
@@ -166,6 +167,7 @@ async function listAutonomoGatewaysFresh() {
       acceptBase: gateways.acceptBase,
       owner: gateways.owner,
       projectSlug: projects.slug,
+      logoUrl: projects.logoUrl,
     })
     .from(gateways)
     .innerJoin(projects, eq(gateways.projectId, projects.id))

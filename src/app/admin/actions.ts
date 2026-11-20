@@ -9,6 +9,7 @@ import { getDb, schema } from "@/db";
 import { isAuthorized } from "@/lib/admin-auth";
 import { logAdmin } from "@/lib/admin-log";
 import { attachEndpoint as attach, detachEndpoint as detach, moveEndpoint as move } from "@/lib/attach-endpoint";
+import { editListing as saveListing, parseListingFields } from "@/lib/edit-listing";
 import { TOKEN } from "@/lib/constants";
 import { gatewayNetworks, gatewayOffers, payeeOf, syncGatewayNetworks } from "@/lib/gateway";
 import { applyPayTo } from "@/lib/pay-to";
@@ -319,4 +320,26 @@ export async function moveListingEndpoint(form: FormData) {
   }
   const listingNote = result.ok ? result.message : result.error;
   redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#endpoints`);
+}
+
+// Edits a listing's description, links and logo (see src/lib/edit-listing.ts).
+export async function editListing(form: FormData) {
+  await requireAdmin();
+  const slug = String(form.get("slug") ?? "").trim();
+  const field = (name: string) => String(form.get(name) ?? "");
+  const parsed = parseListingFields({
+    description: field("description"),
+    website: field("website"),
+    docs: field("docs"),
+    github: field("github"),
+    twitter: field("twitter"),
+    logoUrl: field("logoUrl"),
+  });
+  const result = parsed.ok ? await saveListing(slug, parsed.fields) : parsed;
+  if (result.ok) {
+    await logAdmin({ kind: "listing_edited", subject: `/projects/${slug}` });
+    revalidateCatalog();
+  }
+  const listingNote = result.ok ? result.message : result.error;
+  redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#edit`);
 }

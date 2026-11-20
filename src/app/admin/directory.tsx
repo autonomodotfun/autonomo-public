@@ -1,17 +1,20 @@
 import { formatUsd, networkLabel } from "@/lib/networks";
 import { DIRECT, listingEndpoints } from "@/lib/attach-endpoint";
-import { attachListingEndpoint, detachListingEndpoint, moveListingEndpoint } from "./actions";
+import { Avatar } from "@/components/project-row";
+import { attachListingEndpoint, detachListingEndpoint, editListing, moveListingEndpoint } from "./actions";
 
-/** Adds paid endpoints to a directory listing from each endpoint's own 402, for listings that came from a submission. */
+/** Opens a directory listing to add paid endpoints from each endpoint's own 402, and to edit its description, links
+ * and logo. */
 export async function DirectoryTab({ listing, message, move }: { listing?: string; message?: string; move?: { url: string; method: string } }) {
   const slug = listing?.trim() ?? "";
   const data = slug ? await listingEndpoints(slug) : null;
 
   return (
     <section id="endpoints">
-      <h2 className="text-lg font-semibold">Add paid endpoints to a listing</h2>
+      <h2 className="text-lg font-semibold">Directory listings</h2>
       <p className="mt-1 text-sm text-muted">
-        For an x402 API listed from a submission, which has only a description and links. Give a URL that answers 402:
+        Open a listing to edit its description, links and logo, or to add paid endpoints. Endpoints are for an x402 API
+        listed from a submission, which has only a description and links. Give a URL that answers 402:
         the price, chains, token and pay-to wallet are read from that answer, and nothing is paid. Add example query
         values if the API needs them to ask for payment; they aren&apos;t stored.
       </p>
@@ -42,8 +45,9 @@ export async function DirectoryTab({ listing, message, move }: { listing?: strin
       {slug && !data && <p className="mt-4 text-sm text-warn">No listing at /projects/{slug}.</p>}
       {data && (
         <div className="mt-4 rounded-lg border border-line bg-surface p-5 text-sm">
-          <p className="font-medium">
-            {data.project.name}{" "}
+          <p className="flex items-center gap-3 font-medium">
+            <Avatar name={data.project.name} src={data.project.logoUrl} />
+            {data.project.name}
             <a href={`/projects/${data.project.slug}`} className="font-normal text-muted underline">
               /projects/{data.project.slug}
             </a>
@@ -98,6 +102,61 @@ export async function DirectoryTab({ listing, message, move }: { listing?: strin
           )}
         </div>
       )}
+
+      {data && <EditListing project={data.project} />}
     </section>
+  );
+}
+
+type EditableListing = NonNullable<Awaited<ReturnType<typeof listingEndpoints>>>["project"];
+
+/** The listing's description, links and logo. Blank fields are cleared. An Autonomo gateway's description and website
+ * come from the gateway, so only its logo and other links are editable here. */
+function EditListing({ project: p }: { project: EditableListing }) {
+  const gateway = p.source === "gateway";
+  return (
+    <form key={p.slug} id="edit" action={editListing} className="mt-6 grid gap-3 rounded-lg border border-line bg-surface p-5 text-sm">
+      <h3 className="font-semibold">Edit {p.name}</h3>
+      <input type="hidden" name="slug" value={p.slug} />
+      {gateway ? (
+        <p className="text-muted">An Autonomo gateway: its description and website come from the gateway itself.</p>
+      ) : (
+        <>
+          <label className="grid gap-1">
+            Description
+            <textarea name="description" required maxLength={1000} rows={4} defaultValue={p.description} className="field" />
+          </label>
+          <label className="grid gap-1">
+            Website, the page people should open
+            <input name="website" type="url" defaultValue={p.website ?? ""} placeholder="https://example.com" spellCheck={false} className="field font-mono" />
+          </label>
+        </>
+      )}
+      <label className="grid gap-1">
+        Docs
+        <input name="docs" type="url" defaultValue={p.docs ?? ""} placeholder="https://example.com/docs" spellCheck={false} className="field font-mono" />
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1">
+          GitHub
+          <input name="github" type="url" defaultValue={p.github ?? ""} placeholder="https://github.com/…" spellCheck={false} className="field font-mono" />
+        </label>
+        <label className="grid gap-1">
+          X handle
+          <input name="twitter" defaultValue={p.twitter ?? ""} placeholder="handle" spellCheck={false} className="field font-mono" />
+        </label>
+      </div>
+      <label className="grid gap-1">
+        Logo: a file in /public, like /qhooks-logo.jpg, or an https:// image
+        <span className="flex items-center gap-3">
+          <Avatar name={p.name} src={p.logoUrl} />
+          <input name="logoUrl" defaultValue={p.logoUrl ?? ""} placeholder="/logo.png" spellCheck={false} className="field flex-1 font-mono" />
+        </span>
+      </label>
+      <p className="text-xs text-faint">A blank field clears that link. Changes show on the listing straight away.</p>
+      <div>
+        <button className="btn-brand px-3 py-2">Save {p.name}</button>
+      </div>
+    </form>
   );
 }

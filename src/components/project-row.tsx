@@ -24,8 +24,13 @@ export function NetworkChips({ networks, max = 3 }: { networks: string[]; max?: 
   );
 }
 
-/** A project's first letter on a tinted square, so rows are easy to tell apart without loading anyone's logo. */
-export function Avatar({ name, size = "md" }: { name: string; size?: "md" | "lg" }) {
+/** A project's logo when it has one (set in /admin), otherwise its first letter on a tinted square. */
+export function Avatar({ name, src, size = "md" }: { name: string; src?: string | null; size?: "md" | "lg" }) {
+  const box = size === "lg" ? "size-14" : "size-9";
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" loading="lazy" className={`${box} shrink-0 rounded-md bg-surface object-cover ring-1 ring-line`} />;
+  }
   const letter = (name.match(/[a-z0-9]/i)?.[0] ?? "?").toUpperCase();
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
@@ -35,7 +40,7 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "md" | "lg"
       aria-hidden
       style={{ backgroundColor: `hsl(${hue} 55% 50% / 0.16)`, color: `hsl(${hue} 62% var(--avatar-text-l))` }}
       className={`grid shrink-0 place-items-center rounded-md font-mono font-semibold ${
-        size === "lg" ? "size-14 text-2xl" : "size-9 text-sm"
+        size === "lg" ? `${box} text-2xl` : `${box} text-sm`
       }`}
     >
       {letter}
@@ -51,7 +56,7 @@ export function ProjectRow({ p, verified = false }: { p: ProjectListItem; verifi
         href={`/projects/${p.slug}`}
         className="grid grid-cols-[auto_1fr_auto] items-start gap-x-4 px-4 py-4 hover:bg-surface sm:grid-cols-[auto_1fr_7rem_6rem_5rem]"
       >
-        <Avatar name={p.name} />
+        <Avatar name={p.name} src={p.logoUrl} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{p.name}</span>

@@ -227,7 +227,19 @@ export async function detachEndpoint(slug: string, endpointId: number): Promise<
 export async function listingEndpoints(slug: string) {
   const db = await getDb();
   const [project] = await db
-    .select({ id: schema.projects.id, slug: schema.projects.slug, name: schema.projects.name, source: schema.projects.source, networks: schema.projects.networks })
+    .select({
+      id: schema.projects.id,
+      slug: schema.projects.slug,
+      name: schema.projects.name,
+      source: schema.projects.source,
+      networks: schema.projects.networks,
+      description: schema.projects.description,
+      website: schema.projects.website,
+      docs: schema.projects.docs,
+      github: schema.projects.github,
+      twitter: schema.projects.twitter,
+      logoUrl: schema.projects.logoUrl,
+    })
     .from(schema.projects)
     .where(eq(schema.projects.slug, slug.trim()))
     .limit(1);
