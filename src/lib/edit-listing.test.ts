@@ -14,7 +14,7 @@ test("valid fields are kept and tidied", () => {
     docs: "https://qhooks.com/skill.md",
     github: "",
     twitter: "https://x.com/qHooks_",
-    logoUrl: "/qhooks-logo.jpg",
+    logoUrl: "/qhooks-logo.png",
   });
   assert.ok(r.ok);
   assert.deepEqual(r.fields, {
@@ -23,7 +23,7 @@ test("valid fields are kept and tidied", () => {
     docs: "https://qhooks.com/skill.md",
     github: null,
     twitter: "qHooks_",
-    logoUrl: "/qhooks-logo.jpg",
+    logoUrl: "/qhooks-logo.png",
   });
 });
 

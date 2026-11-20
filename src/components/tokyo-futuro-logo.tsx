@@ -1,11 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
 
-// Tokyo Futuro's own mark, as the Tokyo Futuro team sent it, unchanged, next to its name. The mark has a dark
-// background of its own, so it reads the same on light and dark pages.
+// Tokyo Futuro's own mark, as the Tokyo Futuro team sent it, with its black background cut away so the sun sits on
+// the page itself, next to its name.
 export function TokyoFuturoLogo({ className = "" }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
-      <img src="/tokyo-futuro-logo.jpg" alt="" width={160} height={160} className="aspect-square h-full w-auto shrink-0 rounded-md ring-1 ring-line" />
+      <img src="/tokyo-futuro-logo.png" alt="" width={192} height={192} className="aspect-square h-full w-auto shrink-0" />
       <span className="text-[1.15em] leading-none font-medium tracking-tight whitespace-nowrap text-ink">Tokyo Futuro</span>
     </span>
   );

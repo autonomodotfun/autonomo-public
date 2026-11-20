@@ -32,13 +32,13 @@ function httpsUrl(raw: string, label: string): { value: string | null } | { erro
   }
 }
 
-/** A logo: an image on this site (a path like /qhooks-logo.jpg, from /public) or an https:// address. */
+/** A logo: an image on this site (a path like /qhooks-logo.png, from /public) or an https:// address. */
 function logo(raw: string): { value: string | null } | { error: string } {
   const v = raw.trim();
   if (!v) return { value: null };
   if (/^\/[a-z0-9][a-z0-9._/-]*\.(png|jpe?g|svg|webp|gif)$/i.test(v) && !v.includes("..")) return { value: v };
   const url = httpsUrl(v, "Logo");
-  if ("error" in url) return { error: "Logo must be a path on this site (like /qhooks-logo.jpg) or an https:// address." };
+  if ("error" in url) return { error: "Logo must be a path on this site (like /qhooks-logo.png) or an https:// address." };
   return url;
 }
 

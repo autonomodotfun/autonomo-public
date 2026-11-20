@@ -147,7 +147,7 @@ function EditListing({ project: p }: { project: EditableListing }) {
         </label>
       </div>
       <label className="grid gap-1">
-        Logo: a file in /public, like /qhooks-logo.jpg, or an https:// image
+        Logo: a file in /public, like /qhooks-logo.png, or an https:// image
         <span className="flex items-center gap-3">
           <Avatar name={p.name} src={p.logoUrl} />
           <input name="logoUrl" defaultValue={p.logoUrl ?? ""} placeholder="/logo.png" spellCheck={false} className="field flex-1 font-mono" />
