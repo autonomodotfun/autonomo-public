@@ -75,9 +75,9 @@ export default function QWalletGuidePage() {
       <Table
         rows={[
           ["Chain", <>{TOKEN.chainName}. The tokens a QWallet holds are fixed when it&apos;s created: USDG by default, and ETH always</>],
-          ["You need", "Two wallets: an owner wallet for the QWallet and a small wallet that pays, plus a little ETH for gas"],
+          ["You need", "Two wallets: an owner wallet for the QWallet and a small wallet that pays, plus about 0.001 ETH in the owner wallet for gas"],
           ["Tools", <>QHooks&apos; MCP server, <code>@qhooks/mcp</code> 0.2.0 or later (Node 18+), which signs on your machine</>],
-          ["Cost", "No QHooks fee. You pay network gas"],
+          ["Cost", <>No QHooks fee. You pay network gas: see <a href="#gas">Gas</a> below</>],
         ]}
       />
 
@@ -88,7 +88,7 @@ export default function QWalletGuidePage() {
               <b key="q">QWallet</b>,
               "A contract that only you control, holding the savings. A withdrawal needs the owner wallet's signature and the post-quantum key's signature, both for the same amount, recipient and 15-minute window. QHooks holds neither key and can't move the funds",
             ],
-            [<b key="o">Owner wallet</b>, "Creates the QWallet, deposits into it and signs withdrawals. It needs a little ETH for gas"],
+            [<b key="o">Owner wallet</b>, "Creates the QWallet, deposits into it and signs withdrawals. About 0.001 ETH in it covers setup and a good run of withdrawals"],
             [
               <b key="p">Post-quantum key</b>,
               "A post-quantum signature key (SLH-DSA, a NIST standard), a different kind of key from a wallet key. The agent creates it on its own machine",
@@ -184,6 +184,22 @@ export default function QWalletGuidePage() {
           The approval is for that amount, to that wallet, and is valid for 15 minutes. A changed recipient or a reused
           approval is refused on chain. Withdraw about a day&apos;s spending at a time, so the paying wallet never holds
           much.
+        </p>
+      </Section>
+
+      <Section id="gas" title="Gas">
+        <p>Measured by QHooks on {TOKEN.chainName}, at the gas price on November 20, 2026:</p>
+        <Table
+          rows={[
+            ["Setup", "About 5M gas, roughly 0.0001 ETH, for the verifier, the pool and enrolling the key"],
+            ["Each withdrawal", "About 2.5M gas, roughly 0.00005 ETH"],
+            ["Each deposit", "Very little"],
+          ]}
+        />
+        <p>
+          Enrolling the key and withdrawing cost the most, because the post-quantum signature is checked on chain. About
+          0.001 ETH in the owner wallet covers setup and a good run of withdrawals with plenty to spare. The ETH amounts
+          move with the gas price.
         </p>
       </Section>
 
