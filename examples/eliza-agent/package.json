@@ -1,0 +1,19 @@
+{
+  "name": "autonomo-eliza-agent",
+  "private": true,
+  "description": "A small elizaOS 2.x agent with the Autonomo plugin, for one live test before publishing the plugin.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "check": "node chat.mjs --check",
+    "chat": "node --env-file=.env chat.mjs"
+  },
+  "dependencies": {
+    "@elizaos/core": "2.0.5",
+    "@elizaos/plugin-anthropic": "2.0.5",
+    "@elizaos/plugin-sql": "2.0.5",
+    "elizaos-plugin-autonomo": "file:../../sdk/eliza"
+  }
+}

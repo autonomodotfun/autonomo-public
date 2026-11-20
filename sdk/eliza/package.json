@@ -1,0 +1,108 @@
+{
+  "name": "elizaos-plugin-autonomo",
+  "version": "0.1.0",
+  "description": "elizaOS plugin for Autonomo: an agent finds the right paid API, sees its price and pays for a call in USDG or $AUTONOMO on Robinhood Chain, within spending caps.",
+  "homepage": "https://autonomo.fun/docs/eliza",
+  "author": "Autonomo (https://autonomo.fun)",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck:v1": "tsc -p tsconfig.v1.json",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build && npm run typecheck:v1 && npm test"
+  },
+  "keywords": [
+    "elizaos",
+    "elizaos-plugins",
+    "eliza",
+    "plugin",
+    "x402",
+    "autonomo",
+    "ai-agents",
+    "robinhood-chain",
+    "usdg",
+    "payments"
+  ],
+  "dependencies": {
+    "autonomo-sdk": "^0.1.3"
+  },
+  "peerDependencies": {
+    "@elizaos/core": ">=1.7.0 <3.0.0"
+  },
+  "devDependencies": {
+    "@elizaos/core": "2.0.5",
+    "@elizaos/core-v1": "npm:@elizaos/core@1.7.2",
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
+  },
+  "packageType": "plugin",
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "AUTONOMO_WALLET_KEY": {
+        "type": "string",
+        "description": "Private key of a wallet made just for the agent, holding only what it may spend. Without it the agent can find APIs and check prices, not pay.",
+        "required": false,
+        "sensitive": true
+      },
+      "AUTONOMO_PAY_WITH": {
+        "type": "string",
+        "description": "Token to pay with: usdg, autonomo or auto (USDG first, then $AUTONOMO).",
+        "required": false,
+        "default": "auto"
+      },
+      "AUTONOMO_MAX_USDG_PER_CALL": {
+        "type": "string",
+        "description": "The most one call may cost in USDG.",
+        "required": false,
+        "default": "0.05"
+      },
+      "AUTONOMO_MAX_AUTONOMO_PER_CALL": {
+        "type": "string",
+        "description": "The most one call may cost in $AUTONOMO.",
+        "required": false,
+        "default": "5000"
+      },
+      "AUTONOMO_DAILY_USDG": {
+        "type": "string",
+        "description": "The most to spend per UTC day in USDG.",
+        "required": false,
+        "default": "1"
+      },
+      "AUTONOMO_DAILY_AUTONOMO": {
+        "type": "string",
+        "description": "The most to spend per UTC day in $AUTONOMO.",
+        "required": false,
+        "default": "10000"
+      },
+      "AUTONOMO_BORRO_ACCOUNT": {
+        "type": "string",
+        "description": "Address of a Borro credit line to borrow from when the wallet is short of USDG.",
+        "required": false
+      },
+      "AUTONOMO_MAX_OUTPUT_CHARS": {
+        "type": "string",
+        "description": "Longer API answers are cut before they reach the model or the chat.",
+        "required": false,
+        "default": "8000"
+      }
+    }
+  }
+}

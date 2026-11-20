@@ -9,6 +9,7 @@ import { metadata as agents } from "../docs/agents/page";
 import { metadata as borro } from "../docs/borro/page";
 import { metadata as cli } from "../docs/cli/page";
 import { metadata as directory } from "../docs/directory/page";
+import { metadata as eliza } from "../docs/eliza/page";
 import { metadata as gloam } from "../docs/gloam/page";
 import { metadata as langchain } from "../docs/langchain/page";
 import { metadata as launch } from "../docs/launch/page";
@@ -42,6 +43,7 @@ const DOCS: Page[] = [
   { path: "/docs/sdk", meta: sdk },
   { path: "/docs/cli", meta: cli },
   { path: "/docs/langchain", meta: langchain },
+  { path: "/docs/eliza", meta: eliza },
   { path: "/docs/official-apis", meta: officialApis },
   { path: "/api-docs", meta: apiDocs },
   { path: "/docs/gloam", meta: gloam },
@@ -132,6 +134,7 @@ Or use one of Autonomo's tools, which do all three steps within a per-call cap a
 - SDK: \`npm install autonomo-sdk\` or \`pip install autonomo-sdk\`. One \`call\` finds the API, pays and returns the answer with a receipt. Guide: ${SITE}/docs/sdk
 - CLI: \`npx autonomo-sdk find "<what you need>"\`, then \`npx autonomo-sdk call "<what you need>"\`. Add \`--dry-run\` to see the price without paying. Guide: ${SITE}/docs/cli
 - LangChain and LangGraph: \`pip install langchain-autonomo\` or \`npm install langchain-autonomo\`. Guide: ${SITE}/docs/langchain
+- elizaOS (1.x and 2.x): \`npm install elizaos-plugin-autonomo\`, with \`AUTONOMO_WALLET_KEY\` in the agent's secrets. Actions: \`AUTONOMO_FIND_APIS\` and \`AUTONOMO_GET_PRICE\` (free), \`AUTONOMO_CALL_API\` (pays). Guide: ${SITE}/docs/eliza
 
 Use a new wallet with a small balance for an agent, never a main wallet.
 

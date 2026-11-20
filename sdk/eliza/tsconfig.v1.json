@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@elizaos/core": ["./node_modules/@elizaos/core-v1/dist/index.d.ts"]
+    }
+  }
+}
