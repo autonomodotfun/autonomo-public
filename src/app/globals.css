@@ -93,3 +93,20 @@ textarea:focus-visible {
     @apply rounded-sm bg-surface px-1 py-0.5 font-mono text-[0.85em];
   }
 }
+
+/* The homepage's payment demo: its lines appear one after another, once. Still, and all there, with motion turned off. */
+@keyframes pay-step {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.pay-demo > li {
+  animation: pay-step 0.45s ease-out both;
+  animation-delay: calc(0.4s + var(--i) * 0.75s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pay-demo > li {
+    animation: none;
+  }
+}
