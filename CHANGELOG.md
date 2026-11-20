@@ -11,7 +11,7 @@ repo gets a copy of each release.
 ## November 19, 2026
 
 - **A "Use with" section on the homepage.** The partners move out of the hero into their own section under "How a
-  launch works": one card each, with the partner's logo and what an agent can do with it, linking to its guide.
+  launch works": one card each, with a two-word label above the partner's logo, linking to its guide.
 - **QHooks joins the partners**, on [/partners](https://autonomo.fun/partners) and in the homepage's "Use with" section.
   Its QProof API is in the directory with both paid endpoints: a stored token report for $0.02 and a fresh scan for
   $0.25, in USDG on Robinhood Chain or USDC on Base. A fresh scan is only charged once every required check completes.

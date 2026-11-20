@@ -13,8 +13,6 @@ export type Partner = {
   Logo?: (props: { className?: string }) => React.ReactNode;
   href: string;
   what: string;
-  // What an agent can do with it, in a few words, for the homepage card.
-  does: string;
   about: string;
   guides?: { href: string; label: string }[];
 };
@@ -25,7 +23,6 @@ export const PARTNERS: Partner[] = [
     Logo: GloamLogo,
     href: "https://gloam.trade",
     what: "Private payments",
-    does: "Pay without linking your wallet",
     about:
       "Agents can pay any API on Autonomo that accepts USDG from a private Gloam balance, so the payment doesn't link back to their wallet.",
     guides: [{ href: "/docs/gloam", label: "Pay privately with Gloam" }],
@@ -35,7 +32,6 @@ export const PARTNERS: Partner[] = [
     Logo: BorroLogo,
     href: "https://borro.markets",
     what: "Agent credit",
-    does: "Borrow and pay in one request",
     about:
       "Agents short on USDG can borrow what they need from a Borro credit line and pay for an Autonomo API in the same request.",
     guides: [{ href: "/docs/borro", label: "Pay with a Borro credit line" }],
@@ -45,7 +41,6 @@ export const PARTNERS: Partner[] = [
     Logo: OstraLogo,
     href: "https://ostraagent.xyz",
     what: "Agent vault",
-    does: "Pay from an agent vault",
     about:
       "Agents with an Ostra vault can list Autonomo's APIs and pay for them in USDG with Ostra's MCP server. Autonomo's Offer Finder also finds agents for hire on Ostrapad, built on Ostrapad's public listings, not an official Ostra API.",
     guides: [
@@ -58,7 +53,6 @@ export const PARTNERS: Partner[] = [
     Logo: TokyoFuturoLogo,
     href: "https://tokyofuturo.xyz",
     what: "Agent jobs",
-    does: "Find paid jobs for agents",
     about:
       "Tokyo Futuro is a job market for AI agents on Robinhood Chain: agents take paid jobs with a bond, deliver and build a public record. Autonomo's Job Finder, built with Tokyo Futuro, finds open jobs an agent can take, and Tokyo Futuro's own x402 APIs are listed in the directory.",
     guides: [
@@ -71,7 +65,6 @@ export const PARTNERS: Partner[] = [
     Logo: StoaLogo,
     href: "https://stoadex.com",
     what: "Swap router",
-    does: "Quote and route a swap",
     about:
       "Stoa is a DEX aggregator on Robinhood Chain. Agents can check a token before buying and get a quote with ready-to-sign swap calldata, paid per call through Autonomo.",
     guides: [
@@ -84,7 +77,6 @@ export const PARTNERS: Partner[] = [
     Logo: QHooksLogo,
     href: "https://qhooks.com",
     what: "Token proof",
-    does: "Check a token before buying",
     about:
       "QProof by QHooks gives agents the evidence on a token before they buy: a simulated buy and sell, taxes, holder and insider concentration and the pool's hook, with a link behind every value. Checks it couldn't run are reported, never called clear. Paid per call in USDG on Robinhood Chain or USDC on Base.",
     guides: [{ href: "/projects/qproof", label: "Check a token with QProof" }],
@@ -102,8 +94,8 @@ export function PartnerMark({ partner, className }: { partner: Partner; classNam
   );
 }
 
-/** The homepage's "Use with" cards: each partner's logo and what an agent can do with it, in the same joined grid as
- * "How a launch works". A card links to our guide for the partner (the partner's own site when there's none). Empty
+/** The homepage's "Use with" cards: each partner's two-word label as a tag above its logo, the way /partners shows
+ * it, in one joined grid. A card links to our guide for the partner (the partner's own site when there's none). Empty
  * cells fill the last row, so the grid stays whole with any number of partners. */
 export function PartnersGrid() {
   if (!PARTNERS.length) return null;
@@ -114,8 +106,8 @@ export function PartnersGrid() {
       {PARTNERS.map((p) => {
         const inner = (
           <>
+            <span className="mb-3 block font-mono text-xs tracking-wide text-faint uppercase">{p.what}</span>
             <PartnerMark partner={p} className="h-6 w-auto" />
-            <span className="mt-3 block text-sm text-muted">{p.does}</span>
           </>
         );
         const guide = p.guides?.[0];

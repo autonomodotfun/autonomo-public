@@ -29,7 +29,7 @@ export function Avatar({ name, src, size = "md" }: { name: string; src?: string 
   const box = size === "lg" ? "size-14" : "size-9";
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" loading="lazy" className={`${box} shrink-0 rounded-md bg-surface object-cover ring-1 ring-line`} />;
+    return <img src={src} alt="" loading="lazy" className={`${box} shrink-0 rounded-md object-cover`} />;
   }
   const letter = (name.match(/[a-z0-9]/i)?.[0] ?? "?").toUpperCase();
   let hash = 0;
