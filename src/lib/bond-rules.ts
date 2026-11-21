@@ -46,15 +46,47 @@ export type BondState = {
 };
 
 /**
- * Where a wallet stands. `active` is what counts: locked tokens minus any amount the creator asked to take out.
- * `meets` is the contract's own isBonded. The badge needs more: after a slash runs it stays hidden for 30 days, even
- * when what is left is still above the minimum.
+ * Where a wallet stands against the amount it is held to (`required`, in the token's smallest unit: see lockStanding).
+ * `active` is what counts: locked tokens minus any amount the creator asked to take out. The badge needs more than
+ * `meets`: after a slash runs it stays hidden for 30 days, even when what is left is still above the amount.
  */
-export function bondStanding(s: BondState, minBond: bigint, now: number) {
+export function bondStanding(s: BondState, required: bigint, now: number) {
   const active = s.amount - s.pendingWithdraw;
-  const meets = minBond > 0n && active >= minBond;
+  const meets = required > 0n && active >= required;
   const hiddenUntil = s.nextSlashAt > now ? s.nextSlashAt : null;
   return { active, meets, bonded: meets && hiddenUntil === null, hiddenUntil };
+}
+
+/** Bonded is about $100 of $AUTONOMO, rounded to this many whole tokens. */
+export const BOND_ROUND_TOKENS = 10_000;
+const WEI = 10n ** 18n;
+
+/**
+ * Whole tokens worth `usd` at a price, rounded to the nearest 10,000, and never below the contract's own minimum
+ * (`floorTokens`), which isBonded() on-chain still applies.
+ */
+export function bondTokensFor(usd: number, priceUsd: number, floorTokens: number) {
+  if (!(usd > 0) || !(priceUsd > 0)) throw new Error("bad price for the bond amount");
+  const tokens = Math.round(usd / priceUsd / BOND_ROUND_TOKENS) * BOND_ROUND_TOKENS;
+  return Math.max(tokens, floorTokens, BOND_ROUND_TOKENS);
+}
+
+export type LockChange = "none" | "insert" | "lower" | "drop";
+
+/**
+ * The amount a wallet is held to, with the same lock as Verified. A wallet that qualifies keeps its amount: it never
+ * has to lock more, and the amount moves down when the weekly one falls below it. A wallet found below its amount loses
+ * the lock and qualifies again at the weekly amount. `lock` and `weekly` are whole tokens; `active` is in the token's
+ * smallest unit.
+ */
+export function lockStanding(lock: number | null, weekly: number, active: bigint) {
+  const tokens = lock === null ? weekly : Math.min(lock, weekly);
+  const meets = active >= BigInt(tokens) * WEI;
+  let change: LockChange = "none";
+  if (lock !== null && !meets) change = "drop";
+  else if (lock !== null && tokens < lock) change = "lower";
+  else if (lock === null && meets) change = "insert";
+  return { tokens: meets ? tokens : weekly, locked: meets, change, saveTokens: tokens };
 }
 
 export type SlashStatus = "waiting" | "ready" | "expired" | "executed" | "cancelled";
@@ -65,10 +97,10 @@ export function openSlashStatus(executableAt: number, now: number): SlashStatus 
   return now > executableAt + EXECUTION_GRACE_S ? "expired" : "ready";
 }
 
-/** How many more tokens a wallet needs to lock to reach the minimum. 0 when it already does. */
-export function shortOfMinimum(s: BondState, minBond: bigint) {
+/** How many more tokens a wallet needs to lock to reach the amount it is held to. 0 when it already does. */
+export function shortOfMinimum(s: BondState, required: bigint) {
   const active = s.amount - s.pendingWithdraw;
-  return active >= minBond ? 0n : minBond - active;
+  return active >= required ? 0n : required - active;
 }
 
 export type BondCall = { to: string; data: `0x${string}`; label: string };

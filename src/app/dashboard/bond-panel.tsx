@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BondedBadge, fmtBond, fmtDay } from "@/components/bonded";
-import { walletBondOrNull } from "@/lib/bond";
+import { bondUsd, walletBondOrNull } from "@/lib/bond";
 import { shortOfMinimum } from "@/lib/bond-rules";
 import { TOKEN } from "@/lib/constants";
 import { privyEnabled } from "@/lib/privy";
@@ -15,7 +15,7 @@ export async function BondPanel({ owner, payee }: { owner: string; payee: string
   const read = await walletBondOrNull(payee);
   if (!read) return null;
   const { contract, settings, bond, heldBySlash } = read;
-  const minBond = BigInt(settings.minBond);
+  const required = BigInt(bond.required) * 10n ** 18n;
   const state = {
     amount: BigInt(bond.amount),
     pendingWithdraw: BigInt(bond.pendingWithdraw),
@@ -23,7 +23,7 @@ export async function BondPanel({ owner, payee }: { owner: string; payee: string
     nextSlashAt: bond.hiddenUntil ?? 0,
     openSlashId: BigInt(bond.openSlashId),
   };
-  const short = shortOfMinimum(state, minBond);
+  const short = shortOfMinimum(state, required);
   const contractWallet = payee !== owner ? await isContractWallet(payee) : false;
 
   const steps: BondStepsProps = {
@@ -56,7 +56,7 @@ export async function BondPanel({ owner, payee }: { owner: string; payee: string
 
       <dl className="mt-4 grid gap-2 sm:grid-cols-3">
         <Fact label="Locked" value={`${fmtBond(bond.amount)} ${TOKEN.symbol}`} />
-        <Fact label="Minimum to show as Bonded" value={`${fmtBond(settings.minBond)} ${TOKEN.symbol}`} />
+        <Fact label="Amount to show as Bonded" value={`${bond.required.toLocaleString("en-US")} ${TOKEN.symbol}`} />
         <Fact
           label="Status"
           value={
@@ -70,6 +70,11 @@ export async function BondPanel({ owner, payee }: { owner: string; payee: string
           }
         />
       </dl>
+      <p className="mt-2 text-muted">
+        {bond.locked
+          ? `Your amount is locked at ${bond.required.toLocaleString("en-US")} ${TOKEN.symbol}: it won't go up if the price falls, and it moves down if the weekly amount falls below it.`
+          : `That's about $${bondUsd().toLocaleString("en-US")} at last week's average price, set once a week. Once your APIs show as Bonded, your amount is locked and won't go up.`}
+      </p>
       {bond.openSlashId > 0 && (
         <p className="mt-3 text-warn">
           Slash {bond.openSlashId} is open against this bond. See it on{" "}

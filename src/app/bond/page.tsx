@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BondedBadge, fmtBond, SlashList } from "@/components/bonded";
-import { bondContract, bondEnabled, bondRefundWallet, getBondSettings, slashesOrNull } from "@/lib/bond";
+import { bondContract, bondEnabled, bondRefundWallet, bondUsd, getBondRequirement, getBondSettings, slashesOrNull } from "@/lib/bond";
 import { BURN_DEAD } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
 import { getGatewayBonds } from "@/lib/queries";
@@ -20,7 +20,7 @@ const days = (seconds: number) => {
 export default async function BondPage() {
   if (!bondEnabled()) notFound();
   const contract = bondContract()!;
-  const [settings, bonds, slashes] = await Promise.all([getBondSettings(), getGatewayBonds(), slashesOrNull()]);
+  const [settings, bonds, slashes, requirement] = await Promise.all([getBondSettings(), getGatewayBonds(), slashesOrNull(), getBondRequirement()]);
   if (!settings) notFound();
   const now = Math.floor(Date.now() / 1000);
   const refundWallet = bondRefundWallet();
@@ -51,15 +51,25 @@ export default async function BondPage() {
 
       <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
         <Stat label="Locked in bonds" value={`${fmtBond(settings.totalBonded)} ${TOKEN.symbol}`} note="Read from the contract" />
-        <Stat label="Minimum to show as Bonded" value={`${fmtBond(settings.minBond)} ${TOKEN.symbol}`} note="About $100, reset about once a month" />
+        <Stat
+          label="Amount to show as Bonded"
+          value={requirement ? `${requirement.tokens.toLocaleString("en-US")} ${TOKEN.symbol}` : "—"}
+          note={requirement ? `About $${requirement.usd.toLocaleString("en-US")} at last week's average, set weekly` : "This week's amount couldn't be read just now"}
+        />
         <Stat label="Bonded APIs" value={String(bonded.length)} note="Listed on Autonomo" />
       </div>
 
       <h2 className="heading mt-12 text-2xl">For a creator</h2>
       <ol className="mt-4 list-decimal space-y-2 pl-5 text-muted">
         <li>
-          Lock the minimum or more from the wallet your APIs pay. It&apos;s one bond per wallet, for all of that wallet&apos;s
-          APIs. The steps are on your <Link href="/dashboard#bond" className="underline hover:text-ink">dashboard</Link>.
+          Lock about ${bondUsd().toLocaleString("en-US")} of {TOKEN.symbol} or more from the wallet your APIs pay. It&apos;s one
+          bond per wallet, for all of that wallet&apos;s APIs. The steps are on your{" "}
+          <Link href="/dashboard#bond" className="underline hover:text-ink">dashboard</Link>.
+        </li>
+        <li>
+          The amount in tokens is set once a week from the previous week&apos;s average price, like Verified. Once your APIs
+          show as Bonded, your amount is locked: it won&apos;t go up if the price falls, and it moves down if the weekly amount
+          falls below it. Take tokens out below your amount and you qualify again at the current weekly amount.
         </li>
         <li>To leave, ask to withdraw. That amount stops counting at once, and you can take it out {days(settings.cooldownS)} later.</li>
         <li>You can drop the request at any time to stay bonded.</li>
@@ -166,7 +176,8 @@ export default async function BondPage() {
           contracts/robinhood
         </a>
         . Settings today: wait to withdraw {days(settings.cooldownS)}, dispute window {days(settings.disputeWindowS)}, at most{" "}
-        {maxSlash}% per slash, {refund}% of a slash refunded.
+        {maxSlash}% per slash, {refund}% of a slash refunded. The contract&apos;s own minimum, a floor under the weekly amount,
+        is {fmtBond(settings.minBond)} {TOKEN.symbol}.
       </p>
     </div>
   );

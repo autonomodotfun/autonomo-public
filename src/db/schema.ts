@@ -306,6 +306,17 @@ export const verifiedWallets = pgTable("verified_wallets", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// The $AUTONOMO amount a wallet's provider bond is held to for Bonded, saved when it first qualifies. Like
+// verified_wallets: it never goes up for that wallet, and it is dropped when the bond falls below it. See src/lib/bond.ts.
+export const bondedWallets = pgTable("bonded_wallets", {
+  // Lowercased wallet address: the wallet the APIs pay, which is the wallet that bonds.
+  wallet: text("wallet").primaryKey(),
+  // Whole tokens.
+  tokens: integer("tokens").notNull(),
+  lockedAt: timestamp("locked_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // One row per question the AI agent took, for costs and to see who comes back. Questions themselves aren't stored.
 export const agentQuestions = pgTable(
   "agent_questions",

@@ -178,7 +178,7 @@ Its constructor takes, in order:
 | `token_` | $AUTONOMO | `0xE83C85E1eaD16FCFe85401E2b337Fb4FB5B5cC96` |
 | `owner_` | A Safe used for nothing else. Cancels slashes, replaces the slasher, changes the settings | To come |
 | `slasher_` | A separate wallet that proposes slashes, its key kept off the server | To come |
-| `minBond_` | Smallest bond that counts: $100 of $AUTONOMO, in the token's 18 decimals. The contract stores a token amount, so the owner updates it about once a month with `setParams` | `460000000000000000000000` (460,000 tokens at $0.00022; recomputed with the price on deploy day) |
+| `minBond_` | The floor `isBonded` applies on-chain, in the token's 18 decimals. The site's Bonded badge asks for about $100 of $AUTONOMO instead, set weekly from the previous week's average price and locked per wallet like Verified (`src/lib/bond.ts`), and never less than this floor | `100000000000000000000000` (100,000 tokens) |
 | `cooldown_` | Seconds between asking to withdraw and withdrawing | `1209600` (14 days) |
 | `disputeWindow_` | Seconds a slash waits before it can run | `259200` (3 days) |
 | `maxSlashBps_` | Most one slash can take | `2000` (20% of the bond) |
