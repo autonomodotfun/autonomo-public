@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { bondEnabled } from "@/lib/bond";
 
 export const metadata: Metadata = {
   title: "Roadmap",
@@ -6,6 +7,12 @@ export const metadata: Metadata = {
 };
 
 // The roadmap. Move items between stages as they ship: "live" items are things anyone can use today.
+// The provider bond moves itself: it is under "Coming next" until its contract is set (PROVIDER_BOND), then under Token.
+
+const BOND: { title: string; note: string } = {
+  title: "Provider bond",
+  note: "Creators lock $AUTONOMO and show as Bonded. If their API takes payments and doesn't deliver, part of the bond refunds the agent and the rest is burned. Not audited yet",
+};
 
 type Item = { title: string; note?: string };
 type Group = { name: string; items: Item[] };
@@ -49,6 +56,7 @@ const ROADMAP: Stage[] = [
           { title: "Verified contracts and a public burn page", note: "The first burn is on-chain" },
           { title: "Verified badge", note: "For API creators who hold $AUTONOMO" },
           { title: "Official APIs paid into a 2-of-2 Safe", note: "It also holds about 1M $AUTONOMO" },
+          ...(bondEnabled() ? [BOND] : []),
         ],
       },
       {
@@ -88,6 +96,7 @@ const ROADMAP: Stage[] = [
       { title: "APIs from other platforms", note: "Coinbase and PayAI APIs, usable through the SDK" },
       { title: "Webhooks and payout analytics", note: "For API owners" },
       { title: "Free daily calls for holders", note: "On the official APIs" },
+      ...(bondEnabled() ? [] : [BOND]),
     ],
   },
   {
@@ -96,10 +105,7 @@ const ROADMAP: Stage[] = [
     items: [
       { title: "API reputation score", note: "Uptime, success rate and real payers, with an open formula and no paid placement" },
       { title: "Router", note: "One endpoint per need, the best provider picked automatically, fallback if one fails, payment only for valid answers" },
-      {
-        title: "Provider bonds",
-        note: "Creators lock $AUTONOMO to receive routed traffic, scaled to that traffic. On failure or fraud, agents are refunded first and the rest is burned. This comes with an outside audit",
-      },
+      { title: "Bond audit and Router rules", note: "An outside audit of the bond contract, and the Router skips an API for 30 days after a slash" },
       { title: "Verifier network", note: "Anyone stakes $AUTONOMO to check API quality" },
       { title: "ZK private payments", note: "Private for the agent, with public proof" },
     ],

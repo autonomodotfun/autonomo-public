@@ -1,6 +1,6 @@
 # Robinhood Chain contracts
 
-The burn, the mirror burn for Base payments, and the rewards vesting. Build and test from this folder; see
+The burn, the mirror burn for Base payments, the rewards vesting, and the provider bond (not deployed yet). Build and test from this folder; see
 [`../README.md`](../README.md) for installing the libraries and the full list of addresses.
 
 ## Burn contracts
@@ -124,3 +124,66 @@ Deployed on Robinhood Chain at [`0xF8795F9F5F92Fec042d94A8D879770C0bdE9D277`](ht
 | `beneficiary` | The Rewards Safe |
 | `startTimestamp` | When vesting starts, in Unix seconds (Dec 1, 2026 00:00 UTC is `1796083200`) |
 | `durationSeconds` | How long it runs (180 days is `15552000`) |
+
+## Provider bond
+
+**`ProviderBond`** lets an API creator lock $AUTONOMO as a bond. If a bonded API takes payments and doesn't deliver, part of
+the bond is slashed: a share refunds the payer and the rest goes to `0x000000000000000000000000000000000000dEaD`. The
+creator gets the rest back after a waiting period. One bond per wallet, for all of that wallet's APIs.
+
+It is **not deployed yet and not audited**. Anyone bonding before an audit takes that risk.
+
+| Function | Who | What it does |
+| --- | --- | --- |
+| `deposit(amount)` | The creator | Locks tokens, after an approval. Can be called again to add more. |
+| `requestWithdraw(amount)` | The creator | That amount stops counting at once, and can be taken out after the cooldown. Calling again replaces the request and restarts the cooldown. |
+| `withdraw()` / `cancelWithdraw()` | The creator | Takes the requested amount out once the cooldown is over, or drops the request to stay bonded. |
+| `proposeSlash(provider, amount, payer, reason)` | The slasher | Opens a slash. `reason` is a hash of the evidence, published off-chain. A `payer` of `address(0)` burns all of it. |
+| `cancelSlash(id)` | Owner or slasher; anyone once it has expired | Drops an open slash. |
+| `executeSlash(id)` | Anyone | Runs a slash after its dispute window: the refund share to the payer, the rest burned. |
+| `isBonded(provider)` / `activeBond(provider)` | Anyone | Whether the wallet holds at least the minimum, and how much counts (locked tokens minus any requested withdrawal). |
+| `setSlasher` / `setParams` | The owner | Replaces the slasher, or changes the settings inside the limits below. |
+
+Limits written into the contract, which the owner can't lift:
+
+- One slash takes at most `maxSlashBps` of a bond, and that setting can never go above 50%.
+- At least 50% of every slash is burned.
+- One open slash per creator, and 30 days between two slashes of the same creator. The cooldown is 7 to 21 days, so a
+  creator who asks to withdraw after a slash gets the rest out before a second slash is possible.
+- Every slash waits out the dispute window (1 to 6 days) before it can run, and expires 7 days after that if nobody runs it.
+- A withdrawal that has finished its cooldown can't be reduced or blocked by a new slash. A slash opened during the
+  cooldown can hold it back until that slash runs, is cancelled or expires.
+- Bonded tokens leave only through the creator's `withdraw` or a slash. Handing over ownership takes two steps, and it
+  can't be given up.
+
+What it doesn't solve:
+
+- A person decides a slash, not code: the contract can't see whether an API answered. The slasher also names the payer,
+  so the owner, who can replace the slasher, is the party creators trust. The limits above bound what that trust can cost:
+  one capped slash, then the creator can leave.
+- One slash names one payer, and the next slash of that creator is 30 days away. When several payers lost money, the
+  slash names an Autonomo refund wallet as the payer. That wallet passes the refund on to each payer in proportion to
+  what they lost, publishes the transfers, and keeps none of it.
+- A slash that is too small still starts the 30 days.
+- A slashed creator still reads as bonded in the contract if what is left is above the minimum. So after a slash the
+  site hides the Bonded badge for 30 days, and the slash history stays on the API's page.
+- Refunds are in $AUTONOMO, whatever the payer paid with.
+- Tokens sent to the contract directly, not through `deposit`, are stuck.
+- If the refund transfer to the payer fails, the slash can't run. It has to be cancelled, or it expires.
+
+Its constructor takes, in order:
+
+| Constructor value | What it is | Proposed |
+| --- | --- | --- |
+| `token_` | $AUTONOMO | `0xE83C85E1eaD16FCFe85401E2b337Fb4FB5B5cC96` |
+| `owner_` | A Safe used for nothing else. Cancels slashes, replaces the slasher, changes the settings | To come |
+| `slasher_` | A separate wallet that proposes slashes, its key kept off the server | To come |
+| `minBond_` | Smallest bond that counts: $100 of $AUTONOMO, in the token's 18 decimals. The contract stores a token amount, so the owner updates it about once a month with `setParams` | `460000000000000000000000` (460,000 tokens at $0.00022; recomputed with the price on deploy day) |
+| `cooldown_` | Seconds between asking to withdraw and withdrawing | `1209600` (14 days) |
+| `disputeWindow_` | Seconds a slash waits before it can run | `259200` (3 days) |
+| `maxSlashBps_` | Most one slash can take | `2000` (20% of the bond) |
+| `refundBps_` | Share of a slash that refunds the payer | `5000` (50%, the other half is burned) |
+
+Tests: `forge test --match-path test/ProviderBond.t.sol` runs 24 tests on a stand-in token, one of them with random
+deposits, withdrawals and slashes. `ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com forge test --match-contract ProviderBondForkTest -vv`
+runs a bond, a slash and an exit with the real $AUTONOMO. The one-file copy is [`flat/ProviderBond.flat.sol`](flat/ProviderBond.flat.sol).

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { bondEnabled } from "@/lib/bond";
 import { burnEnabled } from "@/lib/burn";
 import { getAllSlugs } from "@/lib/queries";
 
@@ -29,6 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/numbers`, changeFrequency: "daily", priority: 0.5 },
     { url: `${base}/api-docs`, changeFrequency: "monthly", priority: 0.6 },
     ...(burnEnabled() ? [{ url: `${base}/burn`, changeFrequency: "daily" as const, priority: 0.7 }] : []),
+    ...(bondEnabled() ? [{ url: `${base}/bond`, changeFrequency: "daily" as const, priority: 0.6 }] : []),
     ...slugs.map((s) => ({ url: `${base}/projects/${s.slug}`, lastModified: s.updatedAt, priority: 0.6 })),
   ];
 }

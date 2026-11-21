@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
 import { BURN_BPS, BURN_DEAD, burnFactory, buybackBurner } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
+import { bondEnabled } from "@/lib/bond";
 import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
 import { Page, Section } from "../ui";
 
@@ -101,6 +102,20 @@ export default function TokenPage() {
           <p>
             If your APIs pay a Safe, the Safe&apos;s balance is what counts: see{" "}
             <Link href="/docs/safe">Get paid at a Safe</Link>.
+          </p>
+        </Section>
+      )}
+
+      {bondEnabled() && (
+        <Section id="bonded" title="Bonded for API providers">
+          <p>
+            Verified shows a provider holds {TOKEN.symbol}. Bonded shows they have something to lose: the provider locks{" "}
+            {TOKEN.symbol} in the bond contract from the wallet their APIs pay. If one of their APIs takes payments and
+            doesn&apos;t deliver, part of the bond refunds the payer and the rest is burned.
+          </p>
+          <p>
+            The rules, the limits written into the contract, and every slash with its evidence are on{" "}
+            <Link href="/bond">the bond page</Link>. The contract has not been audited yet.
           </p>
         </Section>
       )}

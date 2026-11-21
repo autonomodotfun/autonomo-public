@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { shelve } from "@/lib/api-shelves";
+import { bondEnabled } from "@/lib/bond";
 import { BURN_BPS, burnFactory } from "@/lib/burn";
 import { baseCoverage } from "@/lib/gateway";
 import { TOKEN } from "@/lib/constants";
@@ -22,6 +23,7 @@ import { metadata as sdk } from "../docs/sdk/page";
 import { metadata as selfHosted } from "../docs/self-hosted/page";
 import { metadata as token } from "../docs/token/page";
 import { metadata as apiDocs } from "../api-docs/page";
+import { metadata as bond } from "../bond/page";
 import { metadata as burn } from "../burn/page";
 import { metadata as numbers } from "../numbers/page";
 import { metadata as partners } from "../partners/page";
@@ -62,6 +64,7 @@ const OPTIONAL: Page[] = [
   { path: "/playground", meta: playground },
   { path: "/numbers", meta: numbers },
   ...(burnFactory() ? [{ path: "/burn", meta: burn }] : []),
+  ...(bondEnabled() ? [{ path: "/bond", meta: bond }] : []),
   { path: "/roadmap", meta: roadmap },
   { path: "/partners", meta: partners },
 ];

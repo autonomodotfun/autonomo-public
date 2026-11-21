@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BondedBadge } from "@/components/bonded";
 import { VerifiedBadge } from "@/components/verified";
+import { readWalletBonds } from "@/lib/bond";
 import { verifiedStatus } from "@/lib/verified";
 import { lastRejectionNote } from "@/lib/admin-log";
 import { notFound, redirect } from "next/navigation";
@@ -33,9 +35,11 @@ export default async function GatewayDashboard({
   if (!owner) redirect("/dashboard");
   const g = await getOwnedGateway((await params).slug, owner);
   if (!g) notFound();
-  const [stats, { verified }, rejectionNote] = await Promise.all([
+  const [stats, { verified }, bonds, rejectionNote] = await Promise.all([
     gatewayStats(g.id),
     verifiedStatus(payeeOf(g)),
+    // A failed read only hides the badge.
+    readWalletBonds([payeeOf(g)]).catch((e) => (console.error("bond read failed", e), {} as Awaited<ReturnType<typeof readWalletBonds>>)),
     g.listing === "rejected" ? lastRejectionNote(g.id) : null,
   ]);
   const live = gatewayOffers(g);
@@ -124,6 +128,7 @@ export default async function GatewayDashboard({
           <div className="flex items-center gap-2">
             <h1 className="heading text-4xl">{g.name}</h1>
             {verified && <VerifiedBadge />}
+            {bonds[payeeOf(g).toLowerCase()]?.bonded && <BondedBadge />}
             <Badge tone={g.status === "active" ? "ok" : "muted"}>{g.status}</Badge>
             {g.listing !== "unlisted" && <Badge tone={g.listing === "listed" ? "ok" : g.listing === "rejected" ? "warn" : "muted"}>{g.listing}</Badge>}
           </div>

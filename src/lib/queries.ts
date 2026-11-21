@@ -6,6 +6,7 @@ import { getDb, schema } from "@/db";
 import { CATEGORIES, type Category } from "@/db/schema";
 import { TOKEN } from "@/lib/constants";
 import { retrySoon, untilLocalDbIsFree } from "@/lib/prerender";
+import { bondEnabled, readWalletBonds, type WalletBond } from "@/lib/bond";
 import { holdsMinimum } from "@/lib/verified";
 import { summarize, TRACK_RECORD_DAYS, type TrackRecord } from "@/lib/track-record";
 
@@ -182,19 +183,39 @@ async function listAutonomoGatewaysFresh() {
     .orderBy(asc(gateways.createdAt));
 }
 
-// Listed, active gateways whose paid wallet holds the Verified amount. A failed read throws, so it isn't cached.
-async function verifiedGatewaysFresh() {
+// Every listed, active gateway with the wallet it pays, which is the wallet Verified and the bond are read on.
+async function listedHolders() {
   const db = await getDb();
   const { gateways } = schema;
-  const rows = await db
+  return db
     .select({ slug: gateways.slug, holder: sql<string>`coalesce(${gateways.payTo}, ${gateways.owner})`, projectSlug: projects.slug })
     .from(gateways)
     .innerJoin(projects, eq(gateways.projectId, projects.id))
     .where(and(eq(gateways.listing, "listed"), eq(gateways.status, "active"), eq(projects.status, "approved")));
+}
+
+// Listed, active gateways whose paid wallet holds the Verified amount. A failed read throws, so it isn't cached.
+async function verifiedGatewaysFresh() {
+  const rows = await listedHolders();
   const holders = [...new Set(rows.map((r) => r.holder))];
   const holds = new Map(await Promise.all(holders.map(async (h) => [h, await holdsMinimum(h)] as const)));
   const verified = rows.filter((r) => holds.get(r.holder));
   return { slugs: verified.map((r) => r.slug), projectSlugs: verified.map((r) => r.projectSlug) };
+}
+
+export type GatewayBonds = { slugs: string[]; projectSlugs: string[]; byProject: Record<string, WalletBond> };
+
+// Listed, active gateways whose paid wallet shows as Bonded, and the bond of every wallet that has one, by project.
+// A failed read throws, so it isn't cached.
+async function gatewayBondsFresh(): Promise<GatewayBonds> {
+  if (!bondEnabled()) return { slugs: [], projectSlugs: [], byProject: {} };
+  const rows = await listedHolders();
+  const bonds = await readWalletBonds(rows.map((r) => r.holder));
+  const of = (holder: string) => bonds[holder.toLowerCase()];
+  const bonded = rows.filter((r) => of(r.holder)?.bonded);
+  const byProject: Record<string, WalletBond> = {};
+  for (const r of rows) if (of(r.holder)?.known) byProject[r.projectSlug] = of(r.holder);
+  return { slugs: bonded.map((r) => r.slug), projectSlugs: bonded.map((r) => r.projectSlug), byProject };
 }
 
 function escapeLike(s: string) {
@@ -392,6 +413,18 @@ export const getVerifiedGateways = cache(async () => {
     console.error("verified gateways failed", e);
     await retrySoon();
     return { slugs: [] as string[], projectSlugs: [] as string[] };
+  }
+});
+const gatewayBondsCached = cachedRead(gatewayBondsFresh, "gateway-bonds", 300, CATALOG_TAGS.gateways);
+
+/** Bonded gateways and each project's bond; empty while the chain can't be read, so a badge never blocks a page. */
+export const getGatewayBonds = cache(async (): Promise<GatewayBonds> => {
+  try {
+    return await gatewayBondsCached();
+  } catch (e) {
+    console.error("gateway bonds failed", e);
+    await retrySoon();
+    return { slugs: [], projectSlugs: [], byProject: {} };
   }
 });
 export const findAutonomoGateways = cachedRead(findAutonomoGatewaysFresh, "find-autonomo-gateways", 300, CATALOG_TAGS.gateways);

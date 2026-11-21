@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BondedBadge } from "@/components/bonded";
 import { VerifiedBadge } from "@/components/verified";
+import { readWalletBonds } from "@/lib/bond";
 import { verifiedStatus } from "@/lib/verified";
 import { baseCoverage, listOwnerGateways, payeeOf } from "@/lib/gateway";
 import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
@@ -9,6 +11,7 @@ import { platform } from "@/lib/payments";
 import { privyEnabled } from "@/lib/privy";
 import { authEnabled, currentOwner } from "@/lib/session";
 import { Badge } from "./badge";
+import { BondPanel } from "./bond-panel";
 import { ConnectWallet, SignOut } from "./connect-wallet";
 import { PayoutWallet } from "./payout-wallet";
 import { PrivySignIn, PrivySignOut } from "./privy";
@@ -129,6 +132,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const rows = await listOwnerGateways(owner);
   const holders = [...new Set(rows.map((r) => payeeOf(r.gateway)))];
   const verified = new Map(await Promise.all(holders.map(async (h) => [h, (await verifiedStatus(h)).verified] as const)));
+  // A failed read only hides the badges here; the bond panel below says so itself.
+  const bonds = await readWalletBonds(holders).catch((e) => (console.error("bond read failed", e), {} as Awaited<ReturnType<typeof readWalletBonds>>));
 
   return (
     <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6">
@@ -171,6 +176,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{g.name}</span>
                     {verified.get(payeeOf(g)) && <VerifiedBadge />}
+                    {bonds[payeeOf(g).toLowerCase()]?.bonded && <BondedBadge />}
                     <Badge tone={g.status === "active" ? "ok" : "muted"}>{g.status}</Badge>
                     {g.listing !== "unlisted" && <Badge tone={g.listing === "listed" ? "ok" : "muted"}>{g.listing}</Badge>}
                   </div>
@@ -188,6 +194,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {rows.length > 0 && burnPercent() && <p className="mt-2 text-xs text-faint">Earnings are your share after the {burnPercent()}% burn.</p>}
 
       {rows.length > 0 && <PayoutWallet owner={owner} payee={payeeOf(rows[0].gateway)} draft={params.payTo} note={params.payToNote} />}
+
+      {rows.length > 0 && <BondPanel owner={owner} payee={payeeOf(rows[0].gateway)} />}
     </div>
   );
 }
