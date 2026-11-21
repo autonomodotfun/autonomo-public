@@ -3,6 +3,14 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 21, 2026
+
+- **The roadmap is up to date.** [/roadmap](https://autonomo.fun/roadmap) now shows what shipped since November 11:
+  16 official APIs, payments in USDC on Base with the burn still on Robinhood Chain, one dollar price per API, the
+  listing in Coinbase's x402 Bazaar, llms.txt, the official APIs' agent identity, the rewards vesting contract, and
+  Tokyo Futuro, Stoa and QHooks as partners. Coming next adds Base payments in the SDK, CLI, LangChain tools and
+  elizaOS plugin, and Solana payments on gateways.
+
 ## November 20, 2026
 
 - **A guide to keeping an agent's savings in a QWallet.** [/docs/qwallet](https://autonomo.fun/docs/qwallet) shows the

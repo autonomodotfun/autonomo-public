@@ -26,11 +26,17 @@ const ROADMAP: Stage[] = [
       {
         name: "Marketplace",
         items: [
-          { title: "x402 API directory", note: "13 networks, with live prices and usage" },
+          { title: "x402 API directory", note: "5,400+ projects, with live prices, usage, logos and paid endpoints" },
           { title: "Free discovery API", note: "No key needed" },
-          { title: "Launch flow for paid APIs", note: "Hosted gateways on Robinhood Chain" },
+          { title: "Launch flow for paid APIs", note: "Three short steps, a test call before launch, and several APIs at once" },
           { title: "Pay in USDG or $AUTONOMO", note: "On Robinhood Chain, settled by Autonomo's own facilitator" },
-          { title: "8 official APIs", note: "Including Risk Checker, Token Price and New Launches" },
+          { title: "Pay in USDC on Base", note: "Every API can take it, at the same dollar price, when its creator turns it on" },
+          { title: "One price in dollars", note: "Paying in $AUTONOMO costs 20% less" },
+          {
+            title: "16 official APIs",
+            note: "Including Risk Checker, Dev Wallet Tracker, Holders & Bundles and the Tokyo Futuro Job Finder",
+          },
+          { title: "Listed in Coinbase's x402 Bazaar", note: "The official APIs describe themselves to Coinbase's directory" },
           { title: "Agent Playground", note: "Free daily answers" },
           { title: "Research agent", note: "Free reports on any Robinhood Chain token, 3 a day" },
           { title: "Owner dashboard", note: "Paid calls, earnings and on-chain receipts" },
@@ -46,6 +52,8 @@ const ROADMAP: Stage[] = [
           { title: "LangChain tools", note: "For Python and TypeScript" },
           { title: "elizaOS plugin", note: "For elizaOS 1.x and 2.x, with the wallet and limits in the agent's settings" },
           { title: "Spending caps", note: "Per call and per day, and failed calls aren't charged" },
+          { title: "llms.txt", note: "A plain-text map of Autonomo for AI agents" },
+          { title: "Agent identity", note: "The official APIs are agent 26170 in the ERC-8004 registry on Robinhood Chain" },
           { title: "Telegram bot", note: "Ask in a DM or a group, with free daily answers" },
         ],
       },
@@ -56,6 +64,11 @@ const ROADMAP: Stage[] = [
           { title: "Verified contracts and a public burn page", note: "The first burn is on-chain" },
           { title: "Verified badge", note: "For API creators who hold $AUTONOMO" },
           { title: "Official APIs paid into a 2-of-2 Safe", note: "It also holds about 1M $AUTONOMO" },
+          { title: "Burn on Base payments", note: "5% of Base payments still buys back and burns $AUTONOMO, on Robinhood Chain" },
+          {
+            title: "Rewards vesting contract",
+            note: "Holds the $AUTONOMO set aside for rewards, released on a schedule from December 1, 2026 to May 30, 2027",
+          },
           ...(bondEnabled() ? [BOND] : []),
         ],
       },
@@ -65,6 +78,9 @@ const ROADMAP: Stage[] = [
           { title: "Gloam", note: "Private payments" },
           { title: "Borro", note: "Agents borrow to pay for calls" },
           { title: "Ostra", note: "Ostra agents buy data from Autonomo, and agents on Autonomo can find Ostrapad agents to hire" },
+          { title: "Tokyo Futuro", note: "Agent jobs. The Job Finder, built with them, finds open jobs an agent can take" },
+          { title: "Stoa", note: "Swap router. Token safety checks and swap quotes, run on Autonomo's gateways" },
+          { title: "QHooks", note: "Token proof. QProof token checks, and a guide to keeping an agent's savings in a QWallet" },
         ],
       },
       {
@@ -81,6 +97,7 @@ const ROADMAP: Stage[] = [
         items: [
           { title: "First outside agent paying on its own", note: "Minimum Viable Agent paid the Risk Checker from its own wallet on Nov 3" },
           { title: "First borrow-and-pay on-chain", note: "A test agent with no USDG borrowed through Borro and paid New Launches on Nov 6" },
+          { title: "First payments in USDC on Base", note: "An agent paid official APIs in USDC on Base on Nov 18" },
         ],
       },
     ],
@@ -89,9 +106,13 @@ const ROADMAP: Stage[] = [
     name: "Coming next",
     status: "next",
     items: [
-      { title: "More official APIs", note: "Adding to the 8 that are live today" },
+      { title: "More official APIs", note: "Adding to the 16 that are live today" },
       { title: "Grants for outside APIs", note: "Starting with tokenized stock data" },
-      { title: "Base and Solana payments on gateways", note: "With the burn still on Robinhood Chain" },
+      { title: "Solana payments on gateways", note: "Base is live; Solana next, with the burn still on Robinhood Chain" },
+      {
+        title: "Base payments in the agent tools",
+        note: "The SDK, CLI, LangChain tools and elizaOS plugin pay in USDC on Base too. Today they pay on Robinhood Chain",
+      },
       { title: "Token and security page", note: "Supply, team and treasury wallets, unlocks, verified splitter" },
       { title: "APIs from other platforms", note: "Coinbase and PayAI APIs, usable through the SDK" },
       { title: "Webhooks and payout analytics", note: "For API owners" },
@@ -139,7 +160,7 @@ export default function RoadmapPage() {
     <div className="mx-auto max-w-4xl px-4 pt-12 sm:px-6">
       <p className="font-mono text-xs tracking-wide text-accent uppercase">Roadmap</p>
       <h1 className="heading mt-2 text-4xl sm:text-5xl">Roadmap &amp; status</h1>
-      <p className="mt-4 text-muted">What&apos;s live today, what comes next, and what comes after that. Updated November 11, 2026.</p>
+      <p className="mt-4 text-muted">What&apos;s live today, what comes next, and what comes after that. Updated November 21, 2026.</p>
 
       <ol className="mt-8 space-y-3">
         {ROADMAP.map((stage) => (
