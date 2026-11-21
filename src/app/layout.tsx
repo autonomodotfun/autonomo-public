@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { bondEnabled } from "@/lib/bond";
-import { burnFactory } from "@/lib/burn";
-import { TOKEN } from "@/lib/constants";
-import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
 import { TokenBar } from "@/components/token-bar";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
-import { SOCIALS, Socials } from "@/components/socials";
+import { Socials } from "@/components/socials";
 import "./globals.css";
 
 const barlow = Barlow({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-barlow" });
@@ -46,39 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main>{children}</main>
-        <footer className="mt-24 border-t border-line">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:justify-between sm:px-6">
-            <div className="space-y-2">
-              <p>Service data comes from the Coinbase CDP and PayAI discovery endpoints and is refreshed regularly.</p>
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs">
-                <span className="text-ink">{TOKEN.symbol} CA</span>
-                <a href={`${TOKEN.explorer}/token/${TOKEN.address}`} className="break-all text-muted hover:text-ink">
-                  {TOKEN.address}
-                </a>
-                <CopyButton
-                  text={TOKEN.address}
-                  label={`Copy ${TOKEN.symbol} contract address`}
-                  className="rounded-sm border border-line px-1.5 py-0.5 uppercase hover:text-ink"
-                />
-              </p>
-            </div>
-            <p className="flex flex-wrap gap-4">
-              <Link href="/docs" className="hover:text-ink">Docs</Link>
-              <Link href="/api-docs" className="hover:text-ink">API</Link>
-              {burnFactory() && <Link href="/burn" className="hover:text-ink">Burn</Link>}
-              {bondEnabled() && <Link href="/bond" className="hover:text-ink">Bond</Link>}
-              <Link href="/dashboard" className="hover:text-ink">Launch</Link>
-              <Link href="/numbers" className="hover:text-ink">Numbers</Link>
-              <Link href="/partners" className="hover:text-ink">Partners</Link>
-              <a href="https://docs.x402.org" className="hover:text-ink">x402 docs</a>
-              {SOCIALS.map((s) => (
-                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-                  {s.label}
-                </a>
-              ))}
-            </p>
-          </div>
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );
