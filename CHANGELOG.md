@@ -5,6 +5,16 @@ repo gets a copy of each release.
 
 ## November 21, 2026
 
+- **The provider bond is live.** An API creator can lock $AUTONOMO from the wallet their APIs are paid at, and those
+  APIs show as Bonded. If a bonded API takes payments and doesn't deliver, part of the bond is slashed: half refunds
+  the agent and the rest is burned. Bonded means about $100 of $AUTONOMO, set weekly from the previous week's average
+  price, and once a creator qualifies their amount is locked, like Verified. The contract has limits nobody can lift:
+  at most 50% of a bond per slash, at least half of every slash burned, one slash per creator every 30 days, and a
+  creator can always withdraw the rest before a second one. It is not audited yet. The rules, the contract and every
+  slash with its evidence are on [/bond](https://autonomo.fun/bond); creators bond from the dashboard.
+- **A new footer.** Links are grouped into Build, Token and Community, next to the logo and the social icons, with the
+  $AUTONOMO contract address and its copy button underneath. The links to the docs home and to the x402 docs are gone:
+  the docs stay one click away in the header.
 - **The roadmap is up to date.** [/roadmap](https://autonomo.fun/roadmap) now shows what shipped since November 11:
   16 official APIs, payments in USDC on Base with the burn still on Robinhood Chain, one dollar price per API, the
   listing in Coinbase's x402 Bazaar, llms.txt, the official APIs' agent identity, the rewards vesting contract, and
