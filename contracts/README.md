@@ -6,7 +6,7 @@ contract (`flat`) for deploying from [Remix](https://remix.ethereum.org) or veri
 
 ```
 contracts/
-  robinhood/   Robinhood Chain: burn splitters, buyback, mirror burn pot, rewards vesting   → robinhood/README.md
+  robinhood/   Robinhood Chain: burn splitters, buyback, mirror burn pot, rewards vesting, provider bond   → robinhood/README.md
   base/        Base: the splitters for creator APIs paid in USDC on Base                   → base/README.md
   shared/      Interfaces.sol: the few ERC-20 and Uniswap v4 pieces the contracts use
   lib/         forge-std and OpenZeppelin, installed once for both (not committed)

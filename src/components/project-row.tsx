@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { formatUsd, isTestnet, networkLabel } from "@/lib/networks";
-import { getVerifiedGateways, type ProjectListItem } from "@/lib/queries";
+import { getGatewayBonds, getVerifiedGateways, type ProjectListItem } from "@/lib/queries";
+import { BondedBadge } from "@/components/bonded";
 import { VerifiedBadge } from "@/components/verified";
 
 export function compact(n: number): string {
@@ -48,7 +49,7 @@ export function Avatar({ name, src, size = "md" }: { name: string; src?: string 
   );
 }
 
-export function ProjectRow({ p, verified = false }: { p: ProjectListItem; verified?: boolean }) {
+export function ProjectRow({ p, verified = false, bonded = false }: { p: ProjectListItem; verified?: boolean; bonded?: boolean }) {
   const isService = p.category === "service" || p.endpointCount > 0;
   return (
     <li>
@@ -61,6 +62,7 @@ export function ProjectRow({ p, verified = false }: { p: ProjectListItem; verifi
           <div className="flex items-center gap-2">
             <span className="truncate font-medium">{p.name}</span>
             {verified && <VerifiedBadge />}
+            {bonded && <BondedBadge />}
             {p.autonomo && (
               <span className="shrink-0 rounded border border-accent px-1.5 py-px text-[11px] font-medium text-accent">Autonomo</span>
             )}
@@ -106,11 +108,11 @@ function Stat({ show, value, label }: { show: boolean; value: number; label: str
 }
 
 export async function ProjectList({ rows }: { rows: ProjectListItem[] }) {
-  const { projectSlugs } = await getVerifiedGateways();
+  const [{ projectSlugs }, bonds] = await Promise.all([getVerifiedGateways(), getGatewayBonds()]);
   return (
     <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-bg">
       {rows.map((p) => (
-        <ProjectRow key={p.id} p={p} verified={projectSlugs.includes(p.slug)} />
+        <ProjectRow key={p.id} p={p} verified={projectSlugs.includes(p.slug)} bonded={bonds.projectSlugs.includes(p.slug)} />
       ))}
     </ul>
   );

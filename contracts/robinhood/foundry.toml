@@ -1,4 +1,4 @@
-# Robinhood Chain contracts: the burn splitters, the buyback, the mirror burn pot and the rewards vesting.
+# Robinhood Chain contracts: the burn splitters, the buyback, the mirror burn pot, the rewards vesting and the provider bond.
 # Libraries are installed once in ../lib and the small shared interfaces live in ../shared (see ../README.md).
 [profile.default]
 src = "src"

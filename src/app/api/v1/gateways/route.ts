@@ -1,6 +1,6 @@
 import { json, options, withUpdating } from "@/lib/api";
 import { GATEWAY_USAGE } from "@/lib/playground";
-import { getTrackRecords, getVerifiedGateways, listAutonomoGateways } from "@/lib/queries";
+import { getGatewayBonds, getTrackRecords, getVerifiedGateways, listAutonomoGateways } from "@/lib/queries";
 import { AUTONOMO_DISCOUNT } from "@/lib/gateway-rules";
 import { offersBase } from "@/lib/gateway";
 
@@ -8,9 +8,10 @@ export { options as OPTIONS };
 
 // Every listed, active Autonomo gateway, with prices and the path to call. Used by the Autonomo MCP server.
 export const GET = withUpdating(async () => {
-  const [rows, { slugs }, records] = await Promise.all([
+  const [rows, { slugs }, bonds, records] = await Promise.all([
     listAutonomoGateways(),
     getVerifiedGateways(),
+    getGatewayBonds(),
     getTrackRecords().catch((e) => (console.error("track records failed", e), null)),
   ]);
   return json({
@@ -30,6 +31,8 @@ export const GET = withUpdating(async () => {
       autonomoPricing: g.autonomoAmount === null ? null : { followsUsd: Number(g.priceUsd), discount: AUTONOMO_DISCOUNT },
       project: `https://autonomo.fun/projects/${g.projectSlug}`,
       verified: slugs.includes(g.slug),
+      // The wallet this API pays has locked the provider bond's minimum and wasn't slashed in the last 30 days (/bond).
+      bonded: bonds.slugs.includes(g.slug),
       trackRecord: trackRecordOf(records?.[g.slug]),
     })),
   });

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { bondEnabled } from "@/lib/bond";
 import { burnFactory } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
 import { CopyButton } from "@/components/copy-button";
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/docs" className="hover:text-ink">Docs</Link>
               <Link href="/api-docs" className="hover:text-ink">API</Link>
               {burnFactory() && <Link href="/burn" className="hover:text-ink">Burn</Link>}
+              {bondEnabled() && <Link href="/bond" className="hover:text-ink">Bond</Link>}
               <Link href="/dashboard" className="hover:text-ink">Launch</Link>
               <Link href="/numbers" className="hover:text-ink">Numbers</Link>
               <Link href="/partners" className="hover:text-ink">Partners</Link>

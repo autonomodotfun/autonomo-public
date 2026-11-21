@@ -5,7 +5,9 @@ import { CATEGORY_INFO } from "@/lib/categories";
 import { TOKEN } from "@/lib/constants";
 import { formatUsd, isTestnet, networkLabel } from "@/lib/networks";
 import { retrySoon } from "@/lib/prerender";
-import { getProject, getTrackRecords, getVerifiedGateways } from "@/lib/queries";
+import { bondRefundWallet, slashesOrNull } from "@/lib/bond";
+import { getGatewayBonds, getProject, getTrackRecords, getVerifiedGateways } from "@/lib/queries";
+import { BondBlock, BondedBadge } from "@/components/bonded";
 import { VerifiedBadge } from "@/components/verified";
 import { Avatar, compact, NetworkChips } from "@/components/project-row";
 import { TrackRecordBlock } from "@/components/track-record";
@@ -36,8 +38,13 @@ export default async function ProjectPage({ params }: Props) {
   const data = await getProject((await params).slug);
   if (!data) notFound();
   const { project: p, endpoints } = data;
-  const [{ projectSlugs }, records] = await Promise.all([getVerifiedGateways(), trackRecordsOrNone()]);
+  const [{ projectSlugs }, records, bonds] = await Promise.all([getVerifiedGateways(), trackRecordsOrNone(), getGatewayBonds()]);
   const record = Object.values(records).find((r) => r.projectSlug === p.slug);
+  const verified = projectSlugs.includes(p.slug);
+  const bonded = bonds.projectSlugs.includes(p.slug);
+  // Only an API whose paid wallet has a bond, or had one slashed, reads the slash list.
+  const bond = bonds.byProject[p.slug];
+  const slashes = bond ? await slashesOrNull() : null;
 
   const links = [
     { label: "Website", url: p.website },
@@ -62,9 +69,10 @@ export default async function ProjectPage({ params }: Props) {
             <Avatar name={p.name} src={p.logoUrl} size="lg" />
             <h1 className="heading min-w-0 text-4xl normal-case break-words sm:text-5xl">{p.name}</h1>
           </div>
-          {projectSlugs.includes(p.slug) && (
-            <p className="mt-2">
-              <VerifiedBadge />
+          {(verified || bonded) && (
+            <p className="mt-2 flex flex-wrap items-center gap-2">
+              {verified && <VerifiedBadge />}
+              {bonded && <BondedBadge />}
             </p>
           )}
           {p.host && <p className="mt-1 font-mono text-sm text-faint">{p.host}</p>}
@@ -106,6 +114,8 @@ export default async function ProjectPage({ params }: Props) {
       </header>
 
       {record && <TrackRecordBlock record={record} />}
+
+      {bond && <BondBlock bond={bond} slashes={slashes} now={Math.floor(Date.now() / 1000)} refundWallet={bondRefundWallet()} />}
 
       {endpoints.length > 0 && <HowToPay onAutonomo={!!record} networks={p.networks} />}
 
