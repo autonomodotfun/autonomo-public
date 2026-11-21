@@ -8,8 +8,10 @@ import {
   approveAbi,
   bondAbi,
   bondStanding,
+  bondTokensFor,
   depositCalls,
   EXECUTION_GRACE_S,
+  lockStanding,
   openSlashStatus,
   requestWithdrawCall,
   shortOfMinimum,
@@ -59,6 +61,47 @@ test("an open slash waits, can run for 7 days, then is expired", () => {
   assert.equal(openSlashStatus(NOW, NOW), "ready");
   assert.equal(openSlashStatus(NOW - EXECUTION_GRACE_S, NOW), "ready");
   assert.equal(openSlashStatus(NOW - EXECUTION_GRACE_S - 1, NOW), "expired");
+});
+
+test("$100 becomes whole tokens at the weekly price, rounded to 10,000", () => {
+  assert.equal(bondTokensFor(100, 0.0001693, 100_000), 590_000);
+  assert.equal(bondTokensFor(100, 0.0001414, 100_000), 710_000);
+  assert.equal(bondTokensFor(100, 0.00022, 100_000), 450_000);
+});
+
+test("the amount never goes under the contract's own minimum", () => {
+  assert.equal(bondTokensFor(100, 0.01, 100_000), 100_000);
+  assert.equal(bondTokensFor(100, 1, 0), 10_000);
+});
+
+test("a price that can't be right is refused instead of bonding everyone", () => {
+  assert.throws(() => bondTokensFor(100, 0, 100_000));
+  assert.throws(() => bondTokensFor(100, Number.NaN, 100_000));
+});
+
+test("a wallet that qualifies is locked at the weekly amount", () => {
+  const r = lockStanding(null, 590_000, 590_000n * T);
+  assert.deepEqual(r, { tokens: 590_000, locked: true, change: "insert", saveTokens: 590_000 });
+  assert.equal(lockStanding(null, 590_000, 589_999n * T).change, "none");
+});
+
+test("when the price falls, a locked wallet keeps its badge at its old amount", () => {
+  const r = lockStanding(590_000, 710_000, 600_000n * T);
+  assert.equal(r.locked, true);
+  assert.equal(r.tokens, 590_000);
+  assert.equal(r.change, "none");
+});
+
+test("when the price rises, the locked amount moves down with it", () => {
+  const r = lockStanding(590_000, 450_000, 600_000n * T);
+  assert.equal(r.tokens, 450_000);
+  assert.equal(r.change, "lower");
+  assert.equal(r.saveTokens, 450_000);
+});
+
+test("falling below the locked amount drops the lock, and the weekly amount applies again", () => {
+  const r = lockStanding(590_000, 710_000, 500_000n * T);
+  assert.deepEqual(r, { tokens: 710_000, locked: false, change: "drop", saveTokens: 590_000 });
 });
 
 test("what is missing to reach the minimum", () => {

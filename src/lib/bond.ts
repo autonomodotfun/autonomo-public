@@ -1,14 +1,21 @@
 import "server-only";
+import { eq, inArray } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { getAddress, isAddress, type Address, type Hex } from "viem";
+import { getDb, schema } from "@/db";
 import { SLASH_EVIDENCE, type SlashEvidence } from "@/data/bond-evidence";
-import { bondAbi, bondStanding, type BondState } from "@/lib/bond-rules";
+import { bondAbi, bondStanding, bondTokensFor, lockStanding, type BondState } from "@/lib/bond-rules";
 import { client } from "@/lib/pool-price";
+import { weeklyPriceUsd } from "@/lib/verified";
 
 // The provider bond, read from the chain (contracts/robinhood/src/ProviderBond.sol). A creator locks $AUTONOMO from the
-// wallet that gets paid; a wallet holding at least the contract's minimum shows as Bonded. If a bonded API takes
-// payments and doesn't deliver, part of the bond is slashed: a share refunds the payer and the rest is burned.
-// The rules that don't need the chain are in bond-rules.ts.
+// wallet that gets paid. If a bonded API takes payments and doesn't deliver, part of the bond is slashed: a share
+// refunds the payer and the rest is burned. The rules that don't need the chain are in bond-rules.ts.
+//
+// Bonded means about $100 of $AUTONOMO (PROVIDER_BOND_USD), turned into tokens once a week at the previous week's
+// average price, the same price Verified uses. A wallet that qualifies is locked at that amount, like Verified: it never
+// has to lock more, so a price drop doesn't take the badge away, and the amount moves down if the weekly one falls
+// below it (table bonded_wallets). The contract's own minBond is only a floor under that amount.
 //
 // The site only reads. Creators send their own transactions, and Autonomo's slasher and owner wallets are never on
 // the server.
@@ -18,6 +25,7 @@ import { client } from "@/lib/pool-price";
 //   PROVIDER_BOND_START_BLOCK   The block it was deployed in, where the search for slashes starts.
 //   PROVIDER_BOND_REFUND_WALLET Optional. Autonomo's refund wallet: a slash names it as the payer when several agents
 //                               lost money, and it passes the refund on to each of them.
+//   PROVIDER_BOND_USD           Optional. Dollar value of the Bonded amount (default 100).
 
 function envAddress(name: string) {
   const v = process.env[name]?.trim();
@@ -73,6 +81,31 @@ export async function getBondSettings() {
   return bond ? cachedSettings(bond) : null;
 }
 
+/** Dollar value of the Bonded amount. */
+export function bondUsd() {
+  const raw = process.env.PROVIDER_BOND_USD?.trim();
+  return raw && /^\d+(\.\d+)?$/.test(raw) && Number(raw) > 0 ? Number(raw) : 100;
+}
+
+const WEI = 10n ** 18n;
+
+/** This week's Bonded amount in whole tokens, never below the contract's minBond. Throws if no weekly price can be read. */
+async function weeklyBondTokens(settings: BondSettings) {
+  return bondTokensFor(bondUsd(), await weeklyPriceUsd(), Number(BigInt(settings.minBond) / WEI));
+}
+
+/** This week's Bonded amount for pages: whole tokens and its dollar value. Null while the bond is off or unreadable. */
+export async function getBondRequirement() {
+  const bond = bondContract();
+  if (!bond) return null;
+  try {
+    return { tokens: await weeklyBondTokens(await cachedSettings(bond)), usd: bondUsd() };
+  } catch (e) {
+    console.error("bond amount failed", e);
+    return null;
+  }
+}
+
 /** One wallet's bond, read now. */
 export async function readBondState(bond: Address, wallet: string): Promise<BondState> {
   const at = { address: bond, abi: bondAbi } as const;
@@ -92,10 +125,14 @@ export type WalletBond = {
   amount: string;
   pendingWithdraw: string;
   withdrawReadyAt: number;
-  /** Shows the Bonded badge: at or above the minimum, and not slashed in the last 30 days. */
+  /** Shows the Bonded badge: at or above its amount, and not slashed in the last 30 days. */
   bonded: boolean;
-  /** At or above the minimum, whatever its slash history. */
+  /** At or above its amount, whatever its slash history. */
   meets: boolean;
+  /** The amount this wallet is held to, in whole tokens: its locked amount, or this week's. */
+  required: number;
+  /** Whether that amount is locked for this wallet: it qualified, and the amount won't go up. */
+  locked: boolean;
   /** When the badge comes back after a slash, in unix seconds; null when it isn't hidden. */
   hiddenUntil: number | null;
   openSlashId: number;
@@ -103,8 +140,8 @@ export type WalletBond = {
   known: boolean;
 };
 
-function describe(wallet: string, s: BondState, minBond: bigint, now: number): WalletBond {
-  const { active, meets, bonded, hiddenUntil } = bondStanding(s, minBond, now);
+function describe(wallet: string, s: BondState, required: number, locked: boolean, now: number): WalletBond {
+  const { active, meets, bonded, hiddenUntil } = bondStanding(s, BigInt(required) * WEI, now);
   return {
     wallet: wallet.toLowerCase(),
     active: active.toString(),
@@ -114,14 +151,45 @@ function describe(wallet: string, s: BondState, minBond: bigint, now: number): W
     bonded,
     meets,
     hiddenUntil,
+    required,
+    locked,
     openSlashId: Number(s.openSlashId),
     known: s.amount > 0n || s.nextSlashAt > 0 || s.openSlashId > 0n,
   };
 }
 
 /**
- * Where each wallet stands, read now, keyed by lowercased wallet. Empty while the bond is off. Throws if the chain
- * can't be read, so callers never cache a wrong "not bonded".
+ * Applies the lock rules (lockStanding in bond-rules.ts) to each wallet and saves any change. If the database can't be
+ * reached, every wallet is judged on the weekly amount, and locks are saved on a later read.
+ */
+async function applyLocks(wallets: string[], states: BondState[], weekly: number) {
+  const out = new Map<string, { tokens: number; locked: boolean }>();
+  const { bondedWallets } = schema;
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(bondedWallets).where(inArray(bondedWallets.wallet, wallets));
+    const locks = new Map(rows.map((r) => [r.wallet, r.tokens]));
+    for (const [i, wallet] of wallets.entries()) {
+      const r = lockStanding(locks.get(wallet) ?? null, weekly, states[i].amount - states[i].pendingWithdraw);
+      if (r.change === "drop") {
+        await db.delete(bondedWallets).where(eq(bondedWallets.wallet, wallet));
+      } else if (r.change === "lower") {
+        await db.update(bondedWallets).set({ tokens: r.saveTokens, updatedAt: new Date() }).where(eq(bondedWallets.wallet, wallet));
+      } else if (r.change === "insert") {
+        await db.insert(bondedWallets).values({ wallet, tokens: r.saveTokens }).onConflictDoNothing();
+      }
+      out.set(wallet, { tokens: r.tokens, locked: r.locked });
+    }
+  } catch (e) {
+    console.error("bond lock failed", e);
+    for (const wallet of wallets) out.set(wallet, { tokens: weekly, locked: false });
+  }
+  return out;
+}
+
+/**
+ * Where each wallet stands, read now, keyed by lowercased wallet. Empty while the bond is off. Throws if the chain or
+ * the weekly price can't be read, so callers never cache a wrong "not bonded".
  */
 export async function readWalletBonds(wallets: string[]): Promise<Record<string, WalletBond>> {
   const bond = bondContract();
@@ -129,8 +197,10 @@ export async function readWalletBonds(wallets: string[]): Promise<Record<string,
   const settings = await cachedSettings(bond);
   const now = Math.floor(Date.now() / 1000);
   const unique = [...new Set(wallets.filter((w) => isAddress(w)).map((w) => w.toLowerCase()))];
-  const states = await Promise.all(unique.map((w) => readBondState(bond, w)));
-  return Object.fromEntries(unique.map((w, i) => [w, describe(w, states[i], BigInt(settings.minBond), now)]));
+  if (unique.length === 0) return {};
+  const [states, weekly] = await Promise.all([Promise.all(unique.map((w) => readBondState(bond, w))), weeklyBondTokens(settings)]);
+  const held = await applyLocks(unique, states, weekly);
+  return Object.fromEntries(unique.map((w, i) => [w, describe(w, states[i], held.get(w)!.tokens, held.get(w)!.locked, now)]));
 }
 
 /**

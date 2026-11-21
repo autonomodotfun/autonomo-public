@@ -59,14 +59,21 @@ async function weekPriceUsd(week: number) {
 
 const cachedWeekPrice = unstable_cache(weekPriceUsd, ["verified-week-price"], { revalidate: 2 * WEEK_S });
 
-/** This week's requirement in whole tokens. Falls back to last week's price; throws only if neither can be read. */
-export async function verifiedTokens() {
+/**
+ * This week's price in USD per token, the average of the previous full week. Falls back to last week's; throws only if
+ * neither can be read. Verified and the provider bond's Bonded amount both use it.
+ */
+export async function weeklyPriceUsd() {
   const week = Math.floor(Date.now() / 1000 / WEEK_S);
-  const priceUsd = await cachedWeekPrice(week).catch((e) => {
-    console.error("verified price failed, using last week's", e);
+  return cachedWeekPrice(week).catch((e) => {
+    console.error("weekly price failed, using last week's", e);
     return cachedWeekPrice(week - 1);
   });
-  return tokensFor(verifiedUsd(), priceUsd);
+}
+
+/** This week's requirement in whole tokens. Throws only if no weekly price can be read. */
+export async function verifiedTokens() {
+  return tokensFor(verifiedUsd(), await weeklyPriceUsd());
 }
 
 function readBalance(owner: string) {
