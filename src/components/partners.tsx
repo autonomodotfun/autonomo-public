@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BorroLogo } from "@/components/borro-logo";
 import { GloamLogo } from "@/components/gloam-logo";
 import { QHooksLogo } from "@/components/qhooks-logo";
+import { RaetoLogo } from "@/components/raeto-logo";
 import { StoaLogo } from "@/components/stoa-logo";
 import { TokyoFuturoLogo } from "@/components/tokyo-futuro-logo";
 
@@ -72,6 +73,15 @@ export const PARTNERS: Partner[] = [
       { href: "/docs/qwallet", label: "Keep an agent's savings in a QWallet" },
     ],
   },
+  {
+    name: "Raeto",
+    Logo: RaetoLogo,
+    href: "https://raeto.cc",
+    what: "Agent record",
+    about:
+      "Raeto is the account layer for agentic finance on Robinhood Chain. Autonomo's official APIs have a public record there: Raeto reads the USDG their wallet receives from outside payers and publishes it as statements on-chain that anyone can check.",
+    guides: [{ href: "https://raeto.cc/agent/26170", label: "See the official APIs' record" }],
+  },
 ];
 
 /** A partner's logo, or its name when there's no logo. */
@@ -102,12 +112,13 @@ export function PartnersGrid() {
           </>
         );
         const guide = p.guides?.[0];
-        return guide ? (
+        // A guide on this site opens here; a partner's own page opens in a new tab.
+        return guide && guide.href.startsWith("/") ? (
           <Link key={p.name} href={guide.href} title={guide.label} className={card}>
             {inner}
           </Link>
         ) : (
-          <a key={p.name} href={p.href} target="_blank" rel="noopener noreferrer" className={card}>
+          <a key={p.name} href={guide?.href ?? p.href} title={guide?.label} target="_blank" rel="noopener noreferrer" className={card}>
             {inner}
           </a>
         );

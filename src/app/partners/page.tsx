@@ -24,11 +24,17 @@ export default function PartnersPage() {
               </a>
             </h2>
             <p className="mt-2 text-sm text-muted">{p.about}</p>
-            {p.guides?.map((g) => (
-              <Link key={g.href} href={g.href} className="mt-3 mr-4 inline-block text-sm">
-                {g.label} →
-              </Link>
-            ))}
+            {p.guides?.map((g) =>
+              g.href.startsWith("/") ? (
+                <Link key={g.href} href={g.href} className="mt-3 mr-4 inline-block text-sm">
+                  {g.label} →
+                </Link>
+              ) : (
+                <a key={g.href} href={g.href} target="_blank" rel="noopener noreferrer" className="mt-3 mr-4 inline-block text-sm">
+                  {g.label} →
+                </a>
+              ),
+            )}
           </div>
         ))}
       </div>

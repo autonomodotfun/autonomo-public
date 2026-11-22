@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 22, 2026
 
+- **Raeto joins the partners**, on [/partners](https://autonomo.fun/partners) and in the homepage's "Use with"
+  section. Raeto is the account layer for agentic finance on Robinhood Chain. Autonomo's official APIs have a public
+  record there, at [raeto.cc/agent/26170](https://raeto.cc/agent/26170): Raeto reads the USDG their wallet receives
+  from outside payers and publishes it as statements on-chain that anyone can check.
 - **Simpler docs.** The docs menu is now six short groups (Start, Build an agent, Frameworks, Ways to pay, Launch an
   API, Reference) with short names, in place of one long list. The docs home opens on a three-step quickstart and
   tiles for every tool and way to pay. Long guides get an "On this page" list that follows you down the page, every
