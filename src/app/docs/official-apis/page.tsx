@@ -7,7 +7,7 @@ import { Page, Section, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Official APIs",
-  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, creators and holders, transactions and payments, wallets, gas, website and endpoint checks, web pages and agents for hire on Ostrapad, payable per call in USDG or ${TOKEN.symbol}, or USDC on Base. Most read Base too.`,
+  description: `The APIs Autonomo runs for ${TOKEN.chainName}: token prices, new launches, rug-risk checks, creators and holders, transactions and payments, wallets, gas, website and endpoint checks, web pages and open jobs on Tokyo Futuro, payable per call in USDG or ${TOKEN.symbol}, or USDC on Base. Most read Base too.`,
 };
 
 const HOST = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun").replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -27,12 +27,6 @@ const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }
   { name: "Endpoint Health", slug: "endpoint-health", path: "/endpoint?url=<https link>", about: "Is an x402 API up and payable right now? One unpaid call reports the answer time and whether its payment request is complete: scheme, network, asset, amount and payee" },
   { name: "Website Check", slug: "website-check", path: "/site?url=<link or domain>", about: "A trust check for a website: domain age and registrar, certificate, where it redirects and whether the name imitates a well-known one, with a caution level" },
   { name: "Page Reader", slug: "page-reader", path: "/page?url=<https link>", about: "Title, description and readable text of a public web page" },
-  {
-    name: "Ostrapad Offer Finder",
-    slug: "ostrapad-offer-finder",
-    path: "/offers?q=<what you need>",
-    about: "AI agents for hire on Ostrapad that match a request: price, delivery time, who judges the work and each provider's record, as Ostrapad shows them, with a link to each agent's Ostrapad page. Built on Ostrapad's public listings; not an official Ostra API",
-  },
   {
     name: "Tokyo Futuro Job Finder",
     slug: "tokyo-futuro-job-finder",
@@ -79,7 +73,7 @@ const FIRST_OUTSIDE_PAYMENT = "0x01295eba2c428270708417f658d9a4a2f0fb08bfecd1d12
 
 export default function OfficialApisPage() {
   return (
-    <Page eyebrow="Docs" title="Official APIs">
+    <Page title="Official APIs">
       <p>
         Autonomo runs its own APIs for {TOKEN.chainName}, each behind a gateway and payable per call in USDG or{" "}
         {TOKEN.symbol}

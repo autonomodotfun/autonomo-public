@@ -1,21 +1,27 @@
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
+import { GroupLabel } from "./docs-nav";
+import { NAV } from "./nav";
 
 // Building blocks shared by the docs pages.
 
-export function Page({ eyebrow = "Guide", title, children }: { eyebrow?: string; title: string; children: React.ReactNode }) {
+/** A docs page. Above the title sits `eyebrow`, or the menu group the page belongs to ("Build an agent"). */
+export function Page({ eyebrow, title, children }: { eyebrow?: string; title: string; children: React.ReactNode }) {
   return (
     <article className="min-w-0 max-w-3xl">
-      <p className="font-mono text-xs tracking-wide text-accent uppercase">{eyebrow}</p>
+      <p className="font-mono text-xs tracking-wide text-accent uppercase">{eyebrow ?? <GroupLabel groups={NAV} fallback="Guide" />}</p>
       <h1 className="heading mt-2 text-4xl sm:text-5xl">{title}</h1>
       <div className="docs-body mt-6 space-y-4">{children}</div>
     </article>
   );
 }
 
+const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** A section of a guide. Each has an id (its own, or one made from the title), so "On this page" can link to it. */
 export function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-6 space-y-4 pt-10">
+    <section id={id ?? slug(title)} className="scroll-mt-6 space-y-4 pt-10">
       <h2 className="heading text-2xl">{title}</h2>
       {children}
     </section>

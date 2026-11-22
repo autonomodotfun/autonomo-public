@@ -121,11 +121,10 @@ export default function CliGuidePage() {
             ["tx <hash>", "A transaction in plain words"],
             ["portfolio <wallet>", "What a wallet holds"],
             ["read <https link>", "A web page's text"],
-            ["offers <what you need>", "Matching offers on Ostrapad"],
           ]}
         />
         <p>
-          The last seven are shortcuts for the <Link href="/docs/official-apis">official APIs</Link>. For any other API,
+          The last six are shortcuts for the <Link href="/docs/official-apis">official APIs</Link>. For any other API,
           say what you need with <code>call</code>, or name the API yourself with <code>--slug</code> and{" "}
           <code>--path</code>:
         </p>

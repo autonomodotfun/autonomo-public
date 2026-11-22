@@ -30,7 +30,7 @@ const SHELF_EXAMPLE: Record<string, string> = {
   wallets: "dev-wallet",
   transactions: "gas-now",
   web: "website-check",
-  partners: "ostrapad-offer-finder",
+  partners: "tokyo-futuro-job-finder",
 };
 
 // The page reads nothing from the request, so it can be cached and served to every visitor. The tab (?mode=research)

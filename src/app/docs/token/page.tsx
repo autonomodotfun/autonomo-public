@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function TokenPage() {
   const burn = burnFactory();
   return (
-    <Page eyebrow="Docs" title={`${TOKEN.symbol}, burn and Verified`}>
+    <Page title={`${TOKEN.symbol}, burn and Verified`}>
       <p>The official {TOKEN.symbol} contract address is:</p>
       <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3">
         <code className="min-w-0 flex-1 overflow-x-auto font-mono text-sm whitespace-nowrap select-all">{TOKEN.address}</code>

@@ -1,69 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { compact } from "@/components/project-row";
-import { BURN_BPS, burnFactory } from "@/lib/burn";
 import { TOKEN } from "@/lib/constants";
-import { baseCoverage } from "@/lib/gateway";
 import { getStats } from "@/lib/queries";
-import { Card, Cards, Faq, Page, Section } from "./ui";
+import { group, type NavItem } from "./nav";
+import { Card, Cards, Code, Page, Section } from "./ui";
 
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "How Autonomo works: launch an API that AI agents pay for per call, use Autonomo's APIs from your agent, and how $AUTONOMO, the burn and Verified work.",
+    "Autonomo's docs: make a first paid call, build an agent that finds and pays for APIs, launch an API that agents pay for per call, and how $AUTONOMO, the burn and Verified work.",
 };
 
-const FAQ: [string, React.ReactNode][] = [
-  [
-    "Does Autonomo take a cut of payments?",
-    burnFactory() ? (
-      <>Autonomo keeps none of it, but <Link href="/docs/token#burn">{BURN_BPS / 100}% of each payment is burned</Link>. On hosted gateways, payments go from the agent&apos;s wallet to your own splitter contract and wait there until it&apos;s flushed, which happens when it reaches 1,000 {TOKEN.symbol} or 0.10 USDG, or otherwise once a day if it holds at least 100 {TOKEN.symbol}. Flushing sends {100 - BURN_BPS / 100}% to your <code>payTo</code> wallet and burns the rest. Nobody can take the money out of a splitter any other way, and anyone can flush one. Autonomo&apos;s facilitator settles each payment on-chain and pays the gas. Autonomo is only paid for its own <Link href="/docs/official-apis">official APIs</Link>.</>
-    ) : (
-      <>No. Payments go straight from the agent&apos;s wallet to your <code>payTo</code> wallet. For hosted gateways, Autonomo&apos;s facilitator settles the payment on-chain and pays the gas, but never holds the money. Autonomo is only paid for its own <Link href="/docs/official-apis">official APIs</Link>.</>
-    ),
-  ],
-  [
-    "Does Autonomo host my API?",
-    <>No. Your API runs wherever it runs today. A <Link href="/docs/launch">hosted gateway</Link> sits in front of it, takes the payment and forwards the request; or you <Link href="/docs/self-hosted">run x402 yourself</Link> and Autonomo just lists it.</>,
-  ],
-  [
-    "How much does it cost to launch?",
-    <>Nothing. Launching a gateway and getting listed are free, whether your API comes from a facilitator catalog, the dashboard or the listing form.</>,
-  ],
-  [
-    "Is the discovery API free?",
-    <>Yes, with no key. See the <Link href="/api-docs">API reference</Link>.</>,
-  ],
-  [
-    "Is it safe to give the MCP server a private key?",
-    <>Use a new wallet just for your agent with a small balance, never your main wallet. The key stays on your computer and is only used to sign payments, the server only pays Autonomo gateways, and it stops at a per-call cap and a daily budget.</>,
-  ],
-  [
-    "My listing is wrong or out of date. How do I fix it?",
-    <>Open your project page and use <b>Suggest an edit</b>, or send the details through the <Link href="/submit">listing form</Link>. Edits are reviewed by hand.</>,
-  ],
-  [
-    "Which networks are supported?",
-    <>
-      Hosted gateways and the official APIs take USDG or {TOKEN.symbol} on {TOKEN.chainName}
-      {baseCoverage() === "all" ? ", or USDC on Base" : ""}.
-      {baseCoverage() === "official" && " The official APIs also take USDC on Base."} Self-hosted APIs use whatever their
-      facilitator supports: most listed endpoints settle on Base, followed by Solana, Polygon, Arbitrum and others.
-      Testnet-only services are hidden. {baseCoverage() === "all" ? "Solana for gateways is" : "Base and Solana for gateways are"} on
-      the <Link href="/roadmap">roadmap</Link>.
-    </>,
-  ],
-];
+const TRY = "npx autonomo-sdk risk 0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49 --dry-run";
 
 export default async function DocsPage() {
   const stats = await getStats();
+  // The Overview is the "I'm building an agent" card above, so the tiles start at the tools.
+  const tools = [...group("Build an agent").filter((i) => i.href !== "/docs/agents"), ...group("Frameworks")];
 
   return (
-    <Page eyebrow="Docs" title="Launch an API agents pay for">
+    <Page eyebrow="Docs" title="Autonomo docs">
       <p>
-        Autonomo is the agentic x402 launchpad for APIs. Put a price on an API, launch it here, and AI agents find it and
-        pay for each call in USDG or {TOKEN.symbol} on {TOKEN.chainName}. Agents need no API keys, accounts or invoices:
-        just a wallet.
+        Autonomo is the agentic x402 launchpad for APIs. Agents find an API here and pay for each call from their own
+        wallet, in USDG or {TOKEN.symbol} on {TOKEN.chainName}, with no API keys, accounts or invoices. Creators put a
+        price on an API and get paid per call.
       </p>
       <p className="text-sm text-muted">
         The directory tracks {compact(stats.projects)} x402 projects and {compact(stats.endpoints)} paid endpoints, which
@@ -71,98 +32,77 @@ export default async function DocsPage() {
       </p>
 
       <Section id="start" title="Start here">
-        <Cards>
-          <Card title="I have an API" href="/docs/launch" body="Launch it from the dashboard in minutes and get paid per call." />
-          <Card title="I'm building an agent" href="/docs/agents" body="Let your agent find and pay for APIs, with the MCP server or your own code." />
-          <Card title={`I hold ${TOKEN.symbol}`} href="/docs/token" body="The official address, the burn on every paid call, and Verified." />
-        </Cards>
-        <p>
-          Just curious? Ask the <Link href="/playground">Agent Playground</Link> a question and watch an agent pay for the
-          answer. No wallet needed. Or try it from <Link href="/docs/cli">your terminal</Link> with one command.
-        </p>
-      </Section>
-
-      <Section id="how-x402-works" title="How x402 works">
-        <p>
-          x402 uses the HTTP status code <code>402 Payment Required</code>. Payment happens inside a normal HTTP request:
-        </p>
-        <ol className="list-decimal space-y-2 pl-5">
-          <li>The agent calls an API.</li>
-          <li>
-            The API answers <code>402</code> with the price, the network and the wallet to pay.
-          </li>
-          <li>The agent signs a payment and calls again with it attached.</li>
-          <li>The payment settles on-chain and the API returns the data.</li>
-        </ol>
-        <p>
-          Prices can be fractions of a cent, so per-call pricing works for data, AI and tools that would never justify a
-          subscription.
-        </p>
-      </Section>
-
-      <Section id="guides" title="Guides">
-        <div className="grid gap-6 sm:grid-cols-3">
-          <GuideList
-            title="Launch an API"
-            items={[
-              ["/docs/launch", "Launch from the dashboard", "No code: a hosted gateway in front of your API."],
-              ["/docs/safe", "Get paid at a Safe", "Send your earnings to a multisig."],
-              ["/docs/self-hosted", "Run x402 yourself", "Add x402 to your own server and get listed."],
-            ]}
-          />
-          <GuideList
-            title="Use APIs"
-            items={[
-              ["/docs/directory", "The x402 directory", "What's in it, how to search it and where the data comes from."],
-              ["/docs/agents", "Use Autonomo from your agent", "MCP server, your own code, Playground and Telegram."],
-              ["/docs/sdk", "SDK for TypeScript and Python", "One call finds an API and pays, privately with Gloam or on Borro credit."],
-              ["/docs/official-apis", "Official APIs", "The APIs Autonomo runs, and the wallets behind them."],
-              ["/api-docs", "API reference", "The free discovery API: every endpoint and parameter."],
-            ]}
-          />
-          <GuideList
-            title="Token"
-            items={[["/docs/token", `${TOKEN.symbol}, burn and Verified`, "The address, the burn on paid calls, and the Verified badge."]]}
-          />
+        <div className="space-y-3 rounded-lg border border-accent p-4">
+          <p className="font-medium text-ink">Your first paid call, in three steps</p>
+          <ol className="grid gap-x-6 gap-y-1 text-sm text-muted sm:grid-cols-3">
+            <li>
+              <span className="font-mono text-xs text-accent">01</span> Try it free, with no wallet
+            </li>
+            <li>
+              <span className="font-mono text-xs text-accent">02</span> Give your agent a wallet
+            </li>
+            <li>
+              <span className="font-mono text-xs text-accent">03</span> Pay for a call
+            </li>
+          </ol>
+          <Code code={TRY} lang="Step 1: see what a risk check would cost" />
+          <p className="text-sm">
+            <Link href="/docs/quickstart">Open the quickstart →</Link>
+          </p>
         </div>
-      </Section>
-
-      <Section id="directory" title="The x402 directory">
-        <p>
-          The <Link href="/projects">directory</Link> maps the x402 ecosystem: paid APIs, facilitators, SDKs, wallets and
-          tools, with each endpoint&apos;s price, network and paid calls. Search it by what you need, or let your agent
-          search it through the free API. Paid services come from the Coinbase CDP and PayAI catalogs, refreshed every 3
-          days. <Link href="/docs/directory">How the directory works</Link>.
+        <Cards cols={2}>
+          <Card title="I'm building an agent" href="/docs/agents" body="Let it find and pay for APIs, with the SDK, the CLI or the MCP server." />
+          <Card title="I have an API" href="/docs/launch" body="Launch it from the dashboard and get paid per call." />
+        </Cards>
+        <p className="text-sm text-muted">
+          Just curious? Ask the <Link href="/playground">Agent Playground</Link> a question and watch an agent pay for the
+          answer. No wallet needed.
         </p>
       </Section>
 
-      <Section id="roadmap" title="Roadmap">
-        <p>
-          What has shipped, what comes next and what comes later is on the <Link href="/roadmap">roadmap</Link>.
-        </p>
+      <Section id="tools" title="Use it with your tools">
+        <Tiles items={tools} />
       </Section>
 
-      <Section id="faq" title="FAQ">
-        <Faq items={FAQ} />
+      <Section id="ways-to-pay" title="Ways to pay">
+        <p>
+          An agent pays from its own wallet by default. These add a private payment, a credit line and a place to keep
+          its savings.
+        </p>
+        <Tiles items={group("Ways to pay")} />
       </Section>
+
+      <Section id="agent-jobs" title="Agent jobs">
+        <Tiles items={group("Agent jobs")} />
+      </Section>
+
+      <Section id="launch" title="Launch an API">
+        <Tiles items={group("Launch an API")} />
+      </Section>
+
+      <Section id="reference" title="Reference">
+        <Tiles items={group("Reference")} />
+      </Section>
+
+      <p className="pt-6 text-sm text-muted">
+        New to x402? <Link href="/docs/x402">How x402 works</Link>. Questions? <Link href="/docs/faq">FAQ</Link>. What&apos;s
+        coming? <Link href="/roadmap">Roadmap</Link>.
+      </p>
     </Page>
   );
 }
 
-function GuideList({ title, items }: { title: string; items: [string, string, string][] }) {
+/** Tiles for a group of guides, from the docs menu. Empty cells fill the last row, so the grid stays whole. */
+function Tiles({ items }: { items: NavItem[] }) {
+  const fill = (3 - (items.length % 3)) % 3;
   return (
-    <div>
-      <h3 className="text-xs font-medium tracking-wide text-faint uppercase">{title}</h3>
-      <ul className="mt-2 space-y-3">
-        {items.map(([href, label, about]) => (
-          <li key={href}>
-            <Link href={href} className="font-medium">
-              {label}
-            </Link>
-            <span className="block text-sm text-muted">{about}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Cards>
+      {items.map((i) => (
+        <Card key={i.href} title={i.label} href={i.href} body={i.about ?? ""} />
+      ))}
+      {Array.from({ length: fill }, (_, n) => (
+        <div key={n} aria-hidden className="hidden bg-bg sm:block" />
+      ))}
+    </Cards>
   );
 }

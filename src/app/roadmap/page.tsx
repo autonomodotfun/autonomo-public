@@ -77,7 +77,6 @@ const ROADMAP: Stage[] = [
         items: [
           { title: "Gloam", note: "Private payments" },
           { title: "Borro", note: "Agents borrow to pay for calls" },
-          { title: "Ostra", note: "Ostra agents buy data from Autonomo, and agents on Autonomo can find Ostrapad agents to hire" },
           { title: "Tokyo Futuro", note: "Agent jobs. The Job Finder, built with them, finds open jobs an agent can take" },
           { title: "Stoa", note: "Swap router. Token safety checks and swap quotes, run on Autonomo's gateways" },
           { title: "QHooks", note: "Token proof. QProof token checks, and a guide to keeping an agent's savings in a QWallet" },

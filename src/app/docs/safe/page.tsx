@@ -3,6 +3,9 @@ import Link from "next/link";
 import { TOKEN } from "@/lib/constants";
 import { baseCoverage } from "@/lib/gateway";
 import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
+import { GroupLabel } from "../docs-nav";
+import { NAV } from "../nav";
+import { Section, Step } from "../ui";
 
 export const metadata: Metadata = {
   title: "Get paid at a Safe",
@@ -14,7 +17,9 @@ const SAFE_APP = "https://app.safe.global";
 export default function SafeGuidePage() {
   return (
     <article className="min-w-0 max-w-3xl">
-      <p className="font-mono text-xs tracking-wide text-accent uppercase">Guide</p>
+      <p className="font-mono text-xs tracking-wide text-accent uppercase">
+        <GroupLabel groups={NAV} fallback="Guide" />
+      </p>
       <h1 className="heading mt-2 text-4xl sm:text-5xl">Get paid at a Safe</h1>
 
       <div className="docs-body mt-6 space-y-4">
@@ -177,27 +182,6 @@ const FAQ: [string, React.ReactNode][] = [
     <>Yes. Once your APIs pay a Safe, that Safe holds your earnings, so moving them somewhere else is checked by hand: request the new Safe from the dashboard, and we may ask you to confirm it on <a href="https://t.me/autonomodotfun">Telegram</a> or <a href="https://x.com/useautonomo">X</a>. Until it&apos;s approved, your APIs keep paying the Safe you have. To go back to your sign-in wallet, ask us on Telegram.</>,
   ],
 ];
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-4 pt-8">
-      <h2 className="heading text-2xl">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2 pt-1">
-      <h3 className="flex items-baseline gap-2 font-medium">
-        <span className="font-mono text-xs text-accent">0{n}</span>
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
 
 function Role({ title, body }: { title: string; body: string }) {
   return (

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { BorroLogo } from "@/components/borro-logo";
 import { GloamLogo } from "@/components/gloam-logo";
-import { OstraLogo } from "@/components/ostra-logo";
 import { QHooksLogo } from "@/components/qhooks-logo";
 import { StoaLogo } from "@/components/stoa-logo";
 import { TokyoFuturoLogo } from "@/components/tokyo-futuro-logo";
@@ -37,18 +36,6 @@ export const PARTNERS: Partner[] = [
     guides: [{ href: "/docs/borro", label: "Pay with a Borro credit line" }],
   },
   {
-    name: "Ostra",
-    Logo: OstraLogo,
-    href: "https://ostraagent.xyz",
-    what: "Agent vault",
-    about:
-      "Agents with an Ostra vault can list Autonomo's APIs and pay for them in USDG with Ostra's MCP server. Autonomo's Offer Finder also finds agents for hire on Ostrapad, built on Ostrapad's public listings, not an official Ostra API.",
-    guides: [
-      { href: "/docs/ostra", label: "Use Autonomo from Ostra" },
-      { href: "/projects/ostrapad-offer-finder", label: "Find agents with the Offer Finder" },
-    ],
-  },
-  {
     name: "Tokyo Futuro",
     Logo: TokyoFuturoLogo,
     href: "https://tokyofuturo.xyz",
@@ -56,7 +43,8 @@ export const PARTNERS: Partner[] = [
     about:
       "Tokyo Futuro is a job market for AI agents on Robinhood Chain: agents take paid jobs with a bond, deliver and build a public record. Autonomo's Job Finder, built with Tokyo Futuro, finds open jobs an agent can take, and Tokyo Futuro's own x402 APIs are listed in the directory.",
     guides: [
-      { href: "/projects/tokyo-futuro-job-finder", label: "Find jobs with the Job Finder" },
+      { href: "/docs/tokyo-futuro", label: "Find agent jobs on Tokyo Futuro" },
+      { href: "/projects/tokyo-futuro-job-finder", label: "The Job Finder's page" },
       { href: "/projects?q=tokyo+futuro", label: "Tokyo Futuro's APIs" },
     ],
   },

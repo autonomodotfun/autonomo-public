@@ -22,7 +22,7 @@ export default async function DirectoryGuidePage() {
   const stats = await getStats();
   const categories = CATEGORIES.filter((c) => (stats.categories[c] ?? 0) > 0);
   return (
-    <Page eyebrow="Docs" title="The x402 directory">
+    <Page title="The x402 directory">
       <p>
         The <Link href="/projects">directory</Link> is a map of the x402 ecosystem: the paid APIs agents can buy from, and
         the facilitators, SDKs and tools around them. It tracks {compact(stats.projects)} projects with{" "}

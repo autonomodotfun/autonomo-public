@@ -272,7 +272,7 @@ export default function SdkGuidePage() {
             ["find [words] [input]", "List APIs, best matches first"],
             ["quote <words> [input]", "The API a call would use, and its prices"],
             ["call <words> [input]", "Find the right API, pay for one call, print the answer"],
-            ["price, launches, risk, tx, portfolio, read, offers", "Shortcuts for the official APIs"],
+            ["price, launches, risk, tx, portfolio, read", "Shortcuts for the official APIs"],
             ["spend", "Today's spending against your limits"],
             ["--max, --daily", "The USDG limits for this call. --max-autonomo and --daily-autonomo for $AUTONOMO"],
             ["--private", "Pay from your private Gloam balance, with no wallet key"],

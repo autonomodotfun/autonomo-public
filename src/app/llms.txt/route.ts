@@ -11,17 +11,20 @@ import { metadata as borro } from "../docs/borro/page";
 import { metadata as cli } from "../docs/cli/page";
 import { metadata as directory } from "../docs/directory/page";
 import { metadata as eliza } from "../docs/eliza/page";
+import { metadata as faq } from "../docs/faq/page";
 import { metadata as gloam } from "../docs/gloam/page";
 import { metadata as langchain } from "../docs/langchain/page";
 import { metadata as launch } from "../docs/launch/page";
 import { metadata as officialApis } from "../docs/official-apis/page";
+import { metadata as quickstart } from "../docs/quickstart/page";
 import { metadata as qwallet } from "../docs/qwallet/page";
-import { metadata as ostra } from "../docs/ostra/page";
 import { metadata as docs } from "../docs/page";
 import { metadata as safe } from "../docs/safe/page";
 import { metadata as sdk } from "../docs/sdk/page";
 import { metadata as selfHosted } from "../docs/self-hosted/page";
 import { metadata as token } from "../docs/token/page";
+import { metadata as tokyoFuturo } from "../docs/tokyo-futuro/page";
+import { metadata as x402 } from "../docs/x402/page";
 import { metadata as apiDocs } from "../api-docs/page";
 import { metadata as bond } from "../bond/page";
 import { metadata as burn } from "../burn/page";
@@ -42,6 +45,8 @@ type Page = { path: string; meta: Metadata };
 
 const DOCS: Page[] = [
   { path: "/docs", meta: docs },
+  { path: "/docs/quickstart", meta: quickstart },
+  { path: "/docs/x402", meta: x402 },
   { path: "/docs/agents", meta: agents },
   { path: "/docs/sdk", meta: sdk },
   { path: "/docs/cli", meta: cli },
@@ -51,13 +56,14 @@ const DOCS: Page[] = [
   { path: "/api-docs", meta: apiDocs },
   { path: "/docs/gloam", meta: gloam },
   { path: "/docs/borro", meta: borro },
-  { path: "/docs/ostra", meta: ostra },
+  { path: "/docs/tokyo-futuro", meta: tokyoFuturo },
   { path: "/docs/qwallet", meta: qwallet },
   { path: "/docs/launch", meta: launch },
   { path: "/docs/self-hosted", meta: selfHosted },
   { path: "/docs/safe", meta: safe },
   { path: "/docs/directory", meta: directory },
   { path: "/docs/token", meta: token },
+  { path: "/docs/faq", meta: faq },
 ];
 
 const OPTIONAL: Page[] = [
