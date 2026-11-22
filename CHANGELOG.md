@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 22, 2026
 
+- **A shorter header, and a menu on phones.** The bar now shows four links, Explore APIs, Playground, Docs and
+  Partners, with Roadmap, Numbers, Burn and the API reference behind one More menu. Facilitators and SDKs are tabs
+  on the Explore page, so they no longer have links of their own. On a phone, a menu button opens every page as a
+  full-screen list, where the header had no menu before.
 - **Raeto joins the partners**, on [/partners](https://autonomo.fun/partners) and in the homepage's "Use with"
   section. Raeto is the account layer for agentic finance on Robinhood Chain. Autonomo's official APIs have a public
   record there, at [raeto.cc/agent/26170](https://raeto.cc/agent/26170): Raeto reads the USDG their wallet receives

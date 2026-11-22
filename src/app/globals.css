@@ -52,6 +52,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The page behind the open phone menu stays still. */
+html:has(dialog.site-menu[open]) {
+  overflow: hidden;
+}
+
 ::selection {
   background: var(--color-brand);
   color: var(--color-on-brand);
