@@ -42,22 +42,32 @@ Usage
   autonomo quote <words> [input]    The API a call would use and its prices. Free.
   autonomo call <words> [input]     Find the right API, pay for one call, print the answer.
   autonomo spend                    Today's spending against your limits.
+  autonomo wallet                   What the wallet holds on Robinhood Chain and Base.
 
 Shortcuts for the official APIs
-  autonomo price [token address]    $AUTONOMO's price, or any launchpad token's
+  autonomo price [token address]    $AUTONOMO's price, or any token's
   autonomo launches [how many]      Newest token launches
   autonomo risk <token address>     Rug-risk check
+  autonomo holders <token address>  Top holders, bundles and snipers
+  autonomo dev <token address>      What the token's creator did
   autonomo tx <transaction hash>    A transaction in plain words
+  autonomo payment <tx hash>        Did an x402 payment settle, and who paid whom
   autonomo portfolio <wallet>       What a wallet holds
+  autonomo gas                      The gas price and what common actions cost
   autonomo read <https link>        A web page's text
-  autonomo offers <what you need>   Matching offers on Ostrapad
+  autonomo site <link or domain>    Trust check for a website
+  autonomo health <https link>      Is an x402 API up and payable
+  autonomo jobs <the work>          Open paid jobs on Tokyo Futuro
 
 Options
-  --max <usdg>              Most to pay for one call (default ${DEFAULT_LIMITS.perCall.usdg})
-  --daily <usdg>            Most to spend per UTC day (default ${DEFAULT_LIMITS.daily.usdg})
+  --max <dollars>           Most to pay for one call in USDG or USDC (default ${DEFAULT_LIMITS.perCall.usdg})
+  --daily <dollars>         Most to spend per UTC day in USDG and USDC together (default ${DEFAULT_LIMITS.daily.usdg})
   --max-autonomo <amount>   The same two limits when paying in $AUTONOMO
   --daily-autonomo <amount> (defaults ${DEFAULT_LIMITS.perCall.autonomo} and ${DEFAULT_LIMITS.daily.autonomo})
-  --pay-with <token>        usdg, autonomo or auto (default: USDG, then $AUTONOMO)
+  --pay-with <token>        usdg, autonomo, usdc or auto (default: USDG, then $AUTONOMO, then USDC on Base)
+  --chain <chain>           robinhood or base, for the shortcuts that read a chain: price with a token, launches, risk,
+                            holders, dev, tx, payment, portfolio and gas. Left out: Robinhood Chain, and Base when the
+                            token, wallet or transaction is only there
   --borro <credit line>     Borrow from this Borro line when the wallet is short of USDG
   --private                 Pay from your private Gloam balance, so the payment doesn't link to a wallet
   --retry-header <header>   With --private: finish a call Gloam paid for but the API didn't answer, without paying again
@@ -69,7 +79,8 @@ Options
 
 Wallet
   Set AUTONOMO_WALLET_KEY to the private key of a wallet made just for the agent, holding only what it may spend.
-  find, quote, spend and --dry-run need no wallet.
+  The same wallet pays with USDG or $AUTONOMO on Robinhood Chain, or with USDC on Base; it needs no ETH on either.
+  find, quote, spend and --dry-run need no wallet. wallet only reads balances and signs nothing.
 
 Private payments
   --private starts Gloam's own server on this machine (npx @gloamtrade/mcp) and has it pay in USDG. It needs no
@@ -90,32 +101,64 @@ const usage = (message: string): never => {
   throw new UsageError(message);
 };
 
-/** Each shortcut names its API and builds the path, so nothing is searched. */
-const SHORTCUTS: Record<string, (args: string[]) => { slug: string; path: string }> = {
+/**
+ * Each shortcut names its API and builds the path, so nothing is searched. `chain` marks the APIs that read a chain
+ * and so take --chain.
+ */
+const SHORTCUTS: Record<string, (args: string[]) => { slug: string; path: string; chain?: boolean }> = {
   price: ([token]) => {
     if (token === undefined) return { slug: "token-price", path: "/price/autonomo" };
     if (!ADDRESS.test(token)) usage("price takes a token contract address (0x and 40 hex characters), or nothing for $AUTONOMO.");
-    return { slug: "token-lookup", path: `/price/${token}` };
+    return { slug: "token-lookup", path: `/price/${token}`, chain: true };
   },
   launches: ([count = "10"]) => {
     if (!/^\d{1,3}$/.test(count) || Number(count) < 1) usage("launches takes how many to show, e.g. autonomo launches 5.");
-    return { slug: "new-launches", path: `/launches?limit=${Number(count)}` };
+    return { slug: "new-launches", path: `/launches?limit=${Number(count)}`, chain: true };
   },
   risk: ([token]) => {
     if (!token || !ADDRESS.test(token)) usage("risk takes a token contract address: autonomo risk 0x…");
-    return { slug: "token-risk", path: `/risk/${token}` };
+    return { slug: "token-risk", path: `/risk/${token}`, chain: true };
+  },
+  holders: ([token]) => {
+    if (!token || !ADDRESS.test(token)) usage("holders takes a token contract address: autonomo holders 0x…");
+    return { slug: "holders-bundles", path: `/holders/${token}`, chain: true };
+  },
+  dev: ([token]) => {
+    if (!token || !ADDRESS.test(token)) usage("dev takes a token contract address: autonomo dev 0x…");
+    return { slug: "dev-wallet", path: `/dev/${token}`, chain: true };
   },
   tx: ([hash]) => {
     if (!hash || !TX_HASH.test(hash)) usage("tx takes a transaction hash (0x and 64 hex characters).");
-    return { slug: "tx-explainer", path: `/tx/${hash}` };
+    return { slug: "tx-explainer", path: `/tx/${hash}`, chain: true };
+  },
+  payment: ([hash]) => {
+    if (!hash || !TX_HASH.test(hash)) usage("payment takes the payment's transaction hash (0x and 64 hex characters).");
+    return { slug: "payment-check", path: `/payment/${hash}`, chain: true };
   },
   portfolio: ([wallet]) => {
     if (!wallet || !ADDRESS.test(wallet)) usage("portfolio takes a wallet address: autonomo portfolio 0x…");
-    return { slug: "wallet-portfolio", path: `/portfolio/${wallet}` };
+    return { slug: "wallet-portfolio", path: `/portfolio/${wallet}`, chain: true };
+  },
+  gas: (args) => {
+    if (args.length) usage("gas takes nothing: autonomo gas, or autonomo gas --chain base.");
+    return { slug: "gas-now", path: "/gas", chain: true };
   },
   read: ([link]) => {
     if (!link || !/^https:\/\/\S+$/i.test(link)) usage("read takes an https:// link.");
     return { slug: "page-reader", path: `/page?url=${encodeURIComponent(link)}` };
+  },
+  site: ([site]) => {
+    if (!site || /\s/.test(site) || !/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+/i.test(site)) usage("site takes a website link or a domain: autonomo site example.com");
+    return { slug: "website-check", path: `/site?url=${encodeURIComponent(site)}` };
+  },
+  health: ([link]) => {
+    if (!link || !/^https:\/\/\S+$/i.test(link)) usage("health takes the https:// address of an x402 API.");
+    return { slug: "endpoint-health", path: `/endpoint?url=${encodeURIComponent(link)}` };
+  },
+  jobs: (words) => {
+    const q = words.join(" ").trim();
+    if (!q) usage('jobs takes the work you are after: autonomo jobs "write a summary"');
+    return { slug: "tokyo-futuro-job-finder", path: `/jobs?q=${encodeURIComponent(q)}` };
   },
   offers: (words) => {
     const q = words.join(" ").trim();
@@ -125,7 +168,11 @@ const SHORTCUTS: Record<string, (args: string[]) => { slug: string; path: string
 };
 
 const price = (api: Api) => {
-  const parts = [api.price.usdg !== undefined && `${api.price.usdg} USDG`, api.price.autonomo !== undefined && `${api.price.autonomo} AUTONOMO`].filter(Boolean);
+  const parts = [
+    api.price.usdg !== undefined && api.price.usdg !== null && `${api.price.usdg} USDG`,
+    api.price.autonomo !== undefined && api.price.autonomo !== null && `${api.price.autonomo} AUTONOMO`,
+    api.price.usdcBase !== undefined && api.price.usdcBase !== null && `${api.price.usdcBase} USDC on Base`,
+  ].filter(Boolean);
   return parts.join(" or ") || "see quote";
 };
 
@@ -155,6 +202,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
         "daily-autonomo": { type: "string" },
         "pay-with": { type: "string" },
         borro: { type: "string" },
+        chain: { type: "string" },
         private: { type: "boolean" },
         "retry-header": { type: "string" },
         slug: { type: "string" },
@@ -178,7 +226,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
 
     const amount = (flag: "max" | "daily" | "max-autonomo" | "daily-autonomo") => {
       const v = values[flag];
-      if (v !== undefined && !AMOUNT.test(v)) usage(`--${flag} takes an amount in whole tokens, e.g. --${flag} 0.05.`);
+      if (v !== undefined && !AMOUNT.test(v)) usage(`--${flag} takes an amount in whole tokens or dollars, e.g. --${flag} 0.05.`);
       return v;
     };
     const limits: Limits = {
@@ -186,7 +234,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
       daily: { usdg: amount("daily") ?? DEFAULT_LIMITS.daily.usdg, autonomo: amount("daily-autonomo") ?? DEFAULT_LIMITS.daily.autonomo },
     };
     const payWith = values["pay-with"] ?? "auto";
-    if (payWith !== "usdg" && payWith !== "autonomo" && payWith !== "auto") usage("--pay-with takes usdg, autonomo or auto.");
+    if (payWith !== "usdg" && payWith !== "autonomo" && payWith !== "usdc" && payWith !== "auto") usage("--pay-with takes usdg, autonomo, usdc or auto.");
     const borro = values.borro ?? io.env.AUTONOMO_BORRO_ACCOUNT;
     if (borro !== undefined && !ADDRESS.test(borro)) usage("--borro takes the credit line's address.");
     const retryHeader = values["retry-header"];
@@ -225,15 +273,44 @@ export async function run(argv: string[], io: Io): Promise<number> {
       return EXIT.ok;
     }
 
+    if (command === "wallet") {
+      const b = await client(true).balances();
+      if (json) return print(b), EXIT.ok;
+      const shown = (v: string) => Number(v).toLocaleString("en-US", { maximumFractionDigits: 6 });
+      io.out(`Wallet ${b.address}`);
+      io.out(`  Robinhood Chain  ${b.robinhood ? `${shown(b.robinhood.usdg)} USDG, ${shown(b.robinhood.autonomo)} AUTONOMO, ${shown(b.robinhood.eth)} ETH` : "couldn't be read just now"}`);
+      io.out(`  Base             ${b.base ? `${shown(b.base.usdc)} USDC` : "couldn't be read just now"}`);
+      if (b.robinhood && Number(b.robinhood.autonomo) > 0 && Number(b.robinhood.eth) === 0) {
+        io.err("Paying in $AUTONOMO needs a little ETH on Robinhood Chain once, for the Permit2 approval. USDG and USDC need none.");
+      }
+      return EXIT.ok;
+    }
+
     if (command === "spend") {
       const day = new Date().toISOString().slice(0, 10);
       const spent = await store.get(day);
-      const row = (t: TokenName) => ({ spent: formatUnits(spent[t] ?? 0n, TOKENS[t].decimals), daily: limits.daily![t]!, perCall: limits.perCall![t]! });
-      const report = { day, wallet: client(true).address, usdg: row("usdg"), autonomo: row("autonomo") };
+      const usd = (t: TokenName) => formatUnits(spent[t] ?? 0n, TOKENS[t].decimals);
+      // USDG and USDC on Base share the dollar limits.
+      const dollars = {
+        spent: formatUnits((spent.usdg ?? 0n) + (spent.usdc ?? 0n), 6),
+        usdg: usd("usdg"),
+        usdcBase: usd("usdc"),
+        daily: limits.daily!.usdg!,
+        perCall: limits.perCall!.usdg!,
+      };
+      const autonomo = { spent: usd("autonomo"), daily: limits.daily!.autonomo!, perCall: limits.perCall!.autonomo! };
+      // `usdg` keeps its shape from earlier versions and now holds the dollar limits: USDG and USDC on Base together.
+      const report = {
+        day,
+        wallet: client(true).address,
+        usdg: { spent: dollars.spent, daily: dollars.daily, perCall: dollars.perCall },
+        autonomo,
+        spentByToken: { usdg: dollars.usdg, usdcBase: dollars.usdcBase, autonomo: autonomo.spent },
+      };
       if (json) return print(report), EXIT.ok;
       io.out(`Today (${day}, UTC)`);
-      io.out(`  USDG      ${report.usdg.spent} of ${report.usdg.daily} spent, up to ${report.usdg.perCall} a call`);
-      io.out(`  AUTONOMO  ${report.autonomo.spent} of ${report.autonomo.daily} spent, up to ${report.autonomo.perCall} a call`);
+      io.out(`  Dollars   ${dollars.spent} of ${dollars.daily} spent (USDG ${dollars.usdg}, USDC on Base ${dollars.usdcBase}), up to ${dollars.perCall} a call`);
+      io.out(`  AUTONOMO  ${autonomo.spent} of ${autonomo.daily} spent, up to ${autonomo.perCall} a call`);
       io.out(`  Wallet    ${report.wallet ?? "none set (AUTONOMO_WALLET_KEY)"}`);
       return EXIT.ok;
     }
@@ -254,9 +331,20 @@ export async function run(argv: string[], io: Io): Promise<number> {
       }
     } else if (Object.hasOwn(SHORTCUTS, command)) {
       if (values.slug || values.path) usage(`${command} already names its API. Use call with --slug and --path instead.`);
-      opts = SHORTCUTS[command](rest);
+      const shortcut = SHORTCUTS[command](rest);
+      let path = shortcut.path;
+      if (values.chain !== undefined) {
+        const chain = values.chain.toLowerCase();
+        if (chain !== "robinhood" && chain !== "base") usage("--chain takes robinhood or base.");
+        if (!shortcut.chain) usage(`${command}${rest.length ? "" : " on its own"} doesn't read a chain, so it takes no --chain.`);
+        path += `${path.includes("?") ? "&" : "?"}chain=${chain}`;
+      }
+      opts = { slug: shortcut.slug, path };
     } else {
       return usage(`Unknown command "${command}". Run autonomo --help.`);
+    }
+    if (values.chain !== undefined && (command === "call" || command === "quote")) {
+      usage("--chain goes with the shortcuts. With call or quote, put chain=base in --path instead.");
     }
 
     if (quoteOnly) {

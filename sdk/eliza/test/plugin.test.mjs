@@ -144,12 +144,15 @@ test("finding APIs is free and filters by the input", async () => {
   assert.equal(f.paid(), 0);
 });
 
-test("a price check pays nothing, and shows only the ways the agent can pay", async () => {
+test("a price check pays nothing, and shows the ways the agent can pay, USDC on Base included", async () => {
   const f = fakeFetch({ base: true });
   const { result } = await planned(plugin(f), "AUTONOMO_GET_PRICE", fakeRuntime(WALLET), { slug: "token-risk", input: ADDR });
   assert.equal(result.data.url, `https://autonomo.fun/x/token-risk/risk/${ADDR}`);
-  assert.deepEqual(result.data.offers, [{ scheme: "exact", token: "USDG", amount: "0.01", private: false }]);
-  assert.match(result.text, /One call to Token Risk costs 0\.01 USDG\./);
+  assert.deepEqual(result.data.offers, [
+    { scheme: "exact", token: "USDG", amount: "0.01", private: false },
+    { scheme: "exact", token: "USDC on Base", amount: "0.01", private: false },
+  ]);
+  assert.match(result.text, /One call to Token Risk costs 0\.01 USDG, or 0\.01 USDC on Base\./);
   assert.ok(!result.text.includes("0x8335"));
   assert.ok(!result.text.includes("Gloam"));
   assert.equal(f.paid(), 0);
@@ -233,7 +236,7 @@ test("limits come from the agent's settings", async () => {
   assert.equal((await planned(p, "AUTONOMO_CALL_API", rt, { query: "newest launches" })).result.success, true);
   const third = await planned(p, "AUTONOMO_CALL_API", rt, { query: "newest launches" });
   assert.equal(third.result.success, false);
-  assert.match(third.result.text, /today's USDG budget/);
+  assert.match(third.result.text, /today's dollar budget/);
   assert.equal(f.paid(), 2);
 });
 

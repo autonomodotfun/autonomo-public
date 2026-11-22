@@ -1,8 +1,8 @@
 # LangChain tools for Autonomo
 
 Give a [LangChain](https://python.langchain.com) or LangGraph agent [Autonomo](https://autonomo.fun)'s paid APIs.
-The agent finds the right API for its task, checks the price and pays for the call itself, in USDG or $AUTONOMO with
-x402 on Robinhood Chain. Spending caps are checked before anything is signed.
+The agent finds the right API for its task, checks the price and pays for the call itself with x402, in USDG or
+$AUTONOMO on Robinhood Chain, or USDC on Base. Spending caps are checked before anything is signed.
 
 ```bash
 pip install langchain-autonomo

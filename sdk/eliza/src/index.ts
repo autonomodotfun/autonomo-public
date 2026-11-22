@@ -13,7 +13,7 @@
 import type { Action, ActionResult, HandlerCallback, IAgentRuntime, Memory, Plugin } from "@elizaos/core";
 import { Autonomo, AutonomoError, rankApis, type Api, type AutonomoOptions, type Receipt, type TokenName } from "autonomo-sdk";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 const DEFAULT_MAX_OUTPUT_CHARS = 8_000;
 const FIND_LIMIT = 10;
@@ -100,8 +100,8 @@ function buildKit(runtime: IAgentRuntime, opts: AutonomoPluginOptions): Kit {
   let payWith = sdk.payWith;
   const payRaw = setting(runtime, SETTINGS.payWith)?.toLowerCase();
   if (payWith === undefined && payRaw !== undefined) {
-    if (payRaw === "usdg" || payRaw === "autonomo" || payRaw === "auto") payWith = payRaw;
-    else wrong.push(`${SETTINGS.payWith} should be usdg, autonomo or auto`);
+    if (payRaw === "usdg" || payRaw === "autonomo" || payRaw === "usdc" || payRaw === "auto") payWith = payRaw;
+    else wrong.push(`${SETTINGS.payWith} should be usdg, autonomo, usdc or auto`);
   }
 
   let key = sdk.privateKey ?? setting(runtime, SETTINGS.walletKey);
@@ -201,7 +201,13 @@ const clip = (text: string, limit: number) =>
   text.length <= limit ? text : `${text.slice(0, limit)}\n[cut: the answer was ${text.length} characters, the first ${limit} are shown]`;
 
 const priceOf = (a: Api) =>
-  [a.price.usdg !== undefined ? `${a.price.usdg} USDG` : null, a.price.autonomo !== undefined ? `${a.price.autonomo} AUTONOMO` : null].filter(Boolean).join(" or ") ||
+  [
+    a.price.usdg != null ? `${a.price.usdg} USDG` : null,
+    a.price.autonomo != null ? `${a.price.autonomo} AUTONOMO` : null,
+    a.price.usdcBase != null ? `${a.price.usdcBase} USDC on Base` : null,
+  ]
+    .filter(Boolean)
+    .join(" or ") ||
   "price on request";
 
 const apiInfo = (a: Api) => ({
@@ -340,10 +346,10 @@ export function createAutonomoPlugin(opts: AutonomoPluginOptions = {}): Plugin {
     validate: async () => true,
     handler: handler(NAMES.price, async ({ kit, params }) => {
       const q = await kit.client.quote(params.query ?? "", { slug: params.slug, path: params.path, input: params.input });
-      // Only the ways this agent can pay. An API may also take USDC on Base, which the SDK doesn't pay and shows by
-      // its contract address, with the wrong decimals; and a private payment needs Gloam set up.
+      // Only the ways this agent can pay: a token the SDK doesn't know shows as its contract address, and a private
+      // payment needs Gloam set up.
       const offers = q.offers.filter((o) => !o.token.startsWith("0x") && (canGoPrivate || !o.private));
-      if (!offers.length) throw new AutonomoError(`${q.api.name} doesn't take USDG or $AUTONOMO on Robinhood Chain, so this agent can't pay for it.`, "no_price");
+      if (!offers.length) throw new AutonomoError(`${q.api.name} doesn't take USDG or $AUTONOMO on Robinhood Chain, or USDC on Base, so this agent can't pay for it.`, "no_price");
       const ways = offers.map((o) => `${o.amount} ${o.token}${o.private ? " (private, through Gloam)" : ""}`).join(", or ");
       return { text: `One call to ${q.api.name} costs ${ways}. URL: ${q.url}`, data: { api: { slug: q.api.slug, name: q.api.name }, url: q.url, offers } };
     }),
@@ -408,7 +414,7 @@ export function createAutonomoPlugin(opts: AutonomoPluginOptions = {}): Plugin {
 
   return {
     name: "autonomo",
-    description: "Find, price and pay for Autonomo's x402 APIs in USDG or $AUTONOMO on Robinhood Chain, within spending caps.",
+    description: "Find, price and pay for Autonomo's x402 APIs in USDG or $AUTONOMO on Robinhood Chain, or USDC on Base, within spending caps.",
     init: async (_config: Record<string, string>, runtime: IAgentRuntime) => {
       const log = loggerOf(runtime);
       try {

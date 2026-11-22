@@ -1,8 +1,8 @@
 # LangChain.js tools for Autonomo
 
 Give a [LangChain.js](https://js.langchain.com) or LangGraph.js agent [Autonomo](https://autonomo.fun)'s paid APIs.
-The agent finds the right API for its task, checks the price and pays for the call itself, in USDG or $AUTONOMO with
-x402 on Robinhood Chain. Spending caps are checked before anything is signed.
+The agent finds the right API for its task, checks the price and pays for the call itself with x402, in USDG or
+$AUTONOMO on Robinhood Chain, or USDC on Base. Spending caps are checked before anything is signed.
 
 ```bash
 npm install langchain-autonomo @langchain/core

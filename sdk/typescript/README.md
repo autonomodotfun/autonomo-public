@@ -4,7 +4,7 @@ One call for AI agents. Say what you need, and the SDK:
 
 1. **Finds the right API** on [Autonomo](https://autonomo.fun), from your words and the kind of input you give
    (a token or wallet address, a transaction hash, a link).
-2. **Pays for it** with x402 on Robinhood Chain, in USDG or $AUTONOMO, whichever the wallet can afford.
+2. **Pays for it** with x402, in USDG or $AUTONOMO on Robinhood Chain, or USDC on Base, whichever the wallet can afford.
 3. **Pays privately through [Gloam](https://gloam.trade)** when you ask, so the payment doesn't link to your wallet.
 4. **Borrows from a [Borro](https://borro.markets) credit line** when the wallet is short of USDG.
 5. **Keeps to your caps**: a most-per-call and a daily budget, checked before anything is signed.
@@ -41,6 +41,9 @@ await autonomo.quote("explain this transaction", { input: "0x…" }); // the API
 
 To skip the search, name the API: `autonomo.call("", { slug: "token-risk", path: "/risk/0x…" })`.
 
+To see what the wallet can pay with, `await autonomo.balances()` returns what it holds on both chains: USDG,
+$AUTONOMO and ETH on Robinhood Chain, and USDC on Base. It only reads.
+
 ## From the terminal
 
 The package also installs a command, for people and for agents that run shell commands. `find`, `quote`, `spend` and
@@ -64,8 +67,13 @@ npx autonomo-sdk call "explain this transaction" 0x… --max 0.02 --daily 0.5 --
 | `find [words] [input]` | List APIs, best matches first |
 | `quote <words> [input]` | The API a call would use, and its prices |
 | `call <words> [input]` | Find the right API, pay for one call, print the answer |
-| `price [token]`, `launches [n]`, `risk <token>`, `tx <hash>`, `portfolio <wallet>`, `read <link>`, `offers <words>` | Shortcuts for the official APIs |
+| `price [token]`, `launches [n]`, `risk <token>`, `holders <token>`, `dev <token>`, `tx <hash>`, `payment <hash>`, `portfolio <wallet>`, `gas`, `read <link>`, `site <link or domain>`, `health <link>`, `jobs <words>` | Shortcuts for the official APIs |
 | `spend` | Today's spending against your limits |
+| `wallet` | What the wallet holds on Robinhood Chain and Base |
+
+`--chain base` (or `robinhood`) goes with the shortcuts that read a chain: `price` with a token, `launches`, `risk`,
+`holders`, `dev`, `tx`, `payment`, `portfolio` and `gas`. Left out, they read Robinhood Chain, and Base when the
+token, wallet or transaction is only there.
 
 `--max` and `--daily` set the USDG limits (`--max-autonomo` and `--daily-autonomo` for $AUTONOMO), `--pay-with`
 picks the token and `--borro <credit line>` borrows when the wallet is short. At a terminal it shows the price and
@@ -100,7 +108,7 @@ own server (`npx -y @gloamtrade/mcp`) on your machine for that one payment and s
 ```ts
 new Autonomo({
   privateKey,
-  payWith: "auto", // or "usdg" / "autonomo"
+  payWith: "auto", // or "usdg" / "autonomo" / "usdc" (USDC on Base)
   limits: {
     perCall: { usdg: "0.05", autonomo: "5000" }, // the defaults
     daily: { usdg: "1", autonomo: "10000" }, // per UTC day; Gloam and Borro count as USDG
@@ -155,10 +163,10 @@ still checked against your caps first.
 | Field | |
 | --- | --- |
 | `api` | The API's slug and name |
-| `route` | `usdg`, `autonomo`, `gloam` or `borro` |
-| `amount`, `token` | What was paid |
+| `route` | `usdg`, `autonomo`, `usdc`, `gloam` or `borro` |
+| `amount`, `token`, `chain` | What was paid, and on which chain: `Robinhood Chain` or `Base` |
 | `payer`, `payTo` | The wallet (or "private (Gloam)") and the API's payment address |
-| `tx`, `explorer` | The payment transaction and its Blockscout link |
+| `tx`, `explorer` | The payment transaction and its link on Blockscout, or on Basescan for Base |
 | `borrowTxs`, `approveTx` | Borro borrows and the one-time Permit2 approval, when there were any |
 | `spentToday` | Today's total against the daily budget |
 

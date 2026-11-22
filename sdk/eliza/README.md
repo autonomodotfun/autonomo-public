@@ -1,7 +1,8 @@
 # elizaOS plugin for Autonomo
 
 Give an [elizaOS](https://elizaos.ai) agent [Autonomo](https://autonomo.fun)'s paid APIs. The agent finds the right
-API for its task, checks the price and pays for the call itself, in USDG or $AUTONOMO with x402 on Robinhood Chain.
+API for its task, checks the price and pays for the call itself with x402: in USDG or $AUTONOMO on Robinhood Chain,
+or USDC on Base.
 Spending caps are checked before anything is signed.
 
 ```bash
@@ -45,10 +46,10 @@ All optional. Set them in the character's secrets or settings, or in the environ
 | Setting | | Default |
 | --- | --- | --- |
 | `AUTONOMO_WALLET_KEY` | The agent wallet's private key | none: free actions only |
-| `AUTONOMO_PAY_WITH` | `usdg`, `autonomo`, or `auto` (USDG first, then $AUTONOMO) | `auto` |
-| `AUTONOMO_MAX_USDG_PER_CALL` | The most one call may cost in USDG | `0.05` |
+| `AUTONOMO_PAY_WITH` | `usdg`, `autonomo`, `usdc` (on Base), or `auto` (USDG first, then $AUTONOMO, then USDC on Base) | `auto` |
+| `AUTONOMO_MAX_USDG_PER_CALL` | The most one call may cost in USDG or USDC | `0.05` |
 | `AUTONOMO_MAX_AUTONOMO_PER_CALL` | The most one call may cost in $AUTONOMO | `5000` |
-| `AUTONOMO_DAILY_USDG` | The most to spend per UTC day in USDG | `1` |
+| `AUTONOMO_DAILY_USDG` | The most to spend per UTC day in USDG and USDC together | `1` |
 | `AUTONOMO_DAILY_AUTONOMO` | The most to spend per UTC day in $AUTONOMO | `10000` |
 | `AUTONOMO_BORRO_ACCOUNT` | A [Borro](https://borro.markets) credit line to borrow from when the wallet is short of USDG | none |
 | `AUTONOMO_MAX_OUTPUT_CHARS` | Longer answers are cut before they reach the model or the chat | `8000` |
@@ -66,7 +67,7 @@ limit.
   The daily budget is the most they can spend between them, so set it to what you're fine losing in a day.
 - Today's spending is kept in `~/.autonomo/spend.json`, shared with the Autonomo SDK and CLI on the same machine. On a
   host that wipes its disk on each deploy, the daily count starts again after a deploy.
-- Each paid call is public on Robinhood Chain: the wallet, the amount and the API it paid.
+- Each paid call is public on Robinhood Chain or Base: the wallet, the amount and the API it paid.
 - Paying in $AUTONOMO needs a little ETH once, for a Permit2 approval. USDG needs none.
 - Prefer APIs marked verified with a good track record. Autonomo lists outside creators' APIs too, and doesn't vouch
   for each one.

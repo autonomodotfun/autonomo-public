@@ -2,14 +2,14 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.autonomodotfun/autonomo",
   "title": "Autonomo",
-  "description": "Let AI agents find x402 APIs and pay per call in USDG or $AUTONOMO on Robinhood Chain.",
+  "description": "Let AI agents find x402 APIs and pay per call in USDG or $AUTONOMO on Robinhood Chain, or USDC on Base.",
   "websiteUrl": "https://autonomo.fun",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "autonomo-mcp",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "transport": {
         "type": "stdio"
       },
@@ -23,15 +23,34 @@
         },
         {
           "name": "AUTONOMO_PAY_WITH",
-          "description": "Token used when the agent doesn't say: usdg or autonomo.",
+          "description": "Token used when the agent doesn't say. auto pays with the first the wallet can afford: USDG, then $AUTONOMO, then USDC on Base.",
           "isRequired": false,
           "format": "string",
-          "default": "usdg",
-          "choices": ["usdg", "autonomo"]
+          "default": "auto",
+          "choices": [
+            "auto",
+            "usdg",
+            "autonomo",
+            "usdc"
+          ]
+        },
+        {
+          "name": "AUTONOMO_MAX_USDG_PER_CALL",
+          "description": "Most one call may cost in USDG or USDC.",
+          "isRequired": false,
+          "format": "string",
+          "default": "0.05"
+        },
+        {
+          "name": "AUTONOMO_MAX_AUTONOMO_PER_CALL",
+          "description": "Most one call may cost in $AUTONOMO.",
+          "isRequired": false,
+          "format": "string",
+          "default": "5000"
         },
         {
           "name": "AUTONOMO_DAILY_USDG",
-          "description": "Most USDG the server will spend per UTC day.",
+          "description": "Most dollars the server will spend per UTC day, in USDG and USDC on Base together.",
           "isRequired": false,
           "format": "string",
           "default": "1"

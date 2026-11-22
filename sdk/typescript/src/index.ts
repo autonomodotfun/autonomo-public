@@ -1,5 +1,5 @@
-// Autonomo SDK: one call that finds the right paid API on Autonomo, pays for it on Robinhood Chain and returns the
-// answer with a receipt.
+// Autonomo SDK: one call that finds the right paid API on Autonomo, pays for it on Robinhood Chain or Base and returns
+// the answer with a receipt.
 //
 //   const autonomo = new Autonomo({ privateKey });
 //   const { data, receipt } = await autonomo.call("is this token safe", { input: "0x…" });
@@ -7,9 +7,11 @@
 // How a call is paid, in order:
 //   private: true    Only through Gloam, from a private balance, so the payment doesn't link to the wallet. Never
 //                    falls back to a public payment.
-//   otherwise        USDG, then $AUTONOMO (or just the one set in payWith), from the wallet, whichever it can afford.
-//                    If it can't afford either and a Borro credit line is set, it borrows the USDG it's short and pays.
-// Every route checks the per-call cap and the daily budget before anything is signed or sent.
+//   otherwise        USDG, then $AUTONOMO on Robinhood Chain, then USDC on Base (or just the one set in payWith), from
+//                    the wallet, whichever it can afford. The same key is the same wallet on both chains. If it can't
+//                    afford any and a Borro credit line is set, it borrows the USDG it's short and pays.
+// Every route checks the per-call cap and the daily budget before anything is signed or sent. USDG and USDC are both
+// dollars, so they share the dollar limits (limits.perCall.usdg and limits.daily.usdg).
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -30,21 +32,28 @@ import {
 } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 
-export const VERSION = "0.1.3";
+export const VERSION = "0.1.4";
 
 const NETWORK = "eip155:4663";
 const CHAIN_ID = 4663;
 const EXPLORER = "https://robinhoodchain.blockscout.com";
+const BASE_CHAIN_ID = 8453;
+const BASE_RPC = "https://mainnet.base.org";
 const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 const PERMIT2_PROXY = "0x402085c248EeA27D92E8b30b2C58ed07f9E20001"; // x402's exact-scheme Permit2 proxy
 const BORRO_MCP = "https://borro.markets/mcp";
 
-export type TokenName = "usdg" | "autonomo";
-type Token = { name: TokenName; symbol: string; address: Hex; decimals: number };
+export type TokenName = "usdg" | "autonomo" | "usdc";
+/** The tokens with limits of their own. USDC on Base is held to the USDG (dollar) limits. */
+type LimitName = "usdg" | "autonomo";
+export type ChainName = "Robinhood Chain" | "Base";
+type Token = { name: TokenName; symbol: string; address: Hex; decimals: number; network: string; chainId: number; chain: ChainName; explorer: string };
 export const TOKENS: Record<TokenName, Token> = {
-  usdg: { name: "usdg", symbol: "USDG", address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", decimals: 6 },
-  autonomo: { name: "autonomo", symbol: "AUTONOMO", address: "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96", decimals: 18 },
+  usdg: { name: "usdg", symbol: "USDG", address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", decimals: 6, network: NETWORK, chainId: CHAIN_ID, chain: "Robinhood Chain", explorer: EXPLORER },
+  autonomo: { name: "autonomo", symbol: "AUTONOMO", address: "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96", decimals: 18, network: NETWORK, chainId: CHAIN_ID, chain: "Robinhood Chain", explorer: EXPLORER },
+  usdc: { name: "usdc", symbol: "USDC", address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6, network: "eip155:8453", chainId: BASE_CHAIN_ID, chain: "Base", explorer: "https://basescan.org" },
 };
+const limitOf = (t: TokenName): LimitName => (t === "autonomo" ? "autonomo" : "usdg");
 export const DEFAULT_LIMITS = {
   perCall: { usdg: "0.05", autonomo: "5000" },
   daily: { usdg: "1", autonomo: "10000" },
@@ -53,10 +62,10 @@ export const DEFAULT_LIMITS = {
 // ---------- Public types ----------
 
 export type Limits = {
-  /** Most to pay for one call, in whole tokens, e.g. { usdg: "0.05" }. */
-  perCall?: Partial<Record<TokenName, string>>;
-  /** Most to spend per UTC day, in whole tokens. Gloam and Borro payments count as USDG. */
-  daily?: Partial<Record<TokenName, string>>;
+  /** Most to pay for one call, in whole tokens, e.g. { usdg: "0.05" }. The usdg limit covers USDC on Base too. */
+  perCall?: Partial<Record<LimitName, string>>;
+  /** Most to spend per UTC day, in whole tokens. USDC on Base, Gloam and Borro payments count against the usdg limit. */
+  daily?: Partial<Record<LimitName, string>>;
 };
 
 /**
@@ -76,7 +85,7 @@ export type SpendStore = {
 export type AutonomoOptions = {
   /** The agent wallet's private key. Use a wallet just for the agent, holding only what it may spend. */
   privateKey?: Hex | string;
-  /** Which token to pay with. "auto" (default) tries USDG, then $AUTONOMO. */
+  /** Which token to pay with. "auto" (default) tries USDG, then $AUTONOMO, then USDC on Base. */
   payWith?: TokenName | "auto";
   limits?: Limits;
   /** Pay privately through Gloam when a call asks for `private: true`. */
@@ -85,7 +94,10 @@ export type AutonomoOptions = {
   borro?: { account: Hex | string; mcpUrl?: string };
   spendStore?: SpendStore;
   baseUrl?: string;
+  /** Robinhood Chain RPC. */
   rpcUrl?: string;
+  /** Base RPC, for USDC balances. Defaults to https://mainnet.base.org. */
+  baseRpcUrl?: string;
   fetch?: typeof fetch;
 };
 
@@ -94,7 +106,7 @@ export type Api = {
   name: string;
   description: string;
   path: string;
-  price: { usdg?: number; autonomo?: number };
+  price: { usdg?: number; autonomo?: number; usdcBase?: number };
   verified: boolean;
   successRate: number | null;
   paidCalls30d: number;
@@ -113,7 +125,7 @@ export type CallOptions = {
   payWith?: TokenName | "auto";
 };
 
-export type Route = "usdg" | "autonomo" | "gloam" | "borro";
+export type Route = "usdg" | "autonomo" | "usdc" | "gloam" | "borro";
 
 export type Receipt = {
   api: { slug: string; name: string };
@@ -121,6 +133,8 @@ export type Receipt = {
   route: Route;
   amount: string;
   token: string;
+  /** The chain the payment was made on. */
+  chain: ChainName;
   payer: string;
   payTo: string;
   tx: string | null;
@@ -132,6 +146,13 @@ export type Receipt = {
 };
 
 export type CallResult<T = unknown> = { data: T; receipt: Receipt };
+
+/** What the wallet holds, in whole tokens. A chain that couldn't be read is null. */
+export type Balances = {
+  address: string;
+  robinhood: { usdg: string; autonomo: string; eth: string } | null;
+  base: { usdc: string } | null;
+};
 
 export class AutonomoError extends Error {
   constructor(
@@ -228,7 +249,7 @@ export function fileStore(file = join(homedir(), ".autonomo", "spend.json")): Sp
     get(day) {
       const s = read();
       if (s.date !== day) return {};
-      return { usdg: BigInt(s.usdg ?? 0), autonomo: BigInt(s.autonomo ?? 0) };
+      return { usdg: BigInt(s.usdg ?? 0), autonomo: BigInt(s.autonomo ?? 0), usdc: BigInt(s.usdc ?? 0) };
     },
     add(day, token, amount) {
       const s = read();
@@ -258,11 +279,12 @@ export function memoryStore(): SpendStore {
 export class Autonomo {
   private readonly base: string;
   private readonly rpc: string;
+  private readonly baseRpc: string;
   private readonly fetch: typeof fetch;
   private readonly account: PrivateKeyAccount | null;
   private readonly payWith: TokenName | "auto";
-  private readonly perCall: Record<TokenName, bigint>;
-  private readonly daily: Record<TokenName, bigint>;
+  private readonly perCall: Record<LimitName, bigint>;
+  private readonly daily: Record<LimitName, bigint>;
   private readonly store: SpendStore;
   private readonly gloam?: { fetchPaid: GloamFetchPaid };
   private readonly borro?: { account: Hex; mcpUrl: string };
@@ -272,16 +294,23 @@ export class Autonomo {
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
     rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
   });
+  private readonly baseChain = defineChain({
+    id: BASE_CHAIN_ID,
+    name: "Base",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: { default: { http: [BASE_RPC] } },
+  });
 
   constructor(opts: AutonomoOptions = {}) {
     this.base = (opts.baseUrl ?? "https://autonomo.fun").replace(/\/+$/, "");
     this.rpc = opts.rpcUrl ?? "https://rpc.mainnet.chain.robinhood.com";
+    this.baseRpc = opts.baseRpcUrl ?? BASE_RPC;
     this.fetch = opts.fetch ?? globalThis.fetch;
     const key = opts.privateKey?.trim();
     if (key !== undefined && !/^0x[0-9a-fA-F]{64}$/.test(key)) fail("bad_key", "privateKey should be 0x followed by 64 hex characters.");
     this.account = key ? privateKeyToAccount(key as Hex) : null;
     this.payWith = opts.payWith ?? "auto";
-    const units = (t: TokenName, v: string | undefined, d: string) => parseUnits(v ?? d, TOKENS[t].decimals);
+    const units = (t: LimitName, v: string | undefined, d: string) => parseUnits(v ?? d, TOKENS[t].decimals);
     this.perCall = {
       usdg: units("usdg", opts.limits?.perCall?.usdg, DEFAULT_LIMITS.perCall.usdg),
       autonomo: units("autonomo", opts.limits?.perCall?.autonomo, DEFAULT_LIMITS.perCall.autonomo),
@@ -298,6 +327,26 @@ export class Autonomo {
   /** The wallet that pays, or null when no key is set. */
   get address(): Hex | null {
     return this.account?.address ?? null;
+  }
+
+  /**
+   * What the wallet holds on both chains: USDG, $AUTONOMO and ETH on Robinhood Chain, and USDC on Base. Free, and it
+   * signs nothing. A chain that can't be read right now comes back as null instead of failing the whole answer.
+   */
+  async balances(): Promise<Balances> {
+    const account = this.account ?? fail("no_wallet", "No wallet set. Pass privateKey (a wallet just for this agent).");
+    const { pub, basePub } = this.clients();
+    const held = (client: ReturnType<typeof createPublicClient>, token: Token) =>
+      client.readContract({ address: token.address, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
+    const [robinhood, base] = await Promise.all([
+      Promise.all([held(pub, TOKENS.usdg), held(pub, TOKENS.autonomo), pub.getBalance({ address: account.address })])
+        .then(([usdg, autonomo, eth]) => ({ usdg: formatUnits(usdg, 6), autonomo: formatUnits(autonomo, 18), eth: formatEther(eth) }))
+        .catch(() => null),
+      held(basePub, TOKENS.usdc)
+        .then((usdc) => ({ usdc: formatUnits(usdc, 6) }))
+        .catch(() => null),
+    ]);
+    return { address: account.address, robinhood, base };
   }
 
   /** Every Autonomo API, or the best matches for a query and input. Free. */
@@ -325,8 +374,9 @@ export class Autonomo {
       api,
       url,
       offers: required.accepts.map((a) => {
-        const t = tokenByAsset(a.asset);
-        return { scheme: a.scheme, token: t?.symbol ?? a.asset, amount: formatUnits(BigInt(a.amount), t?.decimals ?? 18), private: a.scheme === "gloam-cashout" };
+        const t = tokenByAsset(a.asset, a.network);
+        const label = t ? (t.name === "usdc" ? "USDC on Base" : t.symbol) : a.asset;
+        return { scheme: a.scheme, token: label, amount: formatUnits(BigInt(a.amount), t?.decimals ?? 18), private: a.scheme === "gloam-cashout" };
       }),
     };
   }
@@ -354,7 +404,10 @@ export class Autonomo {
         fail("payment_refused", reason ? `Payment refused: ${reason}` : `The API answered ${res.status}${detail ? `: ${detail}` : ""}. You aren't charged unless it settled.`);
       }
       await this.store.add(day, token.name, amount);
-      const after = (await this.store.get(day))[token.name] ?? 0n;
+      const now = await this.store.get(day);
+      const limit = limitOf(token.name);
+      const after = limit === "usdg" ? (now.usdg ?? 0n) + (now.usdc ?? 0n) : (now.autonomo ?? 0n);
+      const unit = limit === "usdg" ? "USDG and USDC" : token.symbol;
       const text = await res.text();
       let data: unknown;
       try {
@@ -368,24 +421,28 @@ export class Autonomo {
         route,
         amount: formatUnits(amount, token.decimals),
         token: token.symbol,
+        chain: token.chain,
         payer: route === "gloam" ? "private (Gloam)" : account.address,
         payTo: "",
         tx,
-        explorer: tx ? `${EXPLORER}/tx/${tx}` : null,
+        explorer: tx ? `${token.explorer}/tx/${tx}` : null,
         borrowTxs: [],
         approveTx: null,
         at: new Date().toISOString(),
-        spentToday: `${formatUnits(after, token.decimals)} of ${formatUnits(this.daily[token.name], token.decimals)} ${token.symbol}`,
+        spentToday: `${formatUnits(after, token.decimals)} of ${formatUnits(this.daily[limit], token.decimals)} ${unit}`,
         ...extra,
       };
       return { data: data as T, receipt };
     };
 
+    // USDG and USDC on Base are both dollars with 6 decimals, so they share one cap and one daily budget.
     const within = (token: Token, amount: bigint) => {
+      const limit = limitOf(token.name);
+      const unit = limit === "usdg" ? "dollar" : token.symbol;
       const price = `${formatUnits(amount, token.decimals)} ${token.symbol}`;
-      if (amount > this.perCall[token.name]) return `${price} is above the per-call cap of ${formatUnits(this.perCall[token.name], token.decimals)} ${token.symbol}`;
-      const sofar = spent[token.name] ?? 0n;
-      if (sofar + amount > this.daily[token.name]) return `${price} would pass today's ${token.symbol} budget (${formatUnits(sofar, token.decimals)} of ${formatUnits(this.daily[token.name], token.decimals)} spent)`;
+      if (amount > this.perCall[limit]) return `${price} is above the per-call cap of ${formatUnits(this.perCall[limit], token.decimals)} ${limit === "usdg" ? "USDG/USDC" : token.symbol}`;
+      const sofar = limit === "usdg" ? (spent.usdg ?? 0n) + (spent.usdc ?? 0n) : (spent.autonomo ?? 0n);
+      if (sofar + amount > this.daily[limit]) return `${price} would pass today's ${unit} budget (${formatUnits(sofar, token.decimals)} of ${formatUnits(this.daily[limit], token.decimals)} spent)`;
       return null;
     };
 
@@ -412,16 +469,17 @@ export class Autonomo {
 
     // Public: the wallet's tokens, then Borro.
     const want = opts.payWith ?? this.payWith;
-    const order: TokenName[] = want === "auto" ? ["usdg", "autonomo"] : [want];
+    const order: TokenName[] = want === "auto" ? ["usdg", "autonomo", "usdc"] : [want];
     const reasons: string[] = [];
-    const pub = createPublicClient({ chain: this.chain, transport: http(this.rpc) });
+    const { pub, basePub } = this.clients();
+    const clientFor = (t: Token) => (t.chainId === BASE_CHAIN_ID ? basePub : pub);
     let usdgShort: { offer: Accept; amount: bigint } | null = null;
 
     for (const name of order) {
       const token = TOKENS[name];
-      const offer = required.accepts.find((a) => a.scheme === "exact" && a.network === NETWORK && sameAddr(a.asset, token.address));
+      const offer = required.accepts.find((a) => a.scheme === "exact" && a.network === token.network && sameAddr(a.asset, token.address));
       if (!offer) {
-        reasons.push(`${api.name} doesn't take ${token.symbol}`);
+        reasons.push(`${api.name} doesn't take ${token.name === "usdc" ? "USDC on Base" : token.symbol}`);
         continue;
       }
       const amount = BigInt(offer.amount);
@@ -430,20 +488,20 @@ export class Autonomo {
         reasons.push(why);
         continue;
       }
-      const balance = await pub.readContract({ address: token.address, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
+      const balance = await clientFor(token).readContract({ address: token.address, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
       if (balance < amount) {
-        reasons.push(`the wallet holds ${formatUnits(balance, token.decimals)} ${token.symbol}, the call costs ${formatUnits(amount, token.decimals)}`);
+        reasons.push(`the wallet holds ${formatUnits(balance, token.decimals)} ${token.symbol}${token.name === "usdc" ? " on Base" : ""}, the call costs ${formatUnits(amount, token.decimals)}`);
         if (name === "usdg") usdgShort = { offer, amount };
         continue;
       }
-      return pay(name, token, amount, () => this.payExact(url, required, offer, account, pub));
+      return pay(name, token, amount, () => this.payExact(url, required, offer, account, pub, token.chainId));
     }
 
     if (this.borro && usdgShort) {
       const { offer, amount } = usdgShort;
       const borrowTxs = await this.borrow(url, offer, account, pub);
       return pay("borro", TOKENS.usdg, amount, async () => {
-        const r = await this.payExact(url, required, offer, account, pub);
+        const r = await this.payExact(url, required, offer, account, pub, CHAIN_ID);
         return { ...r, extra: { ...r.extra, borrowTxs: borrowTxs.map((h) => `${EXPLORER}/tx/${h}`) } };
       });
     }
@@ -451,6 +509,14 @@ export class Autonomo {
   }
 
   // ---------- Internals ----------
+
+  /** Read-only clients for both chains. */
+  private clients() {
+    return {
+      pub: createPublicClient({ chain: this.chain, transport: http(this.rpc) }),
+      basePub: createPublicClient({ chain: this.baseChain, transport: http(this.baseRpc) }),
+    };
+  }
 
   private async get(url: string, timeout = 15_000) {
     const res = await this.fetch(url, { signal: AbortSignal.timeout(timeout) });
@@ -501,14 +567,18 @@ export class Autonomo {
     return required!;
   }
 
-  /** Signs an x402 exact payment (EIP-3009 for USDG, Permit2 for $AUTONOMO) and sends the request with it. */
-  private async payExact(url: string, required: PaymentRequired, offer: Accept, account: PrivateKeyAccount, pub: ReturnType<typeof createPublicClient>) {
+  /**
+   * Signs an x402 exact payment (EIP-3009 for USDG and USDC on Base, Permit2 for $AUTONOMO) and sends the request with
+   * it. `chainId` is the chain the offer is paid on; a Permit2 approval is only ever sent on Robinhood Chain.
+   */
+  private async payExact(url: string, required: PaymentRequired, offer: Accept, account: PrivateKeyAccount, pub: ReturnType<typeof createPublicClient>, chainId: number) {
     let approveTx: string | null = null;
     const now = Math.floor(Date.now() / 1000);
     const timeout = offer.maxTimeoutSeconds ?? 300;
     let payload: Record<string, unknown>;
 
     if (offer.extra?.assetTransferMethod === "permit2") {
+      if (chainId !== CHAIN_ID) fail("bad_offer", "A Permit2 payment is only expected on Robinhood Chain.");
       const allowance = await pub.readContract({ address: getAddress(offer.asset), abi: erc20Abi, functionName: "allowance", args: [account.address, PERMIT2] });
       if (allowance < BigInt(offer.amount)) {
         const wallet = createWalletClient({ account, chain: this.chain, transport: http(this.rpc) });
@@ -538,7 +608,7 @@ export class Autonomo {
         validBefore: String(now + timeout),
         nonce: randomHex(32),
       };
-      const signature = await account.signTypedData(eip3009TypedData(auth, offer.asset, name!, version!));
+      const signature = await account.signTypedData(eip3009TypedData(auth, offer.asset, name!, version!, chainId));
       payload = { authorization: auth, signature };
     }
 
@@ -586,16 +656,18 @@ export class Autonomo {
 // ---------- Helpers ----------
 
 const sameAddr = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-const tokenByAsset = (asset: string) => Object.values(TOKENS).find((t) => sameAddr(t.address, asset));
+const tokenByAsset = (asset: string, network?: string) =>
+  Object.values(TOKENS).find((t) => sameAddr(t.address, asset) && (network === undefined || t.network === network));
 
 export function eip3009TypedData(
   auth: { from: string; to: string; value: string; validAfter: string; validBefore: string; nonce: string },
   asset: string,
   name: string,
   version: string,
+  chainId: number = CHAIN_ID,
 ) {
   return {
-    domain: { name, version, chainId: CHAIN_ID, verifyingContract: getAddress(asset) },
+    domain: { name, version, chainId, verifyingContract: getAddress(asset) },
     types: {
       TransferWithAuthorization: [
         { name: "from", type: "address" },

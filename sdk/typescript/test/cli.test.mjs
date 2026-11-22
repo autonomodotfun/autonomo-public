@@ -19,6 +19,13 @@ const APIS = [
   { slug: "wallet-portfolio", name: "Wallet Portfolio", description: "What a wallet holds", usage: "/portfolio/<wallet address>" },
   { slug: "page-reader", name: "Page Reader", description: "Reads a web page", usage: "/page?url=<url-encoded https:// link>" },
   { slug: "ostrapad-offer-finder", name: "Ostrapad Offer Finder", description: "Finds offers on Ostrapad", usage: "/offers?q=<what you need done>" },
+  { slug: "holders-bundles", name: "Holders & Bundles", description: "Top holders and bundles", usage: "/holders/<token contract address>" },
+  { slug: "dev-wallet", name: "Dev Wallet Tracker", description: "What the creator did", usage: "/dev/<token contract address>" },
+  { slug: "payment-check", name: "Payment Check", description: "Did an x402 payment settle", usage: "/payment/<payment hash>" },
+  { slug: "gas-now", name: "Gas Now", description: "Gas costs", usage: "/gas" },
+  { slug: "website-check", name: "Website Check", description: "Trust check for a site", usage: "/site?url=<website or domain>" },
+  { slug: "endpoint-health", name: "Endpoint Health", description: "Is an endpoint up", usage: "/endpoint?url=<url-encoded https:// link>" },
+  { slug: "tokyo-futuro-job-finder", name: "Tokyo Futuro Job Finder", description: "Open paid jobs", usage: "/jobs?q=<the work>" },
 ].map((a) => ({ ...a, verified: true, price: { usdg: 0.01, autonomo: 100 }, trackRecord: { successRate: 1, paidCalls: 5 } }));
 
 // A fake Autonomo: the gateway list, and a 402 price list (0.01 USDG unless told otherwise) for every /x/ URL.
@@ -72,6 +79,18 @@ test("each shortcut goes straight to its API and path", async () => {
     [["portfolio", ADDR], `/x/wallet-portfolio/portfolio/${ADDR}`],
     [["read", "https://example.com/a?b=c"], "/x/page-reader/page?url=https%3A%2F%2Fexample.com%2Fa%3Fb%3Dc"],
     [["offers", "summarize", "a document"], "/x/ostrapad-offer-finder/offers?q=summarize%20a%20document"],
+    [["holders", ADDR], `/x/holders-bundles/holders/${ADDR}`],
+    [["dev", ADDR], `/x/dev-wallet/dev/${ADDR}`],
+    [["payment", TX], `/x/payment-check/payment/${TX}`],
+    [["gas"], "/x/gas-now/gas"],
+    [["site", "example.com"], "/x/website-check/site?url=example.com"],
+    [["health", "https://api.example.com/v1?x=1"], "/x/endpoint-health/endpoint?url=https%3A%2F%2Fapi.example.com%2Fv1%3Fx%3D1"],
+    [["jobs", "write", "a summary"], "/x/tokyo-futuro-job-finder/jobs?q=write%20a%20summary"],
+    // --chain is added to the path of the shortcuts that read a chain.
+    [["risk", ADDR, "--chain", "base"], `/x/token-risk/risk/${ADDR}?chain=base`],
+    [["launches", "5", "--chain", "base"], "/x/new-launches/launches?limit=5&chain=base"],
+    [["gas", "--chain", "base"], "/x/gas-now/gas?chain=base"],
+    [["price", ADDR, "--chain", "robinhood"], `/x/token-lookup/price/${ADDR}?chain=robinhood`],
   ];
   for (const [argv, path] of cases) {
     const c = cli();
@@ -158,15 +177,18 @@ test("--yes and scripts aren't asked", async () => {
 test("spend shows today's total against the limits", async () => {
   const store = memoryStore();
   store.add(new Date().toISOString().slice(0, 10), "usdg", 20_000n);
+  store.add(new Date().toISOString().slice(0, 10), "usdc", 10_000n);
   const c = cli({ env: { AUTONOMO_WALLET_KEY: KEY }, store });
   assert.equal(await c.run("spend", "--daily", "2", "--json"), EXIT.ok);
   const r = JSON.parse(c.out[0]);
-  assert.deepEqual(r.usdg, { spent: "0.02", daily: "2", perCall: "0.05" });
+  // USDG and USDC on Base share the dollar limits.
+  assert.deepEqual(r.usdg, { spent: "0.03", daily: "2", perCall: "0.05" });
+  assert.deepEqual(r.spentByToken, { usdg: "0.02", usdcBase: "0.01", autonomo: "0" });
   assert.deepEqual(r.autonomo, { spent: "0", daily: "10000", perCall: "5000" });
   assert.match(r.wallet, /^0x[0-9a-fA-F]{40}$/);
   const t = cli({ store });
   assert.equal(await t.run("spend"), EXIT.ok);
-  assert.match(t.out.join("\n"), /USDG {6}0\.02 of 1 spent, up to 0\.05 a call[\s\S]*none set/);
+  assert.match(t.out.join("\n"), /Dollars {3}0\.03 of 1 spent \(USDG 0\.02, USDC on Base 0\.01\), up to 0\.05 a call[\s\S]*none set/);
   assert.equal(t.calls.length, 0);
 });
 
@@ -190,7 +212,7 @@ test("--private pays through Gloam with no wallet key, counts it, and stops Gloa
   assert.deepEqual(g.state.asked, [{ url: `https://autonomo.fun/x/token-risk/risk/${ADDR}`, maxAmount: 0.011928, prefer: "gloam-cashout" }]);
   assert.deepEqual(JSON.parse(c.out[0]), { risk: "low" });
   assert.match(c.err.join("\n"), /Paying privately through Gloam/);
-  assert.match(c.err.join("\n"), /Paid 0\.010928 USDG privately through Gloam to Risk Checker\. Today: 0\.010928 of 1 USDG\./);
+  assert.match(c.err.join("\n"), /Paid 0\.010928 USDG privately through Gloam to Risk Checker\. Today: 0\.010928 of 1 USDG and USDC./);
   assert.match(c.err.join("\n"), new RegExp(`/tx/${TX}`));
   assert.equal(c.paid(), false); // The wallet signed nothing.
   assert.equal(await spentToday(c), 10928n);
@@ -280,4 +302,68 @@ test("--private --dry-run only shows the prices", async () => {
   assert.equal(await c.run("risk", ADDR, "--private", "--dry-run"), EXIT.ok);
   assert.match(c.out.join("\n"), /0\.010928 USDG {2}private, through Gloam/);
   assert.equal(g.state.started, 0);
+});
+
+// ---------- --chain and wallet ----------
+
+test("--chain is refused where it means nothing", async () => {
+  for (const argv of [
+    ["risk", ADDR, "--chain", "solana"],
+    ["price", "--chain", "base"],
+    ["read", "https://example.com", "--chain", "base"],
+    ["jobs", "write a summary", "--chain", "base"],
+    ["call", "newest launches", "--chain", "base"],
+  ]) {
+    const c = cli();
+    assert.equal(await c.run(...argv, "--dry-run"), EXIT.usage, argv.join(" "));
+    assert.equal(c.calls.filter((x) => x.url.includes("/x/")).length, 0);
+  }
+});
+
+test("the new shortcuts check what they are given", async () => {
+  for (const argv of [["holders"], ["dev", "0x12"], ["payment", ADDR], ["gas", "now"], ["site"], ["site", "not a site"], ["health", "http://plain.example.com"], ["jobs"]]) {
+    const c = cli();
+    assert.equal(await c.run(...argv, "--dry-run"), EXIT.usage, argv.join(" "));
+  }
+});
+
+test("wallet shows what the wallet holds on both chains, and signs nothing", async () => {
+  const USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+  const AUTONOMO = "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96";
+  const hex = (n) => `0x${n.toString(16).padStart(64, "0")}`;
+  const seen = [];
+  const rpc = async (url, init = {}) => {
+    const u = String(url);
+    const body = JSON.parse(init.body);
+    const one = (b) => {
+      seen.push(b.method);
+      if (b.method === "eth_getBalance") return { jsonrpc: "2.0", id: b.id, result: "0x0" };
+      const to = b.params?.[0]?.to?.toLowerCase();
+      const held = u.includes("base.org") ? (to === USDC_BASE ? 500_000n : 0n) : to === USDG.toLowerCase() ? 1_250_000n : to === AUTONOMO ? 4_500n * 10n ** 18n : 0n;
+      return { jsonrpc: "2.0", id: b.id, result: hex(held) };
+    };
+    return new Response(JSON.stringify(Array.isArray(body) ? body.map(one) : one(body)));
+  };
+  const real = globalThis.fetch;
+  globalThis.fetch = rpc; // viem reads the chains through the global fetch
+  try {
+    const c = cli({ env: { AUTONOMO_WALLET_KEY: KEY } });
+    assert.equal(await c.run("wallet"), EXIT.ok);
+    const text = c.out.join("\n");
+    assert.match(text, /^Wallet 0x[0-9a-fA-F]{40}/);
+    assert.match(text, /Robinhood Chain {2}1\.25 USDG, 4,500 AUTONOMO, 0 ETH/);
+    assert.match(text, /Base {13}0\.5 USDC/);
+    assert.match(c.err.join("\n"), /needs a little ETH/);
+    const j = cli({ env: { AUTONOMO_WALLET_KEY: KEY } });
+    assert.equal(await j.run("wallet", "--json"), EXIT.ok);
+    const b = JSON.parse(j.out[0]);
+    assert.deepEqual(b.robinhood, { usdg: "1.25", autonomo: "4500", eth: "0" });
+    assert.deepEqual(b.base, { usdc: "0.5" });
+    assert.equal(j.err.length, 0);
+    assert.ok(seen.every((m) => m === "eth_call" || m === "eth_getBalance" || m === "eth_chainId"), "only reads");
+  } finally {
+    globalThis.fetch = real;
+  }
+  const none = cli();
+  assert.equal(await none.run("wallet"), EXIT.cannotPay);
 });

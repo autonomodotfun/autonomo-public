@@ -19,7 +19,7 @@ from langchain_core.tools import BaseTool, BaseToolkit, ToolException
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 __all__ = ["AutonomoToolkit", "FindApisTool", "GetPriceTool", "CallApiTool"]
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 DEFAULT_MAX_CALLS = 10
 DEFAULT_MAX_OUTPUT_CHARS = 20_000
@@ -108,7 +108,7 @@ class FindApisTool(_AutonomoTool):
     description: str = (
         "Search Autonomo's paid APIs: crypto data on Robinhood Chain (token risk and prices, wallets, transactions, new launches) "
         "and more, such as reading web pages. Free. Returns the best matches with each API's slug, what it does, its path "
-        "(with <placeholders> to fill), its price in USDG and $AUTONOMO, and its track record. Prefer verified APIs."
+        "(with <placeholders> to fill), its price in USDG and $AUTONOMO, or USDC on Base, and its track record. Prefer verified APIs."
     )
     args_schema: type[BaseModel] = FindApisInput
 

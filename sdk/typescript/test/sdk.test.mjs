@@ -181,3 +181,131 @@ test("a Gloam refusal pays nothing and records nothing", async () => {
   await assert.rejects(a.call("newest launches", { private: true }), (e) => e.code === "payment_refused" && /over the daily limit/.test(e.message));
   assert.equal(store.get(new Date().toISOString().slice(0, 10)).usdg, undefined);
 });
+
+// ---------- USDC on Base ----------
+
+const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const usdcOffer = (amount = "10000") => ({ scheme: "exact", network: "eip155:8453", asset: USDC_BASE, amount, payTo: PAY_TO, maxTimeoutSeconds: 300, extra: { name: "USD Coin", version: "2" } });
+
+test("USDC on Base signs with Base's chain id and recovers to the wallet", async () => {
+  const account = privateKeyToAccount(KEY);
+  const typed = eip3009TypedData({ from: account.address, to: PAY_TO, value: "10000", validAfter: "0", validBefore: "9999999999", nonce: `0x${"22".repeat(32)}` }, USDC_BASE, "USD Coin", "2", 8453);
+  assert.equal(typed.domain.chainId, 8453);
+  assert.equal(await recoverTypedDataAddress({ ...typed, signature: await account.signTypedData(typed) }), account.address);
+});
+
+// A fake Autonomo, Robinhood Chain RPC and Base RPC. Balances are per RPC; a paid request answers 200 with a receipt.
+function chainFetch({ accepts, balances }) {
+  const paid = [];
+  const f = async (url, init = {}) => {
+    const u = String(url);
+    if (u === "https://rpc.test/" || u === "https://base.test/") {
+      const body = JSON.parse(init.body);
+      const one = (b) => {
+        const to = b.params?.[0]?.to?.toLowerCase();
+        const bal = b.method === "eth_call" ? (balances[u]?.[to] ?? 0n) : 0n;
+        return { jsonrpc: "2.0", id: b.id, result: `0x${bal.toString(16).padStart(64, "0")}` };
+      };
+      return new Response(JSON.stringify(Array.isArray(body) ? body.map(one) : one(body)));
+    }
+    if (u.endsWith("/api/v1/gateways")) {
+      return Response.json({ data: [{ slug: "new-launches", name: "New Launches", usage: "/launches?limit=10", verified: true, price: {} }] });
+    }
+    const sig = (init.headers ?? {})["PAYMENT-SIGNATURE"];
+    if (sig) {
+      paid.push(JSON.parse(Buffer.from(sig, "base64").toString()));
+      const receipt = Buffer.from(JSON.stringify({ success: true, transaction: `0x${"cd".repeat(32)}` })).toString("base64");
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "payment-response": receipt } });
+    }
+    return new Response("{}", { status: 402, headers: { "payment-required": Buffer.from(JSON.stringify({ x402Version: 2, accepts, resource: { url: u } })).toString("base64") } });
+  };
+  f.paid = paid;
+  return f;
+}
+async function withGlobalFetch(f, run) {
+  const real = globalThis.fetch;
+  globalThis.fetch = f; // viem reads the chains through the global fetch
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+const client = (f, opts = {}) =>
+  new Autonomo({ privateKey: KEY, fetch: f, rpcUrl: "https://rpc.test/", baseRpcUrl: "https://base.test/", spendStore: opts.store ?? memoryStore(), baseUrl: "https://autonomo.test", ...opts });
+
+test("pays with USDC on Base when asked, signed for Base, with a Basescan receipt", async () => {
+  const f = chainFetch({ accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" }), usdcOffer()], balances: { "https://base.test/": { [USDC_BASE.toLowerCase()]: 50_000n } } });
+  const store = memoryStore();
+  const { data, receipt } = await withGlobalFetch(f, () => client(f, { payWith: "usdc", store }).call("newest launches", { slug: "new-launches" }));
+  assert.deepEqual(data, { ok: true });
+  assert.equal(f.paid.length, 1);
+  const sent = f.paid[0];
+  assert.equal(sent.accepted.network, "eip155:8453");
+  assert.equal(sent.accepted.asset, USDC_BASE);
+  const auth = sent.payload.authorization;
+  const typed = eip3009TypedData(auth, USDC_BASE, "USD Coin", "2", 8453);
+  assert.equal(await recoverTypedDataAddress({ ...typed, signature: sent.payload.signature }), privateKeyToAccount(KEY).address, "signed for Base");
+  assert.equal(receipt.route, "usdc");
+  assert.equal(receipt.chain, "Base");
+  assert.equal(receipt.token, "USDC");
+  assert.equal(receipt.amount, "0.01");
+  assert.match(receipt.explorer, /^https:\/\/basescan\.org\/tx\/0x/);
+  assert.equal(receipt.spentToday, "0.01 of 1 USDG and USDC");
+  assert.equal(store.get(new Date().toISOString().slice(0, 10)).usdc, 10_000n);
+});
+
+test("auto pays with USDC on Base when the wallet has no USDG or $AUTONOMO on Robinhood Chain", async () => {
+  const f = chainFetch({
+    accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" }), exact(AUTONOMO, "36000000000000000000", { assetTransferMethod: "permit2" }), usdcOffer()],
+    balances: { "https://rpc.test/": {}, "https://base.test/": { [USDC_BASE.toLowerCase()]: 10_000n } },
+  });
+  const { receipt } = await withGlobalFetch(f, () => client(f).call("newest launches", { slug: "new-launches" }));
+  assert.equal(receipt.route, "usdc");
+  assert.equal(f.paid[0].accepted.network, "eip155:8453");
+});
+
+test("auto still pays USDG first when the wallet holds it", async () => {
+  const f = chainFetch({
+    accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" }), usdcOffer()],
+    balances: { "https://rpc.test/": { [USDG.toLowerCase()]: 10_000n }, "https://base.test/": { [USDC_BASE.toLowerCase()]: 10_000n } },
+  });
+  const { receipt } = await withGlobalFetch(f, () => client(f).call("newest launches", { slug: "new-launches" }));
+  assert.equal(receipt.route, "usdg");
+  assert.equal(receipt.chain, "Robinhood Chain");
+  assert.equal(f.paid[0].accepted.network, "eip155:4663");
+});
+
+test("USDC on Base shares the dollar budget with USDG", async () => {
+  const store = memoryStore();
+  store.add(new Date().toISOString().slice(0, 10), "usdg", 995_000n); // 0.995 of the 1 dollar budget spent in USDG
+  const f = chainFetch({ accepts: [usdcOffer()], balances: { "https://base.test/": { [USDC_BASE.toLowerCase()]: 50_000n } } });
+  await assert.rejects(
+    withGlobalFetch(f, () => client(f, { payWith: "usdc", store }).call("newest launches", { slug: "new-launches" })),
+    (e) => e.code === "cannot_pay" && /dollar budget/.test(e.message),
+  );
+  assert.equal(f.paid.length, 0, "nothing was signed or sent");
+});
+
+test("USDC on Base is held to the dollar per-call cap", async () => {
+  const f = chainFetch({ accepts: [usdcOffer("100000")], balances: { "https://base.test/": { [USDC_BASE.toLowerCase()]: 500_000n } } }); // 0.10 USDC
+  await assert.rejects(
+    withGlobalFetch(f, () => client(f, { payWith: "usdc" }).call("newest launches", { slug: "new-launches" })),
+    (e) => e.code === "cannot_pay" && /per-call cap/.test(e.message),
+  );
+  assert.equal(f.paid.length, 0);
+});
+
+test("an API that doesn't take USDC on Base says so", async () => {
+  const f = chainFetch({ accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" })], balances: {} });
+  await assert.rejects(
+    withGlobalFetch(f, () => client(f, { payWith: "usdc" }).call("newest launches", { slug: "new-launches" })),
+    (e) => e.code === "cannot_pay" && /doesn't take USDC on Base/.test(e.message),
+  );
+});
+
+test("a quote labels USDC on Base", async () => {
+  const f = chainFetch({ accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" }), usdcOffer()], balances: {} });
+  const q = await client(f).quote("newest launches", { slug: "new-launches" });
+  assert.deepEqual(q.offers.map((o) => o.token), ["USDG", "USDC on Base"]);
+});

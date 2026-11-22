@@ -252,3 +252,136 @@ def test_signed_usdg_payment_header():
     typed = eip3009_typed_data(auth, USDG, "Global Dollar", "1")
     assert _recover(typed, env["payload"]["signature"]) == a.address
     assert result.receipt.route == "usdg" and result.receipt.tx == "0x" + "ef" * 32
+
+
+# ---------- USDC on Base ----------
+
+USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+
+
+def _usdc(amount="10000"):
+    return {"scheme": "exact", "network": "eip155:8453", "asset": USDC_BASE, "amount": amount, "payTo": PAY_TO, "maxTimeoutSeconds": 300, "extra": {"name": "USD Coin", "version": "2"}}
+
+
+def _today():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def test_usdc_on_base_signs_with_bases_chain_id():
+    account = Account.from_key(KEY)
+    auth = {"from": account.address, "to": PAY_TO, "value": "10000", "validAfter": "0", "validBefore": "9999999999", "nonce": "0x" + "22" * 32}
+    typed = eip3009_typed_data(auth, USDC_BASE, "USD Coin", "2", 8453)
+    assert typed["domain"]["chainId"] == 8453
+    signed = Account.sign_typed_data(KEY, domain_data=typed["domain"], message_types=typed["types"], message_data=typed["message"])
+    assert _recover(typed, "0x" + bytes(signed.signature).hex()) == account.address
+
+
+def _paid_capture(seen):
+    def paid(request):
+        seen["env"] = json.loads(base64.b64decode(request.headers["payment-signature"]))
+        settled = base64.b64encode(json.dumps({"transaction": "0x" + "cd" * 32}).encode()).decode()
+        return httpx.Response(200, json={"ok": 1}, headers={"payment-response": settled})
+
+    return paid
+
+
+def test_pays_with_usdc_on_base_signed_for_base():
+    seen = {}
+    client, _ = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"}), _usdc()], on_paid=_paid_capture(seen))
+    store = MemoryStore()
+    a = Autonomo(private_key=KEY, pay_with="usdc", http=client, spend_store=store)
+    a._base_balance = lambda token, owner: 50_000
+    a._balance = lambda token, owner: pytest.fail("Robinhood Chain isn't read when paying with USDC on Base")
+    result = a.call("newest launches")
+    env = seen["env"]
+    assert env["accepted"]["network"] == "eip155:8453" and env["accepted"]["asset"] == USDC_BASE
+    auth = env["payload"]["authorization"]
+    assert _recover(eip3009_typed_data(auth, USDC_BASE, "USD Coin", "2", 8453), env["payload"]["signature"]) == a.address
+    r = result.receipt
+    assert (r.route, r.token, r.amount) == ("usdc", "USDC", "0.01")
+    assert r.explorer.startswith("https://basescan.org/tx/0x")
+    assert r.spent_today == "0.01 of 1 USDG and USDC"
+    assert store.get(_today())["usdc"] == 10_000
+
+
+def test_auto_falls_back_to_usdc_on_base():
+    seen = {}
+    offers = [_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"}), _exact(AUTONOMO, "36000000000000000000", {"assetTransferMethod": "permit2"}), _usdc()]
+    client, _ = _fake(offers, on_paid=_paid_capture(seen))
+    a = Autonomo(private_key=KEY, http=client, spend_store=MemoryStore())
+    a._balance = lambda token, owner: 0
+    a._base_balance = lambda token, owner: 10_000
+    assert a.call("newest launches").receipt.route == "usdc"
+    assert seen["env"]["accepted"]["network"] == "eip155:8453"
+
+
+def test_auto_still_prefers_usdg():
+    seen = {}
+    client, _ = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"}), _usdc()], on_paid=_paid_capture(seen))
+    a = Autonomo(private_key=KEY, http=client, spend_store=MemoryStore())
+    a._balance = lambda token, owner: 10_000
+    a._base_balance = lambda token, owner: 10_000
+    assert a.call("newest launches").receipt.route == "usdg"
+    assert seen["env"]["accepted"]["network"] == "eip155:4663"
+
+
+def test_usdc_on_base_shares_the_dollar_budget():
+    store = MemoryStore()
+    store.add(_today(), "usdg", 995_000)
+    client, sent = _fake([_usdc()])
+    a = Autonomo(private_key=KEY, pay_with="usdc", http=client, spend_store=store)
+    a._base_balance = lambda token, owner: 50_000
+    with pytest.raises(AutonomoError) as e:
+        a.call("newest launches")
+    assert e.value.code == "cannot_pay" and "dollar budget" in str(e.value)
+    assert not any(r.headers.get("payment-signature") for r in sent)
+
+
+def test_usdc_on_base_is_held_to_the_dollar_cap():
+    client, sent = _fake([_usdc("100000")])
+    a = Autonomo(private_key=KEY, pay_with="usdc", http=client, spend_store=MemoryStore())
+    a._base_balance = lambda token, owner: 10**9
+    with pytest.raises(AutonomoError) as e:
+        a.call("newest launches")
+    assert e.value.code == "cannot_pay" and "per-call cap" in str(e.value)
+    assert not any(r.headers.get("payment-signature") for r in sent)
+
+
+def test_quote_labels_usdc_on_base():
+    client, _ = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"}), _usdc()])
+    q = Autonomo(http=client).quote("newest launches")
+    assert [o["token"] for o in q["offers"]] == ["USDG", "USDC on Base"]
+
+
+def test_pay_with_is_checked():
+    with pytest.raises(AutonomoError):
+        Autonomo(pay_with="usdt")
+
+
+def test_balances_reads_both_chains_and_signs_nothing():
+    a = Autonomo(private_key=KEY, http=httpx.Client(transport=httpx.MockTransport(lambda r: pytest.fail("no request expected"))))
+    held = {USDG.lower(): 1_250_000, AUTONOMO.lower(): 4_500 * 10**18}
+    a._balance = lambda token, owner: held.get(token.lower(), 0)
+    a._base_balance = lambda token, owner: 500_000
+    a._rpc = lambda method, params, url=None: "0x0" if method == "eth_getBalance" else pytest.fail(method)
+    b = a.balances()
+    assert b == {"address": a.address, "robinhood": {"usdg": "1.25", "autonomo": "4500", "eth": "0"}, "base": {"usdc": "0.5"}}
+
+    def down(token, owner):
+        raise RuntimeError("Base is down")
+
+    a._base_balance = down
+    assert a.balances()["base"] is None and a.balances()["robinhood"]["usdg"] == "1.25"
+    with pytest.raises(AutonomoError) as e:
+        Autonomo().balances()
+    assert e.value.code == "no_wallet"
+
+
+def test_receipts_say_which_chain_was_paid_on():
+    seen = {}
+    client, _ = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"}), _usdc()], on_paid=_paid_capture(seen))
+    a = Autonomo(private_key=KEY, http=client, spend_store=MemoryStore())
+    a._balance = lambda token, owner: 10_000
+    a._base_balance = lambda token, owner: 10_000
+    assert a.call("newest launches").receipt.chain == "Robinhood Chain"
+    assert a.call("newest launches", pay_with="usdc").receipt.chain == "Base"

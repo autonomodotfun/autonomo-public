@@ -10,7 +10,7 @@ import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { Autonomo, AutonomoError, type Api, type AutonomoOptions } from "autonomo-sdk";
 import { z } from "zod";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 const DEFAULT_MAX_CALLS = 10;
 const DEFAULT_MAX_OUTPUT_CHARS = 20_000;
@@ -120,7 +120,7 @@ export class AutonomoToolkit {
         description:
           "Search Autonomo's paid APIs: crypto data on Robinhood Chain (token risk and prices, wallets, transactions, new launches) " +
           "and more, such as reading web pages. Free. Returns the best matches with each API's slug, what it does, its path " +
-          "(with <placeholders> to fill), its price in USDG and $AUTONOMO, and its track record. Prefer verified APIs.",
+          "(with <placeholders> to fill), its price in USDG and $AUTONOMO, or USDC on Base, and its track record. Prefer verified APIs.",
         schema: FIND_SCHEMA,
       },
     );

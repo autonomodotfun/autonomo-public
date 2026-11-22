@@ -1,5 +1,5 @@
-"""Autonomo SDK: one call that finds the right paid API on Autonomo, pays for it on Robinhood Chain and returns the
-answer with a receipt.
+"""Autonomo SDK: one call that finds the right paid API on Autonomo, pays for it on Robinhood Chain or Base and returns
+the answer with a receipt.
 
     from autonomo import Autonomo
     autonomo = Autonomo(private_key=os.environ["AUTONOMO_WALLET_KEY"])
@@ -9,9 +9,11 @@ answer with a receipt.
 How a call is paid, in order:
     private=True   Only through Gloam, from a private balance, so the payment doesn't link to the wallet. Never falls
                    back to a public payment.
-    otherwise      USDG, then $AUTONOMO (or just the one set in pay_with), from the wallet, whichever it can afford.
-                   If it can't afford either and a Borro credit line is set, it borrows the USDG it's short and pays.
-Every route checks the per-call cap and the daily budget before anything is signed or sent.
+    otherwise      USDG, then $AUTONOMO on Robinhood Chain, then USDC on Base (or just the one set in pay_with), from the
+                   wallet, whichever it can afford. The same key is the same wallet on both chains. If it can't afford
+                   any and a Borro credit line is set, it borrows the USDG it's short and pays.
+Every route checks the per-call cap and the daily budget before anything is signed or sent. USDG and USDC are both
+dollars, so they share the dollar limits (per_call["usdg"] and daily["usdg"]).
 """
 
 from __future__ import annotations
@@ -33,19 +35,23 @@ import httpx
 from eth_account import Account
 from eth_utils import to_checksum_address
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __all__ = ["Autonomo", "AutonomoError", "Api", "Receipt", "CallResult", "MemoryStore", "FileStore", "rank_apis", "find_transactions", "check_borrow"]
 
 NETWORK = "eip155:4663"
 CHAIN_ID = 4663
 EXPLORER = "https://robinhoodchain.blockscout.com"
+BASE_NETWORK = "eip155:8453"
+BASE_CHAIN_ID = 8453
+BASE_EXPLORER = "https://basescan.org"
+BASE_RPC = "https://mainnet.base.org"
 PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
 PERMIT2_PROXY = "0x402085c248EeA27D92E8b30b2C58ed07f9E20001"  # x402's exact-scheme Permit2 proxy
 BORRO_MCP = "https://borro.markets/mcp"
 MAX_UINT256 = 2**256 - 1
 
-TokenName = Literal["usdg", "autonomo"]
-Route = Literal["usdg", "autonomo", "gloam", "borro"]
+TokenName = Literal["usdg", "autonomo", "usdc"]
+Route = Literal["usdg", "autonomo", "usdc", "gloam", "borro"]
 
 
 @dataclass(frozen=True)
@@ -54,14 +60,28 @@ class Token:
     symbol: str
     address: str
     decimals: int
+    network: str = NETWORK
+    chain_id: int = CHAIN_ID
+    explorer: str = EXPLORER
+    chain: str = "Robinhood Chain"
 
 
 TOKENS = {
     "usdg": Token("usdg", "USDG", "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", 6),
     "autonomo": Token("autonomo", "AUTONOMO", "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96", 18),
+    "usdc": Token("usdc", "USDC", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6, BASE_NETWORK, BASE_CHAIN_ID, BASE_EXPLORER, "Base"),
 }
 DEFAULT_PER_CALL = {"usdg": "0.05", "autonomo": "5000"}
 DEFAULT_DAILY = {"usdg": "1", "autonomo": "10000"}
+LIMITS = ("usdg", "autonomo")  # USDC on Base is held to the USDG (dollar) limits
+
+
+def _limit_of(token: str) -> str:
+    return "autonomo" if token == "autonomo" else "usdg"
+
+
+def _label(token: Token) -> str:
+    return "USDC on Base" if token.name == "usdc" else token.symbol
 
 
 class AutonomoError(Exception):
@@ -130,6 +150,7 @@ class Receipt:
     approve_tx: Optional[str] = None
     at: str = ""
     spent_today: str = ""
+    chain: str = "Robinhood Chain"  # the chain the payment was made on: "Robinhood Chain" or "Base"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -176,7 +197,7 @@ class FileStore:
         s = self._read()
         if s.get("date") != day:
             return {}
-        return {k: int(s.get(k, 0)) for k in ("usdg", "autonomo")}
+        return {k: int(s.get(k, 0)) for k in ("usdg", "autonomo", "usdc")}
 
     def add(self, day: str, token: str, amount: int) -> None:
         s = self._read()
@@ -253,9 +274,9 @@ def rank_apis(apis: list[Api], query: str, input: Optional[str] = None) -> list[
 # ---------- Typed data ----------
 
 
-def eip3009_typed_data(auth: dict, asset: str, name: str, version: str) -> dict:
+def eip3009_typed_data(auth: dict, asset: str, name: str, version: str, chain_id: int = CHAIN_ID) -> dict:
     return {
-        "domain": {"name": name, "version": version, "chainId": CHAIN_ID, "verifyingContract": to_checksum_address(asset)},
+        "domain": {"name": name, "version": version, "chainId": chain_id, "verifyingContract": to_checksum_address(asset)},
         "types": {
             "TransferWithAuthorization": [
                 {"name": "from", "type": "address"},
@@ -396,28 +417,54 @@ class Autonomo:
         base_url: str = "https://autonomo.fun",
         rpc_url: str = "https://rpc.mainnet.chain.robinhood.com",
         http: Optional[httpx.Client] = None,
+        base_rpc_url: str = BASE_RPC,
     ):
         key = (private_key or "").strip()
         if key and not re.fullmatch(r"0x[0-9a-fA-F]{64}", key):
             _fail("bad_key", "private_key should be 0x followed by 64 hex characters.")
         self._key = key or None
         self.address: Optional[str] = Account.from_key(key).address if key else None
-        if pay_with not in ("auto", "usdg", "autonomo"):
-            _fail("bad_option", 'pay_with should be "auto", "usdg" or "autonomo".')
+        if pay_with not in ("auto", "usdg", "autonomo", "usdc"):
+            _fail("bad_option", 'pay_with should be "auto", "usdg", "autonomo" or "usdc".')
         self.pay_with = pay_with
         pc = {**DEFAULT_PER_CALL, **(per_call or {})}
         dl = {**DEFAULT_DAILY, **(daily or {})}
-        self.per_call = {t: _units(pc[t], TOKENS[t].decimals) for t in TOKENS}
-        self.daily = {t: _units(dl[t], TOKENS[t].decimals) for t in TOKENS}
+        self.per_call = {t: _units(pc[t], TOKENS[t].decimals) for t in LIMITS}
+        self.daily = {t: _units(dl[t], TOKENS[t].decimals) for t in LIMITS}
         self.gloam_fetch_paid = gloam_fetch_paid
         self.borro_account = to_checksum_address(borro_account) if borro_account else None
         self.borro_mcp_url = borro_mcp_url
         self.store: SpendStore = spend_store or FileStore()
         self.base = base_url.rstrip("/")
         self.rpc_url = rpc_url
+        self.base_rpc_url = base_rpc_url
         self.http = http or httpx.Client(timeout=30, follow_redirects=False)
 
     # ----- Public -----
+
+    def balances(self) -> dict:
+        """What the wallet holds on both chains, in whole tokens: USDG, $AUTONOMO and ETH on Robinhood Chain, and USDC on
+        Base. Free, and it signs nothing. A chain that can't be read right now comes back as None."""
+        if not self.address:
+            _fail("no_wallet", "No wallet set. Pass private_key (a wallet just for this agent).")
+
+        def robinhood() -> Optional[dict]:
+            try:
+                return {
+                    "usdg": _fmt(self._balance(TOKENS["usdg"].address, self.address), 6),
+                    "autonomo": _fmt(self._balance(TOKENS["autonomo"].address, self.address), 18),
+                    "eth": _fmt(int(self._rpc("eth_getBalance", [self.address, "latest"]), 16), 18),
+                }
+            except Exception:
+                return None
+
+        def base() -> Optional[dict]:
+            try:
+                return {"usdc": _fmt(self._base_balance(TOKENS["usdc"].address, self.address), 6)}
+            except Exception:
+                return None
+
+        return {"address": self.address, "robinhood": robinhood(), "base": base()}
 
     def find(self, query: str = "", input: Optional[str] = None) -> list[Api]:
         """Every Autonomo API, or the best matches for a query and input. Free."""
@@ -447,11 +494,11 @@ class Autonomo:
         required = self._price_list(url)
         offers = []
         for a in required["accepts"]:
-            t = _token_by_asset(a["asset"])
+            t = _token_by_asset(a["asset"], a.get("network"))
             offers.append(
                 {
                     "scheme": a["scheme"],
-                    "token": t.symbol if t else a["asset"],
+                    "token": _label(t) if t else a["asset"],
                     "amount": _fmt(int(a["amount"]), t.decimals if t else 18),
                     "private": a["scheme"] == "gloam-cashout",
                 }
@@ -475,13 +522,19 @@ class Autonomo:
         day = _today()
         spent = self.store.get(day)
 
+        def spent_on(limit: str, by_token: dict) -> int:
+            # USDG and USDC on Base are both dollars with 6 decimals, so they share one cap and one daily budget.
+            return by_token.get("usdg", 0) + by_token.get("usdc", 0) if limit == "usdg" else by_token.get("autonomo", 0)
+
         def within(token: Token, amount: int) -> Optional[str]:
+            limit = _limit_of(token.name)
             price = f"{_fmt(amount, token.decimals)} {token.symbol}"
-            if amount > self.per_call[token.name]:
-                return f"{price} is above the per-call cap of {_fmt(self.per_call[token.name], token.decimals)} {token.symbol}"
-            so_far = spent.get(token.name, 0)
-            if so_far + amount > self.daily[token.name]:
-                return f"{price} would pass today's {token.symbol} budget ({_fmt(so_far, token.decimals)} of {_fmt(self.daily[token.name], token.decimals)} spent)"
+            if amount > self.per_call[limit]:
+                return f"{price} is above the per-call cap of {_fmt(self.per_call[limit], token.decimals)} {'USDG/USDC' if limit == 'usdg' else token.symbol}"
+            so_far = spent_on(limit, spent)
+            if so_far + amount > self.daily[limit]:
+                unit = "dollar" if limit == "usdg" else token.symbol
+                return f"{price} would pass today's {unit} budget ({_fmt(so_far, token.decimals)} of {_fmt(self.daily[limit], token.decimals)} spent)"
             return None
 
         def finish(route: str, token: Token, amount: int, res: httpx.Response, tx: Optional[str], extra: dict) -> CallResult:
@@ -498,7 +551,9 @@ class Autonomo:
                     f"Payment refused: {reason}" if reason else f"The API answered {res.status_code}{': ' + detail if detail else ''}. You aren't charged unless it settled.",
                 )
             self.store.add(day, token.name, amount)
-            after = self.store.get(day).get(token.name, 0)
+            limit = _limit_of(token.name)
+            after = spent_on(limit, self.store.get(day))
+            unit = "USDG and USDC" if limit == "usdg" else token.symbol
             try:
                 data = res.json()
             except Exception:
@@ -512,11 +567,12 @@ class Autonomo:
                 payer="private (Gloam)" if route == "gloam" else self.address,
                 pay_to=extra.get("pay_to", ""),
                 tx=tx,
-                explorer=f"{EXPLORER}/tx/{tx}" if tx else None,
+                explorer=f"{token.explorer}/tx/{tx}" if tx else None,
                 borrow_txs=extra.get("borrow_txs", []),
                 approve_tx=extra.get("approve_tx"),
                 at=datetime.now(timezone.utc).isoformat(),
-                spent_today=f"{_fmt(after, token.decimals)} of {_fmt(self.daily[token.name], token.decimals)} {token.symbol}",
+                spent_today=f"{_fmt(after, token.decimals)} of {_fmt(self.daily[limit], token.decimals)} {unit}",
+                chain=token.chain,
             )
             return CallResult(data=data, receipt=receipt)
 
@@ -547,30 +603,33 @@ class Autonomo:
 
         # Public: the wallet's tokens, then Borro.
         want = pay_with or self.pay_with
-        order = ["usdg", "autonomo"] if want == "auto" else [want]
+        if want not in ("auto", "usdg", "autonomo", "usdc"):
+            _fail("bad_option", 'pay_with should be "auto", "usdg", "autonomo" or "usdc".')
+        order = ["usdg", "autonomo", "usdc"] if want == "auto" else [want]
         reasons: list[str] = []
         usdg_short: Optional[tuple[dict, int]] = None
         for name in order:
             token = TOKENS[name]
             offer = next(
-                (a for a in required["accepts"] if a["scheme"] == "exact" and a["network"] == NETWORK and a["asset"].lower() == token.address.lower()),
+                (a for a in required["accepts"] if a["scheme"] == "exact" and a["network"] == token.network and a["asset"].lower() == token.address.lower()),
                 None,
             )
             if not offer:
-                reasons.append(f"{api.name} doesn't take {token.symbol}")
+                reasons.append(f"{api.name} doesn't take {_label(token)}")
                 continue
             amount = int(offer["amount"])
             why = within(token, amount)
             if why:
                 reasons.append(why)
                 continue
-            balance = self._balance(token.address, self.address)
+            balance = self._base_balance(token.address, self.address) if token.chain_id == BASE_CHAIN_ID else self._balance(token.address, self.address)
             if balance < amount:
-                reasons.append(f"the wallet holds {_fmt(balance, token.decimals)} {token.symbol}, the call costs {_fmt(amount, token.decimals)}")
+                where = " on Base" if token.name == "usdc" else ""
+                reasons.append(f"the wallet holds {_fmt(balance, token.decimals)} {token.symbol}{where}, the call costs {_fmt(amount, token.decimals)}")
                 if name == "usdg":
                     usdg_short = (offer, amount)
                 continue
-            res, tx, extra = self._pay_exact(url, required, offer)
+            res, tx, extra = self._pay_exact(url, required, offer, token.chain_id)
             return finish(name, token, amount, res, tx, extra)
 
         if self.borro_account and usdg_short:
@@ -622,13 +681,16 @@ class Autonomo:
             _fail("no_price", f"Expected a 402 price list from {url}, got {res.status_code}.")
         return required
 
-    def _pay_exact(self, url: str, required: dict, offer: dict) -> tuple[httpx.Response, Optional[str], dict]:
-        """Signs an x402 exact payment (EIP-3009 for USDG, Permit2 for $AUTONOMO) and sends the request with it."""
+    def _pay_exact(self, url: str, required: dict, offer: dict, chain_id: int = CHAIN_ID) -> tuple[httpx.Response, Optional[str], dict]:
+        """Signs an x402 exact payment (EIP-3009 for USDG and USDC on Base, Permit2 for $AUTONOMO) and sends the request
+        with it. `chain_id` is the chain the offer is paid on; a Permit2 approval is only ever sent on Robinhood Chain."""
         now = int(time.time())
         timeout = int(offer.get("maxTimeoutSeconds") or 300)
         extra_in = offer.get("extra") or {}
         approve_tx = None
         if extra_in.get("assetTransferMethod") == "permit2":
+            if chain_id != CHAIN_ID:
+                _fail("bad_offer", "A Permit2 payment is only expected on Robinhood Chain.")
             if self._allowance(offer["asset"], self.address, PERMIT2) < int(offer["amount"]):
                 data = "0x095ea7b3" + _word(PERMIT2) + format(MAX_UINT256, "064x")
                 approve_tx = f"{EXPLORER}/tx/{self._send({'to': to_checksum_address(offer['asset']), 'data': data})}"
@@ -653,7 +715,7 @@ class Autonomo:
                 "validBefore": str(now + timeout),
                 "nonce": "0x" + secrets.token_hex(32),
             }
-            payload = {"authorization": auth, "signature": _sign_typed(self._key, eip3009_typed_data(auth, offer["asset"], name, version))}
+            payload = {"authorization": auth, "signature": _sign_typed(self._key, eip3009_typed_data(auth, offer["asset"], name, version, chain_id))}
 
         if required.get("x402Version") == 1:
             envelope = {"x402Version": 1, "scheme": offer["scheme"], "network": offer["network"], "payload": payload}
@@ -691,8 +753,8 @@ class Autonomo:
 
     # ----- Chain -----
 
-    def _rpc(self, method: str, params: list) -> Any:
-        res = self.http.post(self.rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params}, timeout=20)
+    def _rpc(self, method: str, params: list, url: Optional[str] = None) -> Any:
+        res = self.http.post(url or self.rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params}, timeout=20)
         body = res.json()
         if "error" in body:
             _fail("rpc_error", f"{method}: {body['error'].get('message')}")
@@ -700,6 +762,9 @@ class Autonomo:
 
     def _balance(self, token: str, owner: str) -> int:
         return int(self._rpc("eth_call", [{"to": token, "data": "0x70a08231" + _word(owner)}, "latest"]), 16)
+
+    def _base_balance(self, token: str, owner: str) -> int:
+        return int(self._rpc("eth_call", [{"to": token, "data": "0x70a08231" + _word(owner)}, "latest"], self.base_rpc_url), 16)
 
     def _allowance(self, token: str, owner: str, spender: str) -> int:
         return int(self._rpc("eth_call", [{"to": token, "data": "0xdd62ed3e" + _word(owner) + _word(spender)}, "latest"]), 16)
@@ -736,8 +801,8 @@ def _word(address: str) -> str:
     return address.lower().replace("0x", "").rjust(64, "0")
 
 
-def _token_by_asset(asset: str) -> Optional[Token]:
-    return next((t for t in TOKENS.values() if t.address.lower() == asset.lower()), None)
+def _token_by_asset(asset: str, network: Optional[str] = None) -> Optional[Token]:
+    return next((t for t in TOKENS.values() if t.address.lower() == asset.lower() and (network is None or t.network == network)), None)
 
 
 def _mcp_call(http: httpx.Client, url: str, name: str, args: dict) -> Any:

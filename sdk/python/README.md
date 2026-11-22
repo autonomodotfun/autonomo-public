@@ -4,7 +4,7 @@ One call for AI agents. Say what you need, and the SDK:
 
 1. **Finds the right API** on [Autonomo](https://autonomo.fun), from your words and the kind of input you give
    (a token or wallet address, a transaction hash, a link).
-2. **Pays for it** with x402 on Robinhood Chain, in USDG or $AUTONOMO, whichever the wallet can afford.
+2. **Pays for it** with x402, in USDG or $AUTONOMO on Robinhood Chain, or USDC on Base, whichever the wallet can afford.
 3. **Pays privately through [Gloam](https://gloam.trade)** when you ask, so the payment doesn't link to your wallet.
 4. **Borrows from a [Borro](https://borro.markets) credit line** when the wallet is short of USDG.
 5. **Keeps to your caps**: a most-per-call and a daily budget, checked before anything is signed.
@@ -42,12 +42,15 @@ autonomo.quote("explain this transaction", input="0x…")   # the API, the URL a
 
 To skip the search, name the API: `autonomo.call(slug="token-risk", path="/risk/0x…")`.
 
+To see what the wallet can pay with, `autonomo.balances()` returns what it holds on both chains: USDG, $AUTONOMO
+and ETH on Robinhood Chain, and USDC on Base. It only reads.
+
 ## Limits
 
 ```python
 Autonomo(
     private_key=...,
-    pay_with="auto",                                  # or "usdg" / "autonomo"
+    pay_with="auto",                                  # or "usdg" / "autonomo" / "usdc" (USDC on Base)
     per_call={"usdg": "0.05", "autonomo": "5000"},    # the defaults
     daily={"usdg": "1", "autonomo": "10000"},         # per UTC day; Gloam and Borro count as USDG
 )
@@ -97,10 +100,10 @@ still checked against your caps first.
 | Field | |
 | --- | --- |
 | `api` | The API's slug and name |
-| `route` | `usdg`, `autonomo`, `gloam` or `borro` |
-| `amount`, `token` | What was paid |
+| `route` | `usdg`, `autonomo`, `usdc`, `gloam` or `borro` |
+| `amount`, `token`, `chain` | What was paid, and on which chain: `Robinhood Chain` or `Base` |
 | `payer`, `pay_to` | The wallet (or "private (Gloam)") and the API's payment address |
-| `tx`, `explorer` | The payment transaction and its Blockscout link |
+| `tx`, `explorer` | The payment transaction and its link on Blockscout, or on Basescan for Base |
 | `borrow_txs`, `approve_tx` | Borro borrows and the one-time Permit2 approval, when there were any |
 | `spent_today` | Today's total against the daily budget |
 
