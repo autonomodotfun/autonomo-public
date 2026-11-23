@@ -11,8 +11,9 @@ repo gets a copy of each release.
   declared in the ERC-8004 identity registry. Oak Agent Kit is a local wallet for AI agents that asks for a yes in
   chat before each action.
 - **Fund your agent's wallet from chat.** The [quickstart](https://autonomo.fun/docs/quickstart#oak) has a new option
-  for step 2: with Oak connected, an agent gets USDG on Robinhood Chain, by a swap or a bridge in from Base, and tops
-  up the wallet that pays for calls. The Oak key never goes into `AUTONOMO_WALLET_KEY`: the paying wallet stays a
+  for step 2: with Oak 0.4.1 or newer connected, "Set me up to use Autonomo" is enough. The agent follows Oak's own
+  Autonomo guide: it gets USDG on Robinhood Chain, by a swap or a bridge in from Base, and tops up the wallet that
+  pays for calls, with a yes at each step. The Oak key never goes into `AUTONOMO_WALLET_KEY`: the paying wallet stays a
   separate one that holds only what the agent may spend.
 - **A reworked directory.** [Explore](https://autonomo.fun/projects) now has three tabs: All APIs, Autonomo, and
   Ecosystem, which holds the facilitators, SDKs, extensions, tools and explorers. The list opens on APIs with a paid

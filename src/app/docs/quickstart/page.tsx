@@ -20,9 +20,13 @@ export AUTONOMO_WALLET_KEY=0x…
 # Windows PowerShell
 $env:AUTONOMO_WALLET_KEY = "0x…"`;
 
-// What a user says to an agent that has Oak connected. Oak shows each action in chat and waits for a yes.
-const OAK_ASK = `Get 2 USDG on Robinhood Chain: swap from my ETH, or bridge in from Base.
-Then send 1 USDG to 0x… (my Autonomo paying wallet).`;
+// What a user says to an agent that has Oak 0.4.1 or newer. Oak's own Autonomo guide takes it from there, with a yes at each step.
+const OAK_INSTALL = `npm install -g @oakagentkit/addon`;
+
+const OAK_ASK = `Set me up to use Autonomo.
+
+# later, when the paying wallet runs low
+Top up my Autonomo wallet with 1 USDG.`;
 
 const PAY = `npx autonomo-sdk risk ${TOKEN_EXAMPLE}`;
 
@@ -72,28 +76,47 @@ export default function QuickstartPage() {
             Oak Agent Kit
           </a>{" "}
           is a local wallet for AI agents such as Claude Code, Codex and Cursor. Its key stays on your computer, and it
-          shows every action in chat and waits for your yes. If your money sits in an Oak wallet, your agent can get the
-          USDG and top up the paying wallet for you:
+          shows every action in chat and waits for your yes. Since version 0.4.1 it has its own Autonomo guide, so if your
+          money sits in an Oak wallet, your agent can get the USDG and top up the paying wallet for you.
         </p>
         <ol className="list-decimal space-y-1.5 pl-5">
           <li>
-            Set up Oak with{" "}
+            Install Oak (it needs Node.js 22.12 or newer) and connect it to your agent with{" "}
             <a href="https://oakagentkit.org/setup.html" target="_blank" rel="noopener noreferrer">
               its own guide
             </a>
-            .
+            :
           </li>
-          <li>Create the new paying wallet as above, and copy its address.</li>
-          <li>Ask your agent, and say yes to each step it shows you:</li>
+        </ol>
+        <Code code={OAK_INSTALL} lang="bash" />
+        <ol start={2} className="list-decimal space-y-1.5 pl-5">
+          <li>Create the new paying wallet yourself, as above, and copy its address.</li>
+          <li>Ask your agent:</li>
         </ol>
         <Code code={OAK_ASK} lang="ask your agent" />
+        <p>Your agent then walks you through it, and asks for your yes before each step:</p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <b>Get USDG.</b> It swaps from ETH on {TOKEN.chainName}, or bridges in from Base. Keep a little ETH there for
+            gas.
+          </li>
+          <li>
+            <b>Set up an Oak identity, the first time only.</b> Oak needs an on-chain agent identity (ERC-8004) before it
+            can send. It costs only gas, and its profile is public. This is Oak&apos;s rule, not Autonomo&apos;s.
+          </li>
+          <li>
+            <b>Send the top-up.</b> It asks only for the paying wallet&apos;s address, never its key, and suggests about a
+            day&apos;s spend: 1 USDG at the default limits. It never refills the wallet on its own.
+          </li>
+        </ul>
         <p>
           <b>Never paste your Oak key into <code>AUTONOMO_WALLET_KEY</code>.</b> The Oak wallet holds your money. The
-          paying wallet is a separate one that holds only what your agent may spend on calls.
+          paying wallet is a separate one that holds only what your agent may spend on calls, and pays for them without
+          asking each time, within the limits below.
         </p>
         <p className="text-sm text-muted">
-          Oak is made by another team. It takes 0.25% on the swap, bridge or send you approve, shown before your yes, and
-          nothing from your API calls. It has had no outside audit, so start with small amounts.
+          Oak is made by the Oak team. It tops up in USDG only and takes nothing from your API calls. Its 0.25% fee on a
+          swap, bridge or send is shown before your yes and added on top: sending 1 USDG costs 1.0025 USDG plus gas.
         </p>
       </Section>
 
