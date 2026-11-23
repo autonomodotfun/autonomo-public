@@ -16,7 +16,7 @@ Then open `.env` (in this folder) and set:
 
 ```
 AGENT_PRIVATE_KEY=0x…   # a dedicated test wallet, never your main one
-GATEWAY_URL=https://autonomo.fun/x/token-price/price/autonomo   # optional
+GATEWAY_URL=https://autonomo.fun/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96   # optional
 ```
 
 `.env` is git-ignored and the key is never printed.
@@ -56,7 +56,7 @@ Codex can read files in this folder, so keep only a few dollars in the agent wal
 
 ### 1. Fix the gateway (once)
 
-On autonomo.fun/dashboard → **Token Price** → **Settings**: tick **USDG** at `0.01`, keep **$AUTONOMO** at `1000`, make sure the API key is saved, and click **Save changes** (wait for "✓ Changes saved"). The gateway must be **active**.
+On autonomo.fun/dashboard → **Token Lookup** → **Settings**: tick **USDG** at `0.01`, keep **$AUTONOMO** at `1000`, make sure the API key is saved, and click **Save changes** (wait for "✓ Changes saved"). The gateway must be **active**.
 
 ### 2. Make and fund the agent wallet
 
@@ -70,7 +70,7 @@ On autonomo.fun/dashboard → **Token Price** → **Settings**: tick **USDG** at
 
 ### 4. Record
 
-1. The Token Price dashboard on autonomo.fun.
+1. The Token Lookup dashboard on autonomo.fun.
 2. A terminal in this folder, large font: `npm run pay`.
 3. `npm run pay:autonomo` (the first run shows the one-time approval).
 4. Back to the dashboard: refresh to show the new paid calls and earnings, then open a tx link on the Robinhood Chain explorer.

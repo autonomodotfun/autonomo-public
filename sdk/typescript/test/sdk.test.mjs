@@ -11,7 +11,6 @@ const AUTONOMO = "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96";
 const PAY_TO = "0x00000000000000000000000000000000000000aa";
 
 const APIS = [
-  { slug: "token-price", name: "Token Price", description: "show live $autonomo token price", path: "/price/autonomo", verified: true, successRate: 1, paidCalls30d: 38, price: {} },
   { slug: "new-launches", name: "New Launches", description: "Newest token launches on Robinhood Chain", path: "/launches?limit=10", verified: true, successRate: 1, paidCalls30d: 24, price: {} },
   { slug: "token-risk", name: "Token Risk", description: "Rug-risk check for a launchpad token: holders, creator, safety score", path: "/risk/<token contract address>", verified: true, successRate: 1, paidCalls30d: 10, price: {} },
   { slug: "token-lookup", name: "Token Lookup", description: "Price and market cap of any launchpad token", path: "/price/<token contract address>", verified: true, successRate: 1, paidCalls30d: 5, price: {} },

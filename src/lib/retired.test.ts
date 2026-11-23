@@ -2,7 +2,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isRetired, retiredAnswer, RETIRED_SLUGS } from "@/lib/retired";
+import nextConfig from "../../next.config";
+import { isRetired, retiredAnswer, RETIRED_GATEWAYS, RETIRED_SLUGS } from "@/lib/retired";
 
 const LOOKUP = "https://autonomo.fun/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96";
 
@@ -25,4 +26,14 @@ test("paused Token Price answers 410 with Token Lookup's address for $AUTONOMO",
 
 test("any other paused API keeps the plain paused answer", () => {
   assert.equal(retiredAnswer("token-lookup", "https://autonomo.fun"), null);
+});
+
+test("each retired API's project page redirects to its replacement's, and nothing else does", async () => {
+  const redirects = (await nextConfig.redirects?.()) ?? [];
+  const expected = Object.entries(RETIRED_GATEWAYS).map(([slug, r]) => ({
+    source: `/projects/${slug}`,
+    destination: `/projects/${r.replacement.project}`,
+    permanent: true,
+  }));
+  assert.deepEqual(redirects.filter((r) => r.source.startsWith("/projects/")), expected);
 });

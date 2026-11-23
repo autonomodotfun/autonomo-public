@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/.well-known/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] }];
   },
+  // A retired official API's project page goes to the API that replaced it (src/lib/retired.ts), so old links land
+  // somewhere useful. retired.test.ts checks this list against that file.
+  async redirects() {
+    return [{ source: "/projects/token-price", destination: "/projects/token-lookup", permanent: true }];
+  },
 };
 
 export default nextConfig;

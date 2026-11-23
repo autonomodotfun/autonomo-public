@@ -178,8 +178,6 @@ const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
 
 // The path to call after /x/<slug>, shown to outside agents (MCP server, /api/v1/gateways).
 export const GATEWAY_USAGE: Record<string, string> = {
-  // Retired and paused (src/lib/retired.ts): kept so /api/v1/gateways stays right about it if it's ever turned back on.
-  "token-price": "/price/autonomo",
   "new-launches": "/launches?limit=10",
   "token-risk": "/risk/<token contract address>",
   "token-lookup": "/price/<token contract address>",

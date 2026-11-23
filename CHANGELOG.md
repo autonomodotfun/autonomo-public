@@ -24,11 +24,10 @@ repo gets a copy of each release.
 - **The free API takes the new filters.** `/api/v1/projects` accepts `active=1`, `topic` and `price`.
 - **Token Price is retired in favour of Token Lookup.** Token Lookup already answered for any token, so the
   $AUTONOMO price now comes from it, at `/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96`, for the
-  same price per call. The Playground, the Telegram bot, the SDK's `price` shortcut (from its next release), the
-  docs and the agent demo all use it, and Token Price no longer shows on Explore, the Playground, /llms.txt or
-  Coinbase's x402 Bazaar.
-  `/x/token-price` is paused: it charges nothing and answers `410 Gone` with Token Lookup's address, so an agent that
-  calls it by name can move on by itself.
+  same price per call. The Playground, the Telegram bot, the SDK's `price` shortcut (SDK 0.1.4), the docs and the
+  agent demo all use it, and Token Price no longer shows on Explore, the Playground, /llms.txt or Coinbase's x402
+  Bazaar. `/x/token-price` is paused: it charges nothing and answers `410 Gone` with Token Lookup's address, so an
+  agent that calls it by name can move on by itself. Its old page, /projects/token-price, now opens Token Lookup's.
 
 ## November 22, 2026
 

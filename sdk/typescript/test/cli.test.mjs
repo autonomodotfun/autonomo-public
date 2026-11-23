@@ -11,7 +11,6 @@ const ADDR = "0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49";
 const TX = `0x${"ab".repeat(32)}`;
 
 const APIS = [
-  { slug: "token-price", name: "Token Price", description: "show live $autonomo token price", usage: "/price/autonomo" },
   { slug: "new-launches", name: "New Launches", description: "Newest token launches on Robinhood Chain", usage: "/launches?limit=10" },
   { slug: "token-risk", name: "Risk Checker", description: "Rug-risk check for a launchpad token", usage: "/risk/<token contract address>" },
   { slug: "token-lookup", name: "Token Lookup", description: "Price and market cap of any launchpad token", usage: "/price/<token contract address>" },

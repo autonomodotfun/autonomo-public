@@ -11,7 +11,7 @@ You are an AI agent that can **buy data from paid APIs**. APIs on Autonomo use *
 | Pay and get the data | `npm run pay:json --silent -- --url <gateway URL>` | one JSON object with `data` and `settlement` |
 | Pay in $AUTONOMO instead of USDG | add `--pay autonomo` to the pay command | same JSON |
 
-Known paid API: the live $AUTONOMO token price, at `https://autonomo.fun/x/token-price/price/autonomo`. Without `--url`, the tools use this one.
+Known paid API: Token Lookup, the live price of any Robinhood Chain token by its address. For $AUTONOMO: `https://autonomo.fun/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96`. Without `--url`, the tools use this one.
 
 ## How to handle a request
 

@@ -2,10 +2,15 @@ import { TOKEN } from "@/lib/constants";
 
 // Retired official APIs, each with the API that answers the same. Their gateway is paused in /admin, and nothing of
 // ours calls, shelves or suggests them even if one is turned back on: the agent, the Telegram bot, the Playground,
-// Explore and /llms.txt skip them. /api/v1/gateways lists one only while it's listed and active.
+// Explore and /llms.txt skip them. /api/v1/gateways lists one only while it's listed and active. Its project page,
+// /projects/<slug>, redirects to the replacement's (next.config.ts; retired.test.ts keeps the two in step).
 // Token Price was Token Lookup with $AUTONOMO fixed.
-export const RETIRED_GATEWAYS: Readonly<Record<string, { name: string; replacement: { name: string; path: string } }>> = {
-  "token-price": { name: "Token Price", replacement: { name: "Token Lookup", path: `/x/token-lookup/price/${TOKEN.address}` } },
+type Replacement = { name: string; path: string; project: string };
+export const RETIRED_GATEWAYS: Readonly<Record<string, { name: string; replacement: Replacement }>> = {
+  "token-price": {
+    name: "Token Price",
+    replacement: { name: "Token Lookup", path: `/x/token-lookup/price/${TOKEN.address}`, project: "token-lookup" },
+  },
 };
 
 export const RETIRED_SLUGS: readonly string[] = Object.keys(RETIRED_GATEWAYS);

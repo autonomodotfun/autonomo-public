@@ -20,7 +20,6 @@ ADDR = "0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49"
 TX = "0x" + "ab" * 32
 
 APIS = [
-    ("token-price", "Token Price", "show live $autonomo token price", "/price/autonomo", 38),
     ("new-launches", "New Launches", "Newest token launches on Robinhood Chain", "/launches?limit=10", 24),
     ("token-risk", "Token Risk", "Rug-risk check for a launchpad token: holders, creator, safety score", "/risk/<token contract address>", 10),
     ("token-lookup", "Token Lookup", "Price and market cap of any launchpad token", "/price/<token contract address>", 5),
