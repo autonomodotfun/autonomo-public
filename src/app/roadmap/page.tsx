@@ -81,6 +81,8 @@ const ROADMAP: Stage[] = [
           { title: "Stoa", note: "Swap router. Token safety checks and swap quotes, run on Autonomo's gateways" },
           { title: "QHooks", note: "Token proof. QProof token checks, and a guide to keeping an agent's savings in a QWallet" },
           { title: "Raeto", note: "Agent record. The official APIs have a public record on Raeto, with statements anyone can check" },
+          { title: "Priors", note: "Agent loans. Our test agent borrowed from Priors' pool, paid an API and repaid, all on-chain" },
+          { title: "Oak Agent Kit", note: "Agent wallet. Fund the wallet your agent pays from, from chat, with a yes each time" },
         ],
       },
       {

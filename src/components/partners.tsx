@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BorroLogo } from "@/components/borro-logo";
 import { GloamLogo } from "@/components/gloam-logo";
+import { OakLogo } from "@/components/oak-logo";
+import { PriorsLogo } from "@/components/priors-logo";
 import { QHooksLogo } from "@/components/qhooks-logo";
 import { RaetoLogo } from "@/components/raeto-logo";
 import { StoaLogo } from "@/components/stoa-logo";
@@ -81,6 +83,24 @@ export const PARTNERS: Partner[] = [
     about:
       "Raeto is the account layer for agentic finance on Robinhood Chain. Autonomo's official APIs have a public record there: Raeto reads the USDG their wallet receives from outside payers and publishes it as statements on-chain that anyone can check.",
     guides: [{ href: "https://raeto.cc/agent/26170", label: "See the official APIs' record" }],
+  },
+  {
+    name: "Priors",
+    Logo: PriorsLogo,
+    href: "https://priors.trade",
+    what: "Agent loans",
+    about:
+      "Priors lends USDG to ERC-8004 AI agents on Robinhood Chain, and every repayment is public. Autonomo's own test agent borrowed 5 USDG from Priors' pool, paid the New Launches API 38 seconds later and repaid a week on. The official APIs' agent has its payment wallet declared in the ERC-8004 identity registry, and Priors confirmed it on their side.",
+    guides: [{ href: "https://priors.trade", label: "See how Priors works" }],
+  },
+  {
+    name: "Oak Agent Kit",
+    Logo: OakLogo,
+    href: "https://oakagentkit.org",
+    what: "Agent wallet",
+    about:
+      "Oak Agent Kit is a local wallet and tool kit for AI agents on Robinhood Chain, for Claude Code, Codex, Cursor and others. Keys stay on your computer, and every action is shown in chat for a yes before it is signed. From chat, an agent can get USDG, by a swap or a bridge in from Base, and top up the wallet that pays for Autonomo's APIs.",
+    guides: [{ href: "/docs/quickstart#oak", label: "Fund your agent's wallet with Oak" }],
   },
 ];
 

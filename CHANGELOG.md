@@ -3,8 +3,17 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
-## November 23, 2026
-
+## November 23, 2026
+
+- **Priors and Oak Agent Kit join the partners**, on [/partners](https://autonomo.fun/partners) and in the homepage's
+  "Use with" section. Priors lends USDG to ERC-8004 AI agents on Robinhood Chain: our own test agent borrowed from
+  its pool, paid the New Launches API and repaid a week on, and the official APIs' agent has its payment wallet
+  declared in the ERC-8004 identity registry. Oak Agent Kit is a local wallet for AI agents that asks for a yes in
+  chat before each action.
+- **Fund your agent's wallet from chat.** The [quickstart](https://autonomo.fun/docs/quickstart#oak) has a new option
+  for step 2: with Oak connected, an agent gets USDG on Robinhood Chain, by a swap or a bridge in from Base, and tops
+  up the wallet that pays for calls. The Oak key never goes into `AUTONOMO_WALLET_KEY`: the paying wallet stays a
+  separate one that holds only what the agent may spend.
 - **A reworked directory.** [Explore](https://autonomo.fun/projects) now has three tabs: All APIs, Autonomo, and
   Ecosystem, which holds the facilitators, SDKs, extensions, tools and explorers. The list opens on APIs with a paid
   call in the last 30 days, with one tick to show every service. Filters for topic, chain and price per call sit in

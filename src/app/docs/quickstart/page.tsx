@@ -20,6 +20,10 @@ export AUTONOMO_WALLET_KEY=0x…
 # Windows PowerShell
 $env:AUTONOMO_WALLET_KEY = "0x…"`;
 
+// What a user says to an agent that has Oak connected. Oak shows each action in chat and waits for a yes.
+const OAK_ASK = `Get 2 USDG on Robinhood Chain: swap from my ETH, or bridge in from Base.
+Then send 1 USDG to 0x… (my Autonomo paying wallet).`;
+
 const PAY = `npx autonomo-sdk risk ${TOKEN_EXAMPLE}`;
 
 const PAY_OUTPUT = `Risk Checker costs 0.01 USDG or 100 AUTONOMO. Pay from 0x…? [y/N] y
@@ -59,6 +63,38 @@ export default function QuickstartPage() {
           The key stays on your computer and only signs payments. It is read from <code>AUTONOMO_WALLET_KEY</code>, never
           from a flag, so it stays out of your shell history.
         </p>
+
+        <h3 id="oak" className="scroll-mt-6 pt-2 font-medium">
+          Or fund it from chat, with Oak
+        </h3>
+        <p>
+          <a href="https://oakagentkit.org" target="_blank" rel="noopener noreferrer">
+            Oak Agent Kit
+          </a>{" "}
+          is a local wallet for AI agents such as Claude Code, Codex and Cursor. Its key stays on your computer, and it
+          shows every action in chat and waits for your yes. If your money sits in an Oak wallet, your agent can get the
+          USDG and top up the paying wallet for you:
+        </p>
+        <ol className="list-decimal space-y-1.5 pl-5">
+          <li>
+            Set up Oak with{" "}
+            <a href="https://oakagentkit.org/setup.html" target="_blank" rel="noopener noreferrer">
+              its own guide
+            </a>
+            .
+          </li>
+          <li>Create the new paying wallet as above, and copy its address.</li>
+          <li>Ask your agent, and say yes to each step it shows you:</li>
+        </ol>
+        <Code code={OAK_ASK} lang="ask your agent" />
+        <p>
+          <b>Never paste your Oak key into <code>AUTONOMO_WALLET_KEY</code>.</b> The Oak wallet holds your money. The
+          paying wallet is a separate one that holds only what your agent may spend on calls.
+        </p>
+        <p className="text-sm text-muted">
+          Oak is made by another team. It takes 0.25% on the swap, bridge or send you approve, shown before your yes, and
+          nothing from your API calls. It has had no outside audit, so start with small amounts.
+        </p>
       </Section>
 
       <Section id="pay" title="3. Pay for a call">
@@ -74,7 +110,8 @@ export default function QuickstartPage() {
 
       <Section id="next" title="What's next">
         <p>The same call from your own code or your agent framework:</p>
-        <Cards>
+        {/* Two across when that fills the grid and three across wouldn't, as with four cards. */}
+        <Cards cols={next.length % 3 !== 0 && next.length % 2 === 0 ? 2 : 3}>
           {next.map((i) => (
             <Card key={i.href} title={i.label} href={i.href} body={i.about ?? ""} />
           ))}

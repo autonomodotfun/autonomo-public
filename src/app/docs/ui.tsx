@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Children } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { GroupLabel } from "./docs-nav";
 import { NAV } from "./nav";
@@ -40,10 +41,15 @@ export function Step({ n, title, children }: { n: number; title: string; childre
   );
 }
 
+/** A joined grid of cards. Empty cells fill the last row, so the grid stays whole with any number of cards. */
 export function Cards({ children, cols = 3 }: { children: React.ReactNode; cols?: 2 | 3 }) {
+  const fill = (cols - (Children.count(children) % cols)) % cols;
   return (
     <div className={`grid gap-px overflow-hidden rounded-lg border border-line bg-line ${cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
       {children}
+      {Array.from({ length: fill }, (_, i) => (
+        <div key={`fill-${i}`} aria-hidden className="hidden bg-bg sm:block" />
+      ))}
     </div>
   );
 }
