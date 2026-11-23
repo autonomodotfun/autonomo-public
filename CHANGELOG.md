@@ -3,6 +3,17 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 23, 2026
+
+- **A reworked directory.** [Explore](https://autonomo.fun/projects) now has three tabs: All APIs, Autonomo, and
+  Ecosystem, which holds the facilitators, SDKs, extensions, tools and explorers. The list opens on APIs with a paid
+  call in the last 30 days, with one tick to show every service. Filters for topic, chain and price per call sit in
+  one panel beside the list, and open as a sheet on phones. Topics are new: Crypto and tokens, Web and search,
+  Research and data, Compliance and risk, AI models, Agent tools, and Time and utilities.
+- **The homepage leads with Autonomo's own APIs.** A new row shows the four most-paid ones, and the directory is one
+  block: search, a line of numbers, and one list with tabs for Most used, Newest and Autonomo APIs.
+- **The free API takes the new filters.** `/api/v1/projects` accepts `active=1`, `topic` and `price`.
+
 ## November 22, 2026
 
 - **A shorter header, and a menu on phones.** The bar now shows four links, Explore APIs, Playground, Docs and

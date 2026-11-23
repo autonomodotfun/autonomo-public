@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { CATEGORIES } from "@/db/schema";
-import { CATEGORY_INFO } from "@/lib/categories";
-import { networkLabel } from "@/lib/networks";
-import { getFeatured, getStats, searchProjects } from "@/lib/queries";
-import { compact, ProjectList } from "@/components/project-row";
+import { TOKEN } from "@/lib/constants";
+import { baseCoverage } from "@/lib/gateway";
+import { formatUsd } from "@/lib/networks";
+import { getStats, getTrackRecords, listAutonomoGateways, searchProjects } from "@/lib/queries";
+import { ApiCard, mostPaid, paidCalls, type AutonomoApi } from "@/components/api-card";
+import { Avatar, compact, ProjectList } from "@/components/project-row";
+import { Tabs, type TabItem } from "@/components/tabs";
 import { PartnersGrid } from "@/components/partners";
 import { PaymentDemo } from "@/components/payment-demo";
 
@@ -44,13 +46,63 @@ const PATHS = [
   { who: "For agents", steps: AGENT_STEPS, cta: "Connect your agent", href: "/docs/agents" },
 ];
 
+const AUTONOMO_APIS = "/projects?view=autonomo";
+// Rows in each of the directory's lists on this page.
+const LIST_SIZE = 5;
+
 export default async function Home() {
-  const [stats, popular, facilitators, sdks] = await Promise.all([
+  const [stats, popular, newest, autonomoApis, records] = await Promise.all([
     getStats(),
-    searchProjects({ category: "service", sort: "popular", limit: 10 }),
-    getFeatured("facilitator", 6),
-    getFeatured("sdk", 4),
+    searchProjects({ category: "service", sort: "popular", limit: LIST_SIZE }),
+    // Newest with a paid call already, so the list isn't led by services nobody has used yet.
+    searchProjects({ category: "service", sort: "new", active: true, limit: LIST_SIZE }),
+    // A failed read only hides Autonomo's own APIs, so the rest of the homepage still renders.
+    listAutonomoGateways().catch(() => [] as AutonomoApi[]),
+    getTrackRecords().catch(() => null),
   ]);
+  const ownApis = mostPaid(autonomoApis, records, LIST_SIZE);
+
+  // The directory's lists, one tab each. Every list ends with a link to the full one on the Explore page.
+  const lists: TabItem[] = [
+    {
+      id: "used",
+      label: "Most used",
+      panel: (
+        <>
+          <ProjectList rows={popular.rows} />
+          <SeeAll href="/projects">See all paid services by use</SeeAll>
+        </>
+      ),
+    },
+    {
+      id: "new",
+      label: "Newest",
+      panel: (
+        <>
+          <ProjectList rows={newest.rows} />
+          <SeeAll href="/projects?sort=new">See the newest services</SeeAll>
+        </>
+      ),
+    },
+    ...(ownApis.length
+      ? [
+          {
+            id: "autonomo",
+            label: "Autonomo APIs",
+            panel: (
+              <>
+                <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-bg">
+                  {ownApis.map((g) => (
+                    <AutonomoRow key={g.slug} g={g} paid={paidCalls(records, g.slug)} />
+                  ))}
+                </ul>
+                <SeeAll href={AUTONOMO_APIS}>See all {autonomoApis.length} Autonomo APIs</SeeAll>
+              </>
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -106,11 +158,24 @@ export default async function Home() {
         <PartnersGrid />
       </section>
 
+      {ownApis.length > 0 && (
+        <section className="py-8">
+          <SectionHead title="Pay for these today" href={AUTONOMO_APIS} more={`All ${autonomoApis.length} Autonomo APIs`} />
+          <p className="max-w-2xl text-muted">
+            Autonomo&apos;s own APIs. Pay per call in USDG or {TOKEN.symbol} on {TOKEN.chainName}
+            {baseCoverage() !== "none" ? ", or USDC on Base" : ""}, with no account or key.
+          </p>
+          <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {ownApis.slice(0, 4).map((g) => (
+              <ApiCard key={g.slug} g={g} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="py-8">
         <SectionHead title="The x402 directory" href="/projects" />
-        <p className="max-w-2xl text-muted">
-          Every x402 project we can find, on {stats.networks.length} networks, with live prices and usage.
-        </p>
+        <p className="max-w-2xl text-muted">Every x402 project we can find, with live prices and usage.</p>
         <form action="/projects" className="mt-5 flex max-w-xl gap-2">
           <input
             name="q"
@@ -121,71 +186,64 @@ export default async function Home() {
           />
           <button className="btn-brand h-11 px-5 text-sm">Search</button>
         </form>
-        <dl className="mt-8 grid max-w-2xl grid-cols-3 gap-6">
-          <Stat label="Projects" value={compact(stats.projects)} />
-          <Stat label="Paid endpoints" value={compact(stats.endpoints)} />
-          <Stat label="Paid calls, last 30 days" value={compact(stats.calls30d)} />
-        </dl>
-        <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3 lg:grid-cols-5">
-          {CATEGORIES.filter((c) => stats.categories[c]).map((c) => (
-            <Link key={c} href={`/projects?category=${c}`} className="bg-bg p-4 hover:bg-surface">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-medium">{CATEGORY_INFO[c].plural}</span>
-                <span className="font-mono text-xs text-faint">{stats.categories[c]}</span>
-              </div>
-              <p className="mt-1 text-sm text-muted">{CATEGORY_INFO[c].blurb}</p>
-            </Link>
-          ))}
+        <p className="mt-4 text-sm text-muted">
+          <Num>{compact(stats.projects)}</Num> projects · <Num>{compact(stats.endpoints)}</Num> paid endpoints ·{" "}
+          <Num>{compact(stats.calls30d)}</Num> paid calls in 30 days · <Num>{stats.networks.length}</Num> chains
+        </p>
+        <div className="mt-6">
+          <Tabs label="Directory lists" tabs={lists} />
         </div>
       </section>
-
-      <section className="py-8">
-        <SectionHead title="Most used services this month" href="/projects?category=service&sort=popular" />
-        <ProjectList rows={popular.rows} />
-      </section>
-
-      <div className="grid gap-10 py-8 lg:grid-cols-2">
-        <section>
-          <SectionHead title="Facilitators" href="/projects?category=facilitator" />
-          <ProjectList rows={facilitators} />
-        </section>
-        <section>
-          <SectionHead title="SDKs" href="/projects?category=sdk" />
-          <ProjectList rows={sdks} />
-          <h3 className="mt-10 mb-3 text-sm font-medium text-muted">Networks</h3>
-          <div className="flex flex-wrap gap-2">
-            {stats.networks.map((n) => (
-              <Link
-                key={n.network}
-                href={`/projects?network=${encodeURIComponent(n.network)}`}
-                className="rounded-md border border-line px-2.5 py-1 text-sm hover:bg-surface"
-              >
-                {networkLabel(n.network)} <span className="font-mono text-xs text-faint">{n.count}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      </div>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+const Num = ({ children }: { children: React.ReactNode }) => <span className="font-mono text-ink">{children}</span>;
+
+function SeeAll({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <div>
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="mt-1 font-mono text-2xl">{value}</dd>
-    </div>
+    <Link href={href} className="mt-3 inline-block text-sm text-muted hover:text-ink">
+      {children} →
+    </Link>
   );
 }
 
-function SectionHead({ title, href }: { title: string; href?: string }) {
+/** An Autonomo API as a row of the directory's list: what a call costs and how many were paid for in 30 days. */
+function AutonomoRow({ g, paid }: { g: AutonomoApi; paid: number }) {
+  return (
+    <li>
+      <Link
+        href={`/projects/${g.projectSlug}`}
+        className="grid grid-cols-[auto_1fr_auto] items-start gap-x-4 px-4 py-4 hover:bg-surface sm:grid-cols-[auto_1fr_7rem_8rem]"
+      >
+        <Avatar name={g.name} src={g.logoUrl} />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-medium">{g.name}</span>
+            <span className="shrink-0 rounded border border-accent px-1.5 py-px text-[11px] font-medium text-accent">Autonomo</span>
+          </div>
+          <p className="mt-0.5 line-clamp-2 text-sm text-muted sm:line-clamp-1">{g.description}</p>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-sm whitespace-nowrap">from {formatUsd(g.priceUsd)}</div>
+          <div className="text-xs text-faint">a call</div>
+        </div>
+        <div className="hidden text-right sm:block">
+          <div className={`font-mono text-sm ${paid ? "" : "text-faint"}`}>{compact(paid)}</div>
+          <div className="text-xs text-faint">paid calls / 30d</div>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+function SectionHead({ title, href, more = "View all" }: { title: string; href?: string; more?: string }) {
   return (
     <div className="mb-4 flex items-baseline justify-between">
       <h2 className="heading text-xl">{title}</h2>
       {href && (
         <Link href={href} className="text-sm text-muted hover:text-ink">
-          View all →
+          {more} →
         </Link>
       )}
     </div>

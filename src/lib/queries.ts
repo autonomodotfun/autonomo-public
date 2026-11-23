@@ -9,6 +9,7 @@ import { retrySoon, untilLocalDbIsFree } from "@/lib/prerender";
 import { bondEnabled, readWalletBonds, type WalletBond } from "@/lib/bond";
 import { holdsMinimum } from "@/lib/verified";
 import { summarize, TRACK_RECORD_DAYS, type TrackRecord } from "@/lib/track-record";
+import { PRICE_BANDS, priceBand, topic, TOPICS, topicTsQuery, type PriceBand, type Topic } from "@/lib/topics";
 
 const { projects, endpoints } = schema;
 
@@ -19,6 +20,14 @@ export type ProjectQuery = {
   q?: string;
   category?: Category;
   network?: string;
+  /** Only projects with a paid call in the last 30 days. */
+  active?: boolean;
+  /** A topic id from src/lib/topics.ts. */
+  topic?: string;
+  /** A price band id from src/lib/topics.ts. */
+  price?: string;
+  /** Everything that isn't a paid service: facilitators, SDKs, extensions, tools and explorers. */
+  ecosystem?: boolean;
   sort?: Sort;
   page?: number;
   limit?: number;
@@ -68,10 +77,28 @@ export function parseProjectQuery(params: Record<string, string | string[] | und
     q: one("q")?.slice(0, 100),
     category: CATEGORIES.includes(category as Category) ? (category as Category) : undefined,
     network: one("network")?.toLowerCase().slice(0, 40),
+    active: one("active") === "1" || undefined,
+    topic: topic(one("topic"))?.id,
+    price: priceBand(one("price"))?.id,
     sort: SORTS.includes(sort as Sort) ? (sort as Sort) : undefined,
     page: Number.isInteger(page) && page > 0 ? Math.min(page, 1000) : 1,
     limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : 30,
   };
+}
+
+/** A project is in a topic when its name or description has one of the topic's words, or it carries one of its tags. */
+const inTopic = (t: Topic) =>
+  sql`(${projects.search} @@ to_tsquery('english', ${topicTsQuery(t)}) or ${projects.tags} && ${sql.raw(textArray(t.tags))})`;
+
+/** The cheapest endpoint's price falls in the band. Projects with no known price are in none. */
+const inPriceBand = (b: PriceBand) =>
+  and(b.over === null ? undefined : sql`${projects.minPriceUsd} > ${b.over}`, b.upTo === null ? undefined : sql`${projects.minPriceUsd} <= ${b.upTo}`)!;
+
+const hasRecentCalls = sql`${projects.calls30d} > 0`;
+
+/** A Postgres text[] literal of fixed, code-defined words (topic tags), which hold only letters, digits and hyphens. */
+function textArray(words: string[]): string {
+  return `array[${words.filter((w) => /^[a-z0-9-]+$/.test(w)).map((w) => `'${w}'`).join(",")}]::text[]`;
 }
 
 async function searchProjectsFresh(query: ProjectQuery) {
@@ -94,7 +121,13 @@ async function searchProjectsFresh(query: ProjectQuery) {
     );
   }
   if (category) where.push(eq(projects.category, category));
+  if (query.ecosystem) where.push(sql`${projects.category} <> 'service'`);
   if (network) where.push(sql`${network} = any(${projects.networks})`);
+  if (query.active) where.push(hasRecentCalls);
+  const inTopicOf = topic(query.topic);
+  if (inTopicOf) where.push(inTopic(inTopicOf));
+  const band = priceBand(query.price);
+  if (band) where.push(inPriceBand(band));
 
   const order: SQL[] = {
     relevance: rank
@@ -288,6 +321,40 @@ async function getStatsFresh() {
   };
 }
 
+export type DirectoryFacets = {
+  /** Paid services counted: all of them, or only those with a paid call in the last 30 days. */
+  total: number;
+  topics: Record<string, number>;
+  prices: Record<string, number>;
+  /** The chains with the most services, most first. */
+  networks: { network: string; count: number }[];
+};
+
+// How many paid services each Explore filter would show. One API can be in several topics and on several chains.
+async function directoryFacetsFresh(active: boolean): Promise<DirectoryFacets> {
+  const db = await getDb();
+  const services = and(eq(projects.status, "approved"), eq(projects.category, "service"), active ? hasRecentCalls : undefined)!;
+  const counts: Record<string, SQL<number>> = { total: sql<number>`count(*)::int` };
+  for (const t of TOPICS) counts[`topic_${t.id}`] = sql<number>`(count(*) filter (where ${inTopic(t)}))::int`;
+  for (const b of PRICE_BANDS) counts[`price_${b.id}`] = sql<number>`(count(*) filter (where ${inPriceBand(b)}))::int`;
+  const [[row], networks] = await Promise.all([
+    db.select(counts).from(projects).where(services),
+    db.execute<{ network: string; count: number }>(sql`
+      select n as network, count(*)::int as count
+      from ${projects}, unnest(${projects.networks}) as n
+      where ${services}
+      group by n order by count desc`),
+  ]);
+  const networkRows = "rows" in networks ? networks.rows : (networks as unknown as { network: string; count: number }[]);
+  return {
+    total: row.total,
+    topics: Object.fromEntries(TOPICS.map((t) => [t.id, row[`topic_${t.id}`]])),
+    prices: Object.fromEntries(PRICE_BANDS.map((b) => [b.id, row[`price_${b.id}`]])),
+    // The 12 most common, plus Autonomo's own chain wherever it ranks, as in getStats.
+    networks: networkRows.filter((n, i) => i < 12 || n.network === TOKEN.network).map((n) => ({ network: n.network, count: Number(n.count) })),
+  };
+}
+
 async function getFeaturedFresh(category?: Category, limit = 8) {
   const db = await getDb();
   const where = [eq(projects.status, "approved")];
@@ -397,6 +464,7 @@ function cachedRead<A extends unknown[], R>(fn: (...args: A) => Promise<R>, key:
 
 export const searchProjects = cachedRead(searchProjectsFresh, "search-projects", DAY, CATALOG_TAGS.directory);
 export const getStats = cachedRead(getStatsFresh, "stats", DAY, CATALOG_TAGS.directory);
+export const getDirectoryFacets = cachedRead(directoryFacetsFresh, "directory-facets", DAY, CATALOG_TAGS.directory);
 export const getFeatured = cachedRead(getFeaturedFresh, "featured", DAY, CATALOG_TAGS.directory);
 export const getAllSlugs = cachedRead(getAllSlugsFresh, "all-slugs", DAY, CATALOG_TAGS.directory);
 export const getProject = cache(cachedRead(getProjectFresh, "project", DAY, CATALOG_TAGS.directory));

@@ -55,8 +55,17 @@ export default async function DirectoryGuidePage() {
             names, descriptions, websites and tags.
           </li>
           <li>
-            <b>Filter</b> by category and by network. Each filter shows how many projects it has, and filters combine
-            with a search.
+            <b>Three tabs.</b> <b>All APIs</b> lists the paid services. <b>Autonomo</b> shows Autonomo&apos;s own APIs.{" "}
+            <b>Ecosystem</b> holds the <Link href="/projects?category=facilitator">facilitators</Link>,{" "}
+            <Link href="/projects?category=sdk">SDKs</Link>, extensions, tools and explorers.
+          </li>
+          <li>
+            <b>Live APIs first.</b> The list opens on services with a paid call in the last 30 days. Untick that filter
+            to see every service.
+          </li>
+          <li>
+            <b>Filter</b> by topic, chain and price per call. Each filter shows how many APIs it has, and filters
+            combine with a search. An API can be in several topics and on several chains.
           </li>
           <li>
             <b>Sort</b> by <b>Most used</b> (paid calls in the last 30 days, the default), <b>Newest</b>,{" "}
@@ -67,10 +76,6 @@ export default async function DirectoryGuidePage() {
             <b>Tags</b> on a project page, like <code>#weather</code>, open a search for similar projects.
           </li>
         </ul>
-        <p>
-          The header links go straight to <Link href="/projects?category=facilitator">Facilitators</Link> and{" "}
-          <Link href="/projects?category=sdk">SDKs</Link>.
-        </p>
       </Section>
 
       <Section id="project-pages" title="What a project page shows">

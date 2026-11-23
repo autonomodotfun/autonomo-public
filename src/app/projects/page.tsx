@@ -1,39 +1,110 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CATEGORIES } from "@/db/schema";
+import { CATEGORIES, type Category } from "@/db/schema";
 import { shelve } from "@/lib/api-shelves";
 import { CATEGORY_INFO } from "@/lib/categories";
 import { TOKEN } from "@/lib/constants";
-import { formatUsd, networkLabel } from "@/lib/networks";
+import { networkLabel } from "@/lib/networks";
 import {
+  getDirectoryFacets,
   getStats,
   getTrackRecords,
   listAutonomoGateways,
   parseProjectQuery,
   searchProjects,
+  type DirectoryFacets,
   type ProjectQuery,
   type Sort,
 } from "@/lib/queries";
-import { Avatar, compact, ProjectList } from "@/components/project-row";
-import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway-rules";
-import { baseCoverage, offersBase } from "@/lib/gateway";
+import { PRICE_BANDS, priceBand, topic, TOPICS } from "@/lib/topics";
+import { ApiCard, mostPaid, type AutonomoApi } from "@/components/api-card";
+import { FilterSheet } from "@/components/filter-sheet";
+import { compact, ProjectList } from "@/components/project-row";
+import { baseCoverage } from "@/lib/gateway";
 
-type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
-type AutonomoApi = Awaited<ReturnType<typeof listAutonomoGateways>>[number];
+// The Explore page has three tabs. "All APIs" lists the paid services, live ones first, with filters beside the
+// list. "Autonomo" shows Autonomo's own APIs on their shelves. "Ecosystem" holds everything that isn't a paid
+// service: facilitators, SDKs, extensions, tools and explorers.
 
-/** The Autonomo tab isn't a directory category, so it has its own parameter: /projects?view=autonomo. */
+type Params = Record<string, string | string[] | undefined>;
+type Props = { searchParams: Promise<Params> };
+type View = "apis" | "autonomo" | "ecosystem";
+
 const AUTONOMO_VIEW = "/projects?view=autonomo";
-const isAutonomoView = (params: Record<string, string | string[] | undefined>) => params.view === "autonomo";
+/** The kinds of project on the Ecosystem tab. */
+const ECOSYSTEM = CATEGORIES.filter((c) => c !== "service");
 
 // Autonomo APIs shown in the one-row strip above the directory; the rest are on the Autonomo tab.
 const STRIP_SIZE = 4;
+// Chains shown before "More chains"; the rest are a click away.
+const TOP_NETWORKS = 5;
+
+/** What the address asks for: the tab, and on "All APIs" whether services without recent calls are shown too. */
+type State = {
+  view: View;
+  q?: string;
+  /** Only on the Ecosystem tab: one kind of project. */
+  category?: Category;
+  network?: string;
+  topic?: string;
+  price?: string;
+  /** Show every service, not only those with a paid call in the last 30 days. */
+  all?: boolean;
+  sort?: Sort;
+  page?: number;
+};
+
+function readState(params: Params): State {
+  const one = (k: string) => {
+    const v = params[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const query = parseProjectQuery(params);
+  const base = { q: query.q, sort: query.sort, page: query.page };
+  if (one("view") === "autonomo") return { view: "autonomo" };
+  if (one("view") === "ecosystem" || (query.category && query.category !== "service")) {
+    return { ...base, view: "ecosystem", category: query.category === "service" ? undefined : query.category };
+  }
+  return { ...base, view: "apis", network: query.network, topic: query.topic, price: query.price, all: one("all") === "1" };
+}
+
+/** The address of a state. Moving to another filter or sort starts again from the first page. */
+function href(s: State): string {
+  if (s.view === "autonomo") return AUTONOMO_VIEW;
+  const p = new URLSearchParams();
+  if (s.view === "ecosystem" && !s.category) p.set("view", "ecosystem");
+  if (s.q) p.set("q", s.q);
+  if (s.category) p.set("category", s.category);
+  if (s.network) p.set("network", s.network);
+  if (s.topic) p.set("topic", s.topic);
+  if (s.price) p.set("price", s.price);
+  if (s.all) p.set("all", "1");
+  if (s.sort) p.set("sort", s.sort);
+  if (s.page && s.page > 1) p.set("page", String(s.page));
+  const query = p.toString();
+  return query ? `/projects?${query}` : "/projects";
+}
+
+/** The search the list runs for a state. */
+function searchFor(s: State): ProjectQuery {
+  const shared = { q: s.q, sort: s.sort, page: s.page };
+  return s.view === "ecosystem"
+    ? { ...shared, category: s.category, ecosystem: true }
+    : { ...shared, category: "service", network: s.network, topic: s.topic, price: s.price, active: !s.all };
+}
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const params = await searchParams;
-  if (isAutonomoView(params)) return { title: "Autonomo APIs", alternates: { canonical: AUTONOMO_VIEW } };
-  const q = parseProjectQuery(params);
-  const title = q.category ? `x402 ${CATEGORY_INFO[q.category].plural}` : q.q ? `“${q.q}”` : "Explore APIs";
-  return { title, alternates: { canonical: q.category ? `/projects?category=${q.category}` : "/projects" } };
+  const s = readState(await searchParams);
+  if (s.view === "autonomo") return { title: "Autonomo APIs", alternates: { canonical: AUTONOMO_VIEW } };
+  if (s.view === "ecosystem") {
+    return s.category
+      ? { title: `x402 ${CATEGORY_INFO[s.category].plural}`, alternates: { canonical: `/projects?category=${s.category}` } }
+      : { title: "x402 ecosystem", alternates: { canonical: "/projects?view=ecosystem" } };
+  }
+  const about = topic(s.topic);
+  if (s.q) return { title: `“${s.q}”`, alternates: { canonical: "/projects" } };
+  if (about) return { title: `${about.label}: x402 APIs`, alternates: { canonical: `/projects?topic=${about.id}` } };
+  return { title: "Explore APIs", alternates: { canonical: "/projects" } };
 }
 
 const SORT_LABELS: Record<Sort, string> = {
@@ -44,121 +115,132 @@ const SORT_LABELS: Record<Sort, string> = {
   name: "A–Z",
 };
 
-// Chains shown before "More chains"; the rest are a click away.
-const TOP_NETWORKS = 6;
-
-function href(base: ProjectQuery, patch: Partial<ProjectQuery>) {
-  const merged = { ...base, page: undefined, limit: undefined, ...patch };
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(merged)) {
-    if (v !== undefined && v !== "" && !(k === "page" && v === 1)) params.set(k, String(v));
-  }
-  const s = params.toString();
-  return s ? `/projects?${s}` : "/projects";
-}
-
 export default async function ProjectsPage({ searchParams }: Props) {
-  const params = await searchParams;
-  const autonomoView = isAutonomoView(params);
-  const query = parseProjectQuery(params);
-  // The Autonomo strip leads the first page of the plain list, and the paid-services and Robinhood Chain views.
+  const s = readState(await searchParams);
+  // The Autonomo strip leads the first page of the plain list, and of the Robinhood Chain list.
   const showStrip =
-    !autonomoView &&
-    !query.q &&
-    (query.page ?? 1) === 1 &&
-    (!query.category || query.category === "service") &&
-    (!query.network || query.network === TOKEN.network);
-  const [result, stats, autonomoApis, records] = await Promise.all([
-    autonomoView ? null : searchProjects(query),
+    s.view === "apis" && !s.q && !s.topic && !s.price && (s.page ?? 1) === 1 && (!s.network || s.network === TOKEN.network);
+  const [result, stats, liveFacets, allFacets, autonomoApis, records] = await Promise.all([
+    s.view === "autonomo" ? null : searchProjects(searchFor(s)),
     getStats(),
+    getDirectoryFacets(true),
+    s.all ? getDirectoryFacets(false) : null,
     // A failed read only hides the strip and the tab, so the directory still renders.
     listAutonomoGateways().catch(() => [] as AutonomoApi[]),
     showStrip ? getTrackRecords().catch(() => null) : Promise.resolve(null),
   ]);
-  const unfiltered = !autonomoView && !query.q && !query.category && !query.network;
+  const facets = allFacets ?? liveFacets;
+  const ecosystemCount = ECOSYSTEM.reduce((sum, c) => sum + (stats.categories[c] ?? 0), 0);
+  const about = topic(s.topic);
 
-  const title = autonomoView
-    ? "Autonomo APIs"
-    : query.category
-      ? CATEGORY_INFO[query.category].plural
-      : query.q
-        ? "Search results"
-        : "Explore x402 APIs";
-
-  // The strip's cards: the most-paid Autonomo APIs over the track-record window, in shelf order when tied.
-  const inShelfOrder = shelve(autonomoApis).flatMap((s) => s.apis);
-  const paid = (slug: string) => records?.[slug]?.settledCalls ?? 0;
-  const stripApis = [...inShelfOrder].sort((a, b) => paid(b.slug) - paid(a.slug)).slice(0, STRIP_SIZE);
+  const title =
+    s.view === "autonomo"
+      ? "Autonomo APIs"
+      : s.view === "ecosystem"
+        ? s.category
+          ? CATEGORY_INFO[s.category].plural
+          : "x402 ecosystem"
+        : s.q
+          ? "Search results"
+          : about
+            ? about.label
+            : "Explore x402 APIs";
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6">
       <header>
         <p className="font-mono text-xs tracking-wide text-accent uppercase">Directory</p>
         <h1 className="heading mt-2 text-4xl sm:text-5xl">{title}</h1>
-        {unfiltered ? (
-          <>
-            <dl className="mt-5 grid max-w-3xl grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4">
-              <NumberTile value={compact(stats.projects)} label="projects" />
-              <NumberTile value={compact(stats.endpoints)} label="paid endpoints" />
-              <NumberTile value={String(stats.networks.length)} label="chains" />
-              <NumberTile value={compact(stats.calls30d)} label="paid calls in 30 days" />
-            </dl>
-            <p className="mt-2 text-xs text-faint">From the Coinbase CDP and PayAI catalogs, plus every API launched on Autonomo.</p>
-          </>
-        ) : autonomoView ? (
+        {s.view === "autonomo" ? (
           <p className="mt-3 max-w-2xl text-muted">
             Autonomo&apos;s gateways: pay per call in USDG or {TOKEN.symbol} on {TOKEN.chainName}
             {baseCoverage() !== "none" ? ", or USDC on Base" : ""}, no account or key. The ones marked On-chain read{" "}
             {TOKEN.chainName} directly{baseCoverage() !== "none" ? ", and most read Base too" : ""}.
           </p>
+        ) : s.view === "ecosystem" ? (
+          <p className="mt-3 max-w-2xl text-muted">
+            What x402 runs on and what is built around it: the facilitators that settle payments, the SDKs for adding
+            x402 to an app, and the extensions, tools and explorers.
+          </p>
         ) : (
           <p className="mt-3 max-w-2xl text-muted">
-            {compact(stats.projects)} projects and {compact(stats.endpoints)} paid endpoints across{" "}
-            {stats.networks.length} chains, with {compact(stats.calls30d)} paid calls in the last 30 days. From the
-            Coinbase CDP and PayAI catalogs.
+            {compact(stats.projects)} projects and {compact(stats.endpoints)} paid endpoints across {stats.networks.length}{" "}
+            chains, with {compact(stats.calls30d)} paid calls in the last 30 days. From the Coinbase CDP and PayAI
+            catalogs, plus every API launched on Autonomo.
           </p>
         )}
 
-        <form action="/projects" role="search" className="mt-6 flex max-w-2xl gap-2">
-          {query.category && <input type="hidden" name="category" value={query.category} />}
-          {query.network && <input type="hidden" name="network" value={query.network} />}
-          <input
-            name="q"
-            type="search"
-            defaultValue={query.q}
-            placeholder="Search APIs, hosts or tags"
-            aria-label="Search the directory"
-            className="field flex-1 py-2.5 text-base"
-          />
-          <button type="submit" className="btn-brand px-4 text-sm">
-            Search
-          </button>
-        </form>
+        {s.view !== "autonomo" && (
+          <form action="/projects" role="search" className="mt-6 flex max-w-2xl gap-2">
+            {s.view === "ecosystem" && !s.category && <input type="hidden" name="view" value="ecosystem" />}
+            {s.category && <input type="hidden" name="category" value={s.category} />}
+            {s.network && <input type="hidden" name="network" value={s.network} />}
+            {s.topic && <input type="hidden" name="topic" value={s.topic} />}
+            {s.price && <input type="hidden" name="price" value={s.price} />}
+            {s.all && <input type="hidden" name="all" value="1" />}
+            <input
+              name="q"
+              type="search"
+              defaultValue={s.q}
+              placeholder={s.view === "ecosystem" ? "Search facilitators, SDKs and tools" : "Search APIs, hosts or tags"}
+              aria-label="Search the directory"
+              className="field flex-1 py-2.5 text-base"
+            />
+            <button type="submit" className="btn-brand px-4 text-sm">
+              Search
+            </button>
+          </form>
+        )}
 
-        <nav aria-label="Category" className="-mx-4 mt-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <nav aria-label="Directory" className="-mx-4 mt-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <ul className="flex gap-1 border-b border-line text-sm whitespace-nowrap">
-            <Tab active={!autonomoView && !query.category} href={href(query, { category: undefined })} label="All" />
+            <Tab active={s.view === "apis"} href={href({ view: "apis", all: s.all })} label="All APIs" count={facets.total} />
             {autonomoApis.length > 0 && (
-              <Tab active={autonomoView} href={AUTONOMO_VIEW} label="Autonomo" count={autonomoApis.length} />
+              <Tab active={s.view === "autonomo"} href={AUTONOMO_VIEW} label="Autonomo" count={autonomoApis.length} />
             )}
-            {CATEGORIES.filter((c) => stats.categories[c]).map((c) => (
-              <Tab
-                key={c}
-                active={!autonomoView && query.category === c}
-                href={href(query, { category: c })}
-                label={CATEGORY_INFO[c].plural}
-                count={stats.categories[c]}
-              />
-            ))}
+            {ecosystemCount > 0 && (
+              <Tab active={s.view === "ecosystem"} href={href({ view: "ecosystem" })} label="Ecosystem" count={ecosystemCount} />
+            )}
           </ul>
         </nav>
       </header>
 
-      {autonomoView ? (
-        <AutonomoShelves apis={autonomoApis} />
-      ) : (
+      {s.view === "autonomo" && <AutonomoShelves apis={autonomoApis} />}
+
+      {s.view === "ecosystem" && result && (
         <>
-          {showStrip && stripApis.length > 0 && (
+          <ul className="mt-6 flex flex-wrap gap-1.5 text-sm">
+            <Chip active={!s.category} href={href({ view: "ecosystem", q: s.q })} label="All" count={ecosystemCount} />
+            {ECOSYSTEM.filter((c) => stats.categories[c]).map((c) => (
+              <Chip
+                key={c}
+                active={s.category === c}
+                href={href({ view: "ecosystem", q: s.q, category: c })}
+                label={CATEGORY_INFO[c].plural}
+                count={stats.categories[c] ?? 0}
+              />
+            ))}
+          </ul>
+          <section className="mt-6">
+            <Results
+              s={s}
+              result={result}
+              sorts={s.q ? ["relevance", "popular", "new", "name"] : ["popular", "new", "name"]}
+              summary={
+                <>
+                  <Count n={result.total} /> {result.total === 1 ? "project" : "projects"}
+                  {s.q && <> for “{s.q}”</>}
+                </>
+              }
+              clear={s.q ? href({ view: "ecosystem", category: s.category }) : undefined}
+            />
+          </section>
+        </>
+      )}
+
+      {s.view === "apis" && result && (
+        <>
+          {showStrip && autonomoApis.length > 0 && (
             <section className="mt-8">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-sm font-medium">
@@ -169,50 +251,64 @@ export default async function ProjectsPage({ searchParams }: Props) {
                 </Link>
               </div>
               <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {stripApis.map((g, i) => (
+                {mostPaid(autonomoApis, records, STRIP_SIZE).map((g, i) => (
                   // Two cards on phones, so the list still starts near the top; all four from tablet width.
                   <ApiCard key={g.slug} g={g} className={i >= 2 ? "max-sm:hidden" : ""} />
                 ))}
               </ul>
             </section>
           )}
-          {result && <Directory query={query} result={result} stats={stats} noteTags={unfiltered && autonomoApis.length > 0} />}
+
+          <div className="mt-8 grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
+            <aside className="hidden text-sm lg:block">
+              <Filters s={s} facets={facets} liveTotal={liveFacets.total} />
+            </aside>
+            <section className="min-w-0">
+              <Results
+                s={s}
+                result={result}
+                sorts={s.q ? ["relevance", "popular", "new", "price", "name"] : ["popular", "new", "price", "name"]}
+                before={
+                  <FilterSheet count={[!s.all, s.topic, s.network, s.price].filter(Boolean).length}>
+                    <Filters s={s} facets={facets} liveTotal={liveFacets.total} />
+                  </FilterSheet>
+                }
+                summary={
+                  <>
+                    <Count n={result.total} /> {result.total === 1 ? "API" : "APIs"}
+                    {!s.all && <> with a paid call in the last 30 days</>}
+                    {about && <> in {about.label}</>}
+                    {s.network && <> on {networkLabel(s.network)}</>}
+                    {priceBand(s.price) && <>, {priceBand(s.price)!.label.toLowerCase()} a call</>}
+                    {s.q && <> for “{s.q}”</>}
+                  </>
+                }
+                clear={s.q || s.topic || s.network || s.price || s.all ? "/projects" : undefined}
+                after={
+                  s.q &&
+                  !s.all && (
+                    <p className="mt-4 text-sm text-muted">
+                      Not here? Search <Link href={href({ ...s, page: undefined, all: true })} className="underline hover:text-ink">all {(stats.categories.service ?? 0).toLocaleString("en")} paid services</Link>
+                      {ecosystemCount > 0 && (
+                        <>
+                          {" "}
+                          or <Link href={href({ view: "ecosystem", q: s.q })} className="underline hover:text-ink">the ecosystem</Link>
+                        </>
+                      )}
+                      .
+                    </p>
+                  )
+                }
+              />
+            </section>
+          </div>
         </>
       )}
     </div>
   );
 }
 
-function NumberTile({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="bg-bg px-4 py-3">
-      <dd className="heading text-2xl sm:text-3xl">{value}</dd>
-      <dt className="mt-0.5 text-xs text-muted">{label}</dt>
-    </div>
-  );
-}
-
-function ApiCard({ g, className = "" }: { g: AutonomoApi; className?: string }) {
-  return (
-    <li className={className}>
-      <Link href={`/projects/${g.projectSlug}`} className="flex h-full gap-3 rounded-md border border-line bg-bg p-3 hover:border-faint">
-        <Avatar name={g.name} src={g.logoUrl} />
-        <span className="min-w-0">
-          <span className="block truncate font-medium">{g.name}</span>
-          <span className="mt-0.5 line-clamp-2 text-xs text-muted">{g.description}</span>
-          <span className="mt-1.5 block font-mono text-xs">
-            {g.acceptUsdg ? `${formatUsd(g.priceUsd)} USDG` : ""}
-            {g.acceptUsdg && g.autonomoAmount ? " · " : ""}
-            {g.autonomoAmount ? `${Number(g.autonomoAmount).toLocaleString("en")} ${TOKEN.symbol} (${AUTONOMO_DISCOUNT_LABEL})` : ""}
-          </span>
-          {offersBase(g) && <span className="mt-0.5 block font-mono text-xs text-muted">{formatUsd(g.priceUsd)} USDC on Base</span>}
-        </span>
-      </Link>
-    </li>
-  );
-}
-
-/** The Autonomo tab: every Autonomo API on its shelf, as the Explore page showed them before the strip. */
+/** The Autonomo tab: every Autonomo API on its shelf. */
 function AutonomoShelves({ apis }: { apis: AutonomoApi[] }) {
   if (!apis.length) {
     return <p className="mt-8 rounded-lg border border-dashed border-line p-10 text-center text-muted">No Autonomo APIs are live right now.</p>;
@@ -242,125 +338,164 @@ function AutonomoShelves({ apis }: { apis: AutonomoApi[] }) {
   );
 }
 
-type SearchResult = Awaited<ReturnType<typeof searchProjects>>;
-type Stats = Awaited<ReturnType<typeof getStats>>;
-
-/** The directory list, with its heading, chain filter, sorting and pages. */
-function Directory({ query, result, stats, noteTags }: { query: ProjectQuery; result: SearchResult; stats: Stats; noteTags: boolean }) {
-  const pages = Math.max(1, Math.ceil(result.total / result.limit));
-  const sorts: Sort[] = query.q ? ["relevance", "popular", "new", "price", "name"] : ["popular", "new", "price", "name"];
-  const filtered = !!(query.q || query.category || query.network);
-  const onlyNetwork = !!query.network && !query.q && !query.category;
-  const topNetworks = stats.networks.slice(0, TOP_NETWORKS);
-  const moreNetworks = stats.networks.slice(TOP_NETWORKS);
-  const activeInMore = moreNetworks.some((n) => n.network === query.network);
-  const heading = query.q ? "Results" : query.category ? `All ${CATEGORY_INFO[query.category].plural.toLowerCase()}` : "All x402 APIs";
+/** The filters of the "All APIs" tab. Each is a link, so a filter works without scripts and has its own address. */
+function Filters({ s, facets, liveTotal }: { s: State; facets: DirectoryFacets; liveTotal: number }) {
+  // Picking a filter that's already on turns it off.
+  const to = (patch: Partial<State>) => href({ ...s, page: undefined, ...patch });
+  const topics = [...TOPICS].sort((a, b) => (facets.topics[b.id] ?? 0) - (facets.topics[a.id] ?? 0));
+  const top = facets.networks.filter((n, i) => i < TOP_NETWORKS || n.network === TOKEN.network);
+  const more = facets.networks.filter((n) => !top.includes(n));
 
   return (
-    <>
-      <div className="mt-10 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line pb-3">
-        <h2 className="heading text-2xl sm:text-3xl">{heading}</h2>
-        <span className="text-sm text-muted">
-          <span className="font-mono text-ink">{result.total.toLocaleString("en")}</span>{" "}
-          {/* A project can accept several chains, so a chain's count is a share of the directory, not a slice of it. */}
-          {onlyNetwork && <>of {stats.projects.toLocaleString("en")} </>}
-          {result.total === 1 && !onlyNetwork ? "project" : "projects"}
-          {query.network && <> {onlyNetwork ? "accept" : "on"} {networkLabel(query.network)}</>}
-          {query.q && <> for “{query.q}”</>}
-          {noteTags && <> · Autonomo&apos;s own are tagged</>}
-        </span>
+    <div className="space-y-6">
+      <FilterGroup title="Activity">
+        <Option active={!s.all} href={to({ all: s.all ? undefined : true })} label="Paid calls in the last 30 days" count={liveTotal} />
+      </FilterGroup>
+      <FilterGroup title="Topic">
+        {topics.map((t) => (
+          <Option key={t.id} active={s.topic === t.id} href={to({ topic: s.topic === t.id ? undefined : t.id })} label={t.label} count={facets.topics[t.id] ?? 0} />
+        ))}
+      </FilterGroup>
+      <div>
+        <FilterGroup title="Chain">
+          {top.map((n) => (
+            <Option key={n.network} active={s.network === n.network} href={to({ network: s.network === n.network ? undefined : n.network })} label={networkLabel(n.network)} count={n.count} />
+          ))}
+        </FilterGroup>
+        {more.length > 0 && (
+          <details className="mt-1" open={more.some((n) => n.network === s.network)}>
+            <summary className="cursor-pointer py-1 text-muted hover:text-ink">{more.length} more chains</summary>
+            <ul>
+              {more.map((n) => (
+                <Option key={n.network} active={s.network === n.network} href={to({ network: s.network === n.network ? undefined : n.network })} label={networkLabel(n.network)} count={n.count} />
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
+      <FilterGroup title="Price per call">
+        {PRICE_BANDS.map((b) => (
+          <Option key={b.id} active={s.price === b.id} href={to({ price: s.price === b.id ? undefined : b.id })} label={b.label} count={facets.prices[b.id] ?? 0} />
+        ))}
+      </FilterGroup>
+      <p className="text-xs text-faint">An API can be in several topics and take payment on several chains, so the counts overlap.</p>
+    </div>
+  );
+}
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[12rem_1fr]">
-        <aside className="text-sm">
-          <h2 className="mb-2 text-xs font-medium tracking-wide text-faint uppercase">Chain</h2>
-          <ul className="flex flex-wrap gap-1 lg:block lg:space-y-0.5">
-            <FilterLink active={!query.network} href={href(query, { network: undefined })} label="Any chain" />
-            {topNetworks.map((n) => (
-              <FilterLink
-                key={n.network}
-                active={query.network === n.network}
-                href={href(query, { network: n.network })}
-                label={networkLabel(n.network)}
-                count={n.count}
-              />
-            ))}
-          </ul>
-          {moreNetworks.length > 0 && (
-            <details className="mt-1 lg:mt-2" open={activeInMore}>
-              <summary className="cursor-pointer rounded px-2 py-1 text-muted hover:text-ink">
-                {moreNetworks.length} more chains
-              </summary>
-              <ul className="mt-1 flex flex-wrap gap-1 lg:block lg:space-y-0.5">
-                {moreNetworks.map((n) => (
-                  <FilterLink
-                    key={n.network}
-                    active={query.network === n.network}
-                    href={href(query, { network: n.network })}
-                    label={networkLabel(n.network)}
-                    count={n.count}
-                  />
-                ))}
-              </ul>
-            </details>
+function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="mb-1.5 text-xs font-medium tracking-wide text-faint uppercase">{title}</h2>
+      <ul>{children}</ul>
+    </div>
+  );
+}
+
+/** One filter choice, drawn as a tick box with how many APIs it holds. */
+function Option({ href, label, count, active }: { href: string; label: string; count: number; active: boolean }) {
+  return (
+    <li>
+      <Link href={href} aria-current={active ? "true" : undefined} className={`flex items-center gap-2 py-1 ${active ? "text-ink" : "text-muted hover:text-ink"}`}>
+        <span aria-hidden className={`grid size-3.5 shrink-0 place-items-center rounded-sm border ${active ? "border-brand bg-brand text-on-brand" : "border-faint"}`}>
+          {active && (
+            <svg viewBox="0 0 12 12" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m2.5 6.5 2.5 2.5 4.5-5.5" />
+            </svg>
           )}
-          <p className="mt-3 px-2 text-xs text-faint">Many projects accept several chains, so these counts overlap.</p>
-        </aside>
+        </span>
+        <span className="min-w-0 flex-1">{label}</span>
+        <span className="font-mono text-xs text-faint">{count.toLocaleString("en")}</span>
+      </Link>
+    </li>
+  );
+}
 
-        <section className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted">
-              {filtered && (
-                <Link href="/projects" className="underline hover:text-ink">
+type SearchResult = Awaited<ReturnType<typeof searchProjects>>;
+
+const Count = ({ n }: { n: number }) => <span className="font-mono font-medium text-ink">{n.toLocaleString("en")}</span>;
+
+/** A list of projects with what it shows, its sorting and its pages. */
+function Results({
+  s,
+  result,
+  sorts,
+  summary,
+  clear,
+  before,
+  after,
+}: {
+  s: State;
+  result: SearchResult;
+  sorts: Sort[];
+  summary: React.ReactNode;
+  /** Where "Clear filters" goes, when there is something to clear. */
+  clear?: string;
+  before?: React.ReactNode;
+  after?: React.ReactNode;
+}) {
+  const pages = Math.max(1, Math.ceil(result.total / result.limit));
+  return (
+    <>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {before}
+          <p className="text-sm text-muted">
+            {summary}
+            {clear && (
+              <>
+                {" · "}
+                <Link href={clear} className="underline hover:text-ink">
                   Clear filters
                 </Link>
-              )}
-            </p>
-            <div className="flex flex-wrap gap-1 text-sm">
-              {sorts.map((s) => (
-                <Link
-                  key={s}
-                  href={href(query, { sort: s })}
-                  aria-current={result.sort === s ? "true" : undefined}
-                  className={`rounded-md px-2.5 py-1 ${result.sort === s ? "bg-ink text-bg" : "text-muted hover:bg-surface"}`}
-                >
-                  {SORT_LABELS[s]}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {result.rows.length ? (
-            <ProjectList rows={result.rows} />
-          ) : (
-            <div className="rounded-lg border border-dashed border-line p-10 text-center text-muted">
-              <p>Nothing matches these filters.</p>
-              <p className="mt-2 text-sm">
-                <Link href="/projects" className="underline">Clear filters</Link> or{" "}
-                <Link href="/dashboard" className="underline">launch your API</Link>.
-              </p>
-            </div>
-          )}
-
-          {pages > 1 && (
-            <nav className="mt-6 flex items-center justify-between text-sm" aria-label="Pagination">
-              {result.page > 1 ? (
-                <Link href={href(query, { page: result.page - 1 })} className="rounded-md border border-line px-3 py-1.5 hover:bg-surface">
-                  ← Previous
-                </Link>
-              ) : <span />}
-              <span className="text-faint">
-                Page <span className="font-mono">{result.page}</span> of <span className="font-mono">{pages.toLocaleString("en")}</span>
-              </span>
-              {result.page < pages ? (
-                <Link href={href(query, { page: result.page + 1 })} className="rounded-md border border-line px-3 py-1.5 hover:bg-surface">
-                  Next →
-                </Link>
-              ) : <span />}
-            </nav>
-          )}
-        </section>
+              </>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1 text-sm">
+          {sorts.map((sort) => (
+            <Link
+              key={sort}
+              href={href({ ...s, page: undefined, sort })}
+              aria-current={result.sort === sort ? "true" : undefined}
+              className={`rounded-md px-2.5 py-1 ${result.sort === sort ? "bg-ink text-bg" : "text-muted hover:bg-surface"}`}
+            >
+              {SORT_LABELS[sort]}
+            </Link>
+          ))}
+        </div>
       </div>
+
+      {result.rows.length ? (
+        <ProjectList rows={result.rows} />
+      ) : (
+        <div className="rounded-lg border border-dashed border-line p-10 text-center text-muted">
+          <p>Nothing matches these filters.</p>
+          <p className="mt-2 text-sm">
+            <Link href={clear ?? "/projects"} className="underline">Clear filters</Link> or{" "}
+            <Link href="/dashboard" className="underline">launch your API</Link>.
+          </p>
+        </div>
+      )}
+      {after}
+
+      {pages > 1 && (
+        <nav className="mt-6 flex items-center justify-between text-sm" aria-label="Pagination">
+          {result.page > 1 ? (
+            <Link href={href({ ...s, page: result.page - 1 })} className="rounded-md border border-line px-3 py-1.5 hover:bg-surface">
+              ← Previous
+            </Link>
+          ) : <span />}
+          <span className="text-faint">
+            Page <span className="font-mono">{result.page}</span> of <span className="font-mono">{pages.toLocaleString("en")}</span>
+          </span>
+          {result.page < pages ? (
+            <Link href={href({ ...s, page: result.page + 1 })} className="rounded-md border border-line px-3 py-1.5 hover:bg-surface">
+              Next →
+            </Link>
+          ) : <span />}
+        </nav>
+      )}
     </>
   );
 }
@@ -376,24 +511,25 @@ function Tab({ href, label, count, active }: { href: string; label: string; coun
         }`}
       >
         {label}
-        {count !== undefined && <span className="font-mono text-xs text-faint">{compact(count)}</span>}
+        {count !== undefined && <span className="font-mono text-xs text-faint">{count.toLocaleString("en")}</span>}
       </Link>
     </li>
   );
 }
 
-function FilterLink({ href, label, count, active }: { href: string; label: string; count?: number; active: boolean }) {
+/** A kind of project on the Ecosystem tab. */
+function Chip({ href, label, count, active }: { href: string; label: string; count: number; active: boolean }) {
   return (
     <li>
       <Link
         href={href}
-        aria-current={active ? "page" : undefined}
-        className={`flex justify-between gap-3 rounded px-2 py-1 ${
-          active ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"
-        } max-lg:border max-lg:border-line`}
+        aria-current={active ? "true" : undefined}
+        className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 ${
+          active ? "border-ink font-medium text-ink" : "border-line text-muted hover:text-ink"
+        }`}
       >
-        <span>{label}</span>
-        {count !== undefined && <span className="font-mono text-xs text-faint">{compact(count)}</span>}
+        {label}
+        <span className="font-mono text-xs text-faint">{count}</span>
       </Link>
     </li>
   );

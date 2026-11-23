@@ -52,8 +52,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The page behind the open phone menu stays still. */
-html:has(dialog.site-menu[open]) {
+/* The page behind the open phone menu, or the Explore page's filter sheet, stays still. */
+html:has(dialog.site-menu[open]),
+html:has(dialog.filter-sheet[open]) {
   overflow: hidden;
 }
 
