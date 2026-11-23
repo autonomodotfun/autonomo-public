@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { runAgent } from "@/lib/agent";
 import { exampleQuestion } from "@/lib/playground";
 import { listAutonomoGateways } from "@/lib/queries";
+import { isRetired } from "@/lib/retired";
 import { editMessage, esc, freeDaily, Progress, recordAnswer, sendMessage, telegramEnabled, usedToday, validSecret } from "@/lib/telegram";
 
 // Telegram webhook for the Autonomo agent bot. Telegram posts every update here with our secret header; we
@@ -116,8 +117,11 @@ async function handle(msg: TgMessage) {
   await push(true, left === null ? "" : `Free answers left today: ${left} of ${freeDaily()}`);
 }
 
+/** The APIs the agent uses: listed and payable in $AUTONOMO, without the retired ones it no longer picks. */
+const agentApis = async () => (await listAutonomoGateways()).filter((g) => !isRetired(g.slug));
+
 async function sendHelp(chatId: number, replyTo: number) {
-  const apis = await listAutonomoGateways();
+  const apis = await agentApis();
   const examples = apis.slice(0, 4).map((g) => `• <code>${esc(exampleQuestion(g.slug, g.name))}</code>`).join("\n");
   const html = [
     "🤖 <b>Autonomo Agent</b>",
@@ -131,7 +135,7 @@ async function sendHelp(chatId: number, replyTo: number) {
 }
 
 async function sendApis(chatId: number, replyTo: number) {
-  const apis = await listAutonomoGateways();
+  const apis = await agentApis();
   if (!apis.length) return sendMessage(chatId, "No APIs are live right now.", { replyTo });
   const lines = apis.map(
     (g) => `• <b>${esc(g.name)}</b>: ${Number(g.autonomoAmount).toLocaleString("en-US")} $AUTONOMO per call\n  <code>${esc(exampleQuestion(g.slug, g.name))}</code>`,

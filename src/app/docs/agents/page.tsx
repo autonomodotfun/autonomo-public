@@ -54,8 +54,9 @@ client.register("eip155:*", new ExactEvmScheme(signer));
 
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 
+// Token Lookup: the price of any token by its address, here ${TOKEN.symbol}.
 // Pays automatically when the API answers 402, then retries.
-const res = await fetchWithPayment("${SITE}/x/token-price/price/autonomo");
+const res = await fetchWithPayment("${SITE}/x/token-lookup/price/${TOKEN.address}");
 console.log(await res.json());`;
 
 export default function AgentsGuidePage() {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TOKEN } from "@/lib/constants";
 
 // The official APIs as typed tools for the AI agent. The model only fills in validated inputs: our code builds the
 // URL, so it can never choose a host, a payee or a price.
@@ -53,15 +54,9 @@ function holdersForModel(data: unknown) {
 const spec = <S extends z.ZodObject>(s: ToolSpec<S>) => s as unknown as ToolSpec<z.ZodObject>;
 
 export const AGENT_TOOLS: Record<string, ToolSpec<z.ZodObject>> = {
-  token_price: spec({
-    slug: "token-price",
-    description: "Current USD and ETH price of $AUTONOMO, from its last on-chain trade. For any other token use token_lookup.",
-    input: z.strictObject({}),
-    path: () => "/price/autonomo",
-  }),
   token_lookup: spec({
     slug: "token-lookup",
-    description: "Current price of any Robinhood Chain token, by contract address.",
+    description: `Current price of any Robinhood Chain token, by contract address. $AUTONOMO is ${TOKEN.address}.`,
     input: z.strictObject({ address: address.describe("Token contract address") }),
     path: ({ address }) => `/price/${address.toLowerCase()}`,
   }),

@@ -70,7 +70,7 @@ test("find lists matches without a wallet, as text or JSON", async () => {
 
 test("each shortcut goes straight to its API and path", async () => {
   const cases = [
-    [["price"], "/x/token-price/price/autonomo"],
+    [["price"], "/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96"],
     [["price", ADDR], `/x/token-lookup/price/${ADDR}`],
     [["launches"], "/x/new-launches/launches?limit=10"],
     [["launches", "5"], "/x/new-launches/launches?limit=5"],

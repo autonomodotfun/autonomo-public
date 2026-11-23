@@ -14,8 +14,7 @@ const HOST = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun").replac
 
 // The APIs Autonomo runs itself (official-apis/tools). Each sits behind its own gateway at /x/<slug>.
 const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }[] = [
-  { name: "Token Price", slug: "token-price", path: "/price/autonomo", about: `The live ${TOKEN.symbol} price` },
-  { name: "Token Lookup", slug: "token-lookup", path: "/price/<token>", about: "Price and market cap of any Robinhood Chain launchpad token, from its bonding curve or, after graduation, its Uniswap v4 pool" },
+  { name: "Token Lookup", slug: "token-lookup", path: "/price/<token>", about: `Price and market cap of any Robinhood Chain launchpad token, from its bonding curve or, after graduation, its Uniswap v4 pool. For ${TOKEN.symbol}, use ${TOKEN.address}` },
   { name: "New Launches", slug: "new-launches", path: "/launches?limit=10", about: "The newest launchpad tokens: age, buys, sells, market cap and curve progress" },
   { name: "Risk Checker", slug: "token-risk", path: "/risk/<token>", about: "A rug-risk score from holder concentration, the creator, launch-block buyers and bot volume" },
   { name: "Tx Explainer", slug: "tx-explainer", path: "/tx/<hash>", about: "A Robinhood Chain transaction in plain English: launches, buys, sells, transfers and fee" },

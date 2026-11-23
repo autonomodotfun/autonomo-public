@@ -107,7 +107,8 @@ const usage = (message: string): never => {
  */
 const SHORTCUTS: Record<string, (args: string[]) => { slug: string; path: string; chain?: boolean }> = {
   price: ([token]) => {
-    if (token === undefined) return { slug: "token-price", path: "/price/autonomo" };
+    // $AUTONOMO is a Robinhood Chain token, so on its own price takes no --chain.
+    if (token === undefined) return { slug: "token-lookup", path: `/price/${TOKENS.autonomo.address}` };
     if (!ADDRESS.test(token)) usage("price takes a token contract address (0x and 40 hex characters), or nothing for $AUTONOMO.");
     return { slug: "token-lookup", path: `/price/${token}`, chain: true };
   },

@@ -39,7 +39,7 @@ const arg = (name, fallback) => {
 };
 const flag = (name) => argv.includes(`--${name}`);
 const PAY = arg("pay", "usdg").toLowerCase();
-const TARGET = arg("url", ENV.GATEWAY_URL || "https://autonomo.fun/x/token-price/price/autonomo");
+const TARGET = arg("url", ENV.GATEWAY_URL || "https://autonomo.fun/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96");
 const JSON_MODE = flag("json");
 const QUOTE_ONLY = flag("quote");
 

@@ -47,13 +47,8 @@ const bothChains = {
   querySchema: { properties: { chain: chainInput("the token is only there") } },
 };
 
+// Token Price (token-price) is retired and has no listing: Token Lookup answers for $AUTONOMO and any other token.
 export const BAZAAR_LISTINGS: Record<keyof typeof EXAMPLES, Listing> = {
-  "token-price": {
-    routeTemplate: "/x/token-price/price/autonomo",
-    description:
-      "The live price of $AUTONOMO, the Autonomo launchpad token on Robinhood Chain, in USD and ETH, with its market cap and the latest trade. Read from the token's Uniswap v4 pool; ETH/USD from Chainlink.",
-    tags: ["price", "token", "robinhood-chain", "autonomo"],
-  },
   "token-lookup": {
     routeTemplate: "/x/token-lookup/price/:token",
     description:

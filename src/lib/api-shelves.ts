@@ -2,6 +2,7 @@
 // Explore page, the Official APIs docs page, the Playground and /llms.txt all group from this one list, so they can't
 // drift apart. A new official API needs one line in SHELF_OF; one that isn't listed there lands on "Other tools".
 // APIs other teams built and launched on Autonomo go on their own shelf, by owner, so a new one needs no change here.
+import { isRetired } from "@/lib/retired";
 import { OFFICIAL_OWNER } from "@/lib/track-record";
 
 export type ShelfId = "tokens" | "wallets" | "transactions" | "web" | "partners" | "other" | "creators";
@@ -22,7 +23,6 @@ export const SHELVES: Shelf[] = [
 const SHELF_OF: Record<string, ShelfId> = {
   "new-launches": "tokens",
   "token-lookup": "tokens",
-  "token-price": "tokens",
   "token-risk": "tokens",
   "holders-bundles": "tokens",
   "safe-swap": "tokens",
@@ -47,8 +47,8 @@ export function shelfOf(api: { slug: string; owner?: string | null }): ShelfId {
   return SHELF_OF[api.slug] ?? "other";
 }
 
-/** Sorts APIs onto their shelves, in shelf order, leaving out shelves with nothing on them. Creator APIs keep the
- * order they came in (the oldest first, from listAutonomoGateways). */
+/** Sorts APIs onto their shelves, in shelf order, leaving out retired APIs (src/lib/retired.ts) and shelves with nothing
+ * on them. Creator APIs keep the order they came in (the oldest first, from listAutonomoGateways). */
 export function shelve<T extends { slug: string; owner?: string | null }>(apis: T[]): { shelf: Shelf; apis: T[] }[] {
   const rank = (slug: string) => {
     const i = ORDER.indexOf(slug);
@@ -56,6 +56,6 @@ export function shelve<T extends { slug: string; owner?: string | null }>(apis: 
   };
   return SHELVES.map((shelf) => ({
     shelf,
-    apis: apis.filter((a) => shelfOf(a) === shelf.id).sort((a, b) => rank(a.slug) - rank(b.slug)),
+    apis: apis.filter((a) => !isRetired(a.slug) && shelfOf(a) === shelf.id).sort((a, b) => rank(a.slug) - rank(b.slug)),
   })).filter((g) => g.apis.length > 0);
 }

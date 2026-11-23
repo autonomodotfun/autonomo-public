@@ -70,14 +70,25 @@ test("each new API's example question routes to that API, with the path it needs
     ["holders-bundles", "holders", "/holders/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96"],
     ["payment-check", "payment", "/payment/0x01295eba2c428270708417f658d9a4a2f0fb08bfecd1d1229e0b0752c7bfd612"],
     ["gas-now", "gas", "/gas"],
-    ["endpoint-health", "endpoint", `/endpoint?url=${encodeURIComponent("https://autonomo.fun/x/token-price")}`],
+    ["endpoint-health", "endpoint", `/endpoint?url=${encodeURIComponent("https://autonomo.fun/x/token-lookup")}`],
     ["website-check", "website", `/site?url=${encodeURIComponent("autonomo.fun")}`],
+    ["token-lookup", "lookup", "/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96"],
   ];
   for (const [slug, keyword, path] of cases) {
     const question = exampleQuestion(slug, slug);
     assert.ok(intentKeywords(question).includes(keyword), `${slug}: "${question}" → ${intentKeywords(question).join(", ")}`);
     assert.equal(gatewayPath(slug, question), path, slug);
   }
+});
+
+test("the $AUTONOMO price goes to Token Lookup with its address; the retired Token Price is not used", () => {
+  for (const q of ["What's the current price of $AUTONOMO?", "price of autonomo", `Price of token ${TOKEN}`]) {
+    assert.ok(intentKeywords(q).includes("lookup"), `"${q}" → ${intentKeywords(q).join(", ")}`);
+  }
+  assert.equal(gatewayPath("token-lookup", "How much is $AUTONOMO?"), "/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96");
+  assert.equal(AGENT_TOOLS.token_price, undefined);
+  assert.ok(!Object.values(AGENT_TOOLS).some((t) => t.slug === "token-price"));
+  assert.equal(AGENT_TOOLS.token_lookup.path({ address: "0xE83C85E1EAD16FCFE85401E2B337FB4FB5B5CC96" }), "/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96");
 });
 
 test("a safety question about a token still goes to the risk check, not the website check", () => {

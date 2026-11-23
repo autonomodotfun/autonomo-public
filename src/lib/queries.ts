@@ -1,11 +1,12 @@
 import "server-only";
-import { and, asc, desc, eq, gte, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { cache } from "react";
 import { getDb, schema } from "@/db";
 import { CATEGORIES, type Category } from "@/db/schema";
 import { TOKEN } from "@/lib/constants";
 import { retrySoon, untilLocalDbIsFree } from "@/lib/prerender";
+import { RETIRED_SLUGS } from "@/lib/retired";
 import { bondEnabled, readWalletBonds, type WalletBond } from "@/lib/bond";
 import { holdsMinimum } from "@/lib/verified";
 import { summarize, TRACK_RECORD_DAYS, type TrackRecord } from "@/lib/track-record";
@@ -155,7 +156,7 @@ async function searchProjectsFresh(query: ProjectQuery) {
   return { rows: rows as ProjectListItem[], total: count, page, limit, sort };
 }
 
-// Playground: listed, active Autonomo gateways that accept $AUTONOMO, best match first.
+// Playground: listed, active Autonomo gateways that accept $AUTONOMO, best match first. Retired ones are skipped.
 async function findAutonomoGatewaysFresh(keywords: string[], limit = 3) {
   const db = await getDb();
   if (!keywords.length) return [];
@@ -178,6 +179,7 @@ async function findAutonomoGatewaysFresh(keywords: string[], limit = 3) {
         eq(gateways.status, "active"),
         eq(projects.status, "approved"),
         sql`${gateways.autonomoAmount} is not null`,
+        notInArray(gateways.slug, [...RETIRED_SLUGS]),
         or(sql`${projects.search} @@ ${tsq}`, sql`${text} @@ ${tsq}`),
       ),
     )

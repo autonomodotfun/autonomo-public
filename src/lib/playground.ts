@@ -151,7 +151,6 @@ const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
     const target = linkIn(q) ?? q.replace(TX_HASH, " ").match(DOMAIN)?.[0] ?? null;
     return target && SITE_WORDS.test(q) ? `/site?url=${encodeURIComponent(target)}` : null;
   },
-  "token-price": () => "/price/autonomo",
   "new-launches": () => "/launches?limit=10",
   "token-risk": (q) => {
     const address = addressIn(q);
@@ -179,6 +178,7 @@ const GATEWAY_PATHS: Record<string, (question: string) => string | null> = {
 
 // The path to call after /x/<slug>, shown to outside agents (MCP server, /api/v1/gateways).
 export const GATEWAY_USAGE: Record<string, string> = {
+  // Retired and paused (src/lib/retired.ts): kept so /api/v1/gateways stays right about it if it's ever turned back on.
   "token-price": "/price/autonomo",
   "new-launches": "/launches?limit=10",
   "token-risk": "/risk/<token contract address>",
@@ -217,10 +217,9 @@ export const MISSING_INPUT: Record<string, string> = {
 
 // A question that shows off each known gateway; others get a generic one built from their name.
 const EXAMPLE_QUESTIONS: Record<string, string> = {
-  "token-price": "What's the current price of $AUTONOMO?",
   "new-launches": "What are the newest token launches?",
   "token-risk": "Is $AUTONOMO safe? Run a rug-risk check",
-  "token-lookup": `Price of token ${TOKEN.address}`,
+  "token-lookup": "What's the current price of $AUTONOMO?",
   "tx-explainer": "Explain transaction 0x7bd85b4da40a3cf8f5445faa3affac958661f33e4f3790abe288161af6615f07",
   "wallet-portfolio": "What does wallet 0xde87838695ba7151ae93ca24c96b2f5334f4988b hold?",
   "page-reader": "Read this page: https://autonomo.fun/docs",
@@ -230,7 +229,7 @@ const EXAMPLE_QUESTIONS: Record<string, string> = {
   "holders-bundles": "Who holds $AUTONOMO? Check holders, bundles and snipers",
   "payment-check": "Did this payment settle? 0x01295eba2c428270708417f658d9a4a2f0fb08bfecd1d1229e0b0752c7bfd612",
   "gas-now": "What does gas cost on Robinhood Chain right now?",
-  "endpoint-health": "Is this x402 endpoint up and payable? https://autonomo.fun/x/token-price",
+  "endpoint-health": "Is this x402 endpoint up and payable? https://autonomo.fun/x/token-lookup",
   "website-check": "Is the website autonomo.fun safe?",
 };
 
@@ -265,7 +264,8 @@ export function intentKeywords(question: string) {
   else if (aboutToken && HOLDER_WORDS.test(question)) extra.push("holders", "bundles", "snipers");
   else if (/\b(safe|rug|risk|scam|legit)\b/i.test(question)) extra.push("risk", "rug");
   else if (hasAddress && /\b(wallet|portfolio|holdings?|holds?|balances?|owns?)\b/i.test(question)) extra.push("wallet", "portfolio");
-  else if (hasAddress) extra.push("token", "price", "lookup");
+  // A token by address, or $AUTONOMO by name, with nothing more specific asked: its price, from Token Lookup.
+  else if (aboutToken) extra.push("token", "price", "lookup");
   return extra;
 }
 

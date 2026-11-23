@@ -5,7 +5,6 @@ $AUTONOMO or USDG, and the Agent Playground and the Telegram bot use them to ans
 
 | API | Gateway | Upstream |
 | --- | --- | --- |
-| Token Price | `autonomo.fun/x/token-price` | `tools/` → `/v1/price/autonomo` |
 | New Launches | `autonomo.fun/x/new-launches` | `tools/` → `/v1/launches` |
 | Risk Checker | `autonomo.fun/x/token-risk` | `tools/` → `/v1/risk/<token>` |
 | Token Lookup | `autonomo.fun/x/token-lookup` | `tools/` → `/v1/price/<token>` |
@@ -19,8 +18,13 @@ $AUTONOMO or USDG, and the Agent Playground and the Telegram bot use them to ans
 | Website Check | `autonomo.fun/x/website-check` | `tools/` → `/v1/site?url=…` |
 | Page Reader | `autonomo.fun/x/page-reader` | `tools/` → `/v1/page?url=…` |
 
-All thirteen are served by one Vercel project, [`tools/`](tools/) (tools.autonomo.fun). Details and safety limits are
+All twelve are served by one Vercel project, [`tools/`](tools/) (tools.autonomo.fun). Details and safety limits are
 in its README.
+
+Token Price (`autonomo.fun/x/token-price`) was retired on Nov 23, 2026: Token Lookup answers the same for $AUTONOMO at
+`autonomo.fun/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96`. Its gateway is paused and answers
+410 with that address (`src/lib/retired.ts`); the gateway row and its upstream route stay, so it can be turned back on
+from /admin.
 
 ## Adding a new official API
 

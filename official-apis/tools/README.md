@@ -5,7 +5,7 @@ All gateways use the same upstream base, `https://tools.autonomo.fun/v1`, and th
 
 | Gateway slug | Upstream path | What it returns |
 | --- | --- | --- |
-| `token-price` | `/v1/price/autonomo` | The live $AUTONOMO price (same as token-lookup for $AUTONOMO) |
+| `token-price` (retired) | `/v1/price/autonomo` | The live $AUTONOMO price. Retired Nov 23, 2026: use `token-lookup` with $AUTONOMO's address, `0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96`. Its gateway is paused; the route stays so it can be turned back on |
 | `new-launches` | `/v1/launches?limit=10&chain=robinhood\|base` | The newest Robinhood Chain launchpad tokens: age, buys, sells, market cap, curve progress. With `chain=base`: the newest Clanker and Zora launches, with price, market cap, main pool and 24 h trades from DexScreener |
 | `token-risk` | `/v1/risk/<token>?chain=robinhood\|base` | Rug-risk score: holder concentration, creator, launch-block buyers, bot volume. Reads Base too: with `chain=base`, or on its own when the token is only there |
 | `token-lookup` | `/v1/price/<token>?chain=robinhood\|base` | Live price and market cap of any Robinhood Chain launchpad token, from its bonding curve or, once it has graduated, its launchpad Uniswap v4 pool (USDG and WETH too). On Base: its deepest DexScreener pool, with what the pool holds in ETH or USDC; finds a Base token on its own |

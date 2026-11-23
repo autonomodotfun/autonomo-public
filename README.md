@@ -3,7 +3,7 @@
 The agentic x402 launchpad for APIs. Launch an endpoint with an x402 price and AI agents can discover it and pay per call. Autonomo also tracks the ecosystem around it: facilitators, SDKs, extensions and explorers. User-facing docs are at `/docs`.
 
 - **Hosted gateways** (`/dashboard`, `/x/<slug>`): owners put an existing API behind x402, paid in USDG or $AUTONOMO on Robinhood Chain. See below.
-- **Official APIs** run by Autonomo itself (token price and lookup, new launches, risk checker, tx explainer, wallet portfolio, page reader), each behind its own gateway. Source in [`official-apis/`](official-apis/).
+- **Official APIs** run by Autonomo itself (token lookup, new launches, risk checker, tx explainer, wallet portfolio, page reader), each behind its own gateway. Source in [`official-apis/`](official-apis/).
 - **MCP server** (`autonomo-mcp` on npm, source in [`mcp/`](mcp/)): Claude, Cursor, Codex and other MCP clients find Autonomo APIs and pay per call.
 - **Agent Playground** (`/playground`) and the **Telegram bot** ([@autonomoagentbot](https://t.me/autonomoagentbot), webhook at `/api/telegram`): an agent that answers questions by paying the official APIs in $AUTONOMO from its own wallet.
 - **Paid services** are imported from facilitator discovery ("Bazaar") endpoints (Coinbase CDP and PayAI) and grouped into one project per host, with price, network, facilitator and 30-day usage for every endpoint. Refreshed every 3 days by a Vercel cron (`/api/cron/import`).

@@ -9,6 +9,7 @@ import { forward, gatewayOffers, getGateway, isOfficial, recordCall, payeeOf } f
 import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/gloam";
 import { GLOAM_USDG, GLOAM_VAULT } from "@/lib/gloam-check";
 import { acceptsFor, railForAsset, x402Server } from "@/lib/payments";
+import { retiredAnswer } from "@/lib/retired";
 
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
 // Payments go to the owner's wallet, or to its burn splitter when burning is on (src/lib/burn.ts); the upstream is
@@ -86,6 +87,9 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
   }
   if (!g) return withHeaders(Response.json({ error: "not_found" }, { status: 404 }));
   if (g.status !== "active") {
+    // A retired API points to the one that replaced it (src/lib/retired.ts).
+    const retired = retiredAnswer(g.slug, process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin);
+    if (retired) return withHeaders(retired, slug);
     return withHeaders(Response.json({ error: "gateway_paused", message: "This API is paused by its owner." }, { status: 503 }), slug);
   }
   if (!x402Server() || gatewayOffers(g).length === 0) {

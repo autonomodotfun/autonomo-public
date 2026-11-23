@@ -28,12 +28,21 @@ test("an API another team owns is a creator API, even with an official slug", ()
 test("creator APIs come last, in the order they came in", () => {
   const apis = [
     { slug: "stoa-safety", owner: CREATOR },
-    { slug: "token-price", owner: OFFICIAL_OWNER },
+    { slug: "token-lookup", owner: OFFICIAL_OWNER },
     { slug: "stoa-quote", owner: CREATOR },
     { slug: "safe-swap", owner: OFFICIAL_OWNER },
   ];
   const shelves = shelve(apis);
   assert.deepEqual(shelves.map((s) => s.shelf.id), ["tokens", "creators"]);
-  assert.deepEqual(shelves[0].apis.map((a) => a.slug), ["token-price", "safe-swap"]);
+  assert.deepEqual(shelves[0].apis.map((a) => a.slug), ["token-lookup", "safe-swap"]);
   assert.deepEqual(shelves[1].apis.map((a) => a.slug), ["stoa-safety", "stoa-quote"]);
+});
+
+test("a retired official API is left off the shelves while its gateway still answers", () => {
+  const apis = [
+    { slug: "token-price", owner: OFFICIAL_OWNER },
+    { slug: "token-lookup", owner: OFFICIAL_OWNER },
+  ];
+  assert.deepEqual(shelve(apis).flatMap((s) => s.apis.map((a) => a.slug)), ["token-lookup"]);
+  assert.deepEqual(shelve([{ slug: "token-price" }]), [], "the docs list, without owners, too");
 });

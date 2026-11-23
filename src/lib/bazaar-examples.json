@@ -1,22 +1,4 @@
 {
-  "token-price": {
-    "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
-    "name": "Autonomopad",
-    "symbol": "AUTONOMO",
-    "chain": "Robinhood Chain",
-    "priceUsd": 0.0001235184195783782,
-    "priceEth": 6.677429307022863e-8,
-    "marketCapUsd": 123518.4195783782,
-    "ethUsd": 1849.79,
-    "lastTrade": {
-      "side": "sell",
-      "time": "2026-11-16T14:38:44.000Z",
-      "tx": "0x1e219819d8f1f1ba5f7b30c67877cb6f4cb9e9b7edf9a667a70173f1c6fa7a48"
-    },
-    "explorer": "https://robinhoodchain.blockscout.com/token/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
-    "venue": "uniswap-v4",
-    "updatedAt": "2026-11-16T14:54:48.414Z"
-  },
   "token-lookup": {
     "token": "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96",
     "name": "Autonomopad",

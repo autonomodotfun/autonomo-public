@@ -15,7 +15,7 @@ import { listAutonomoGateways } from "@/lib/queries";
 //   6. Wallet Portfolio: the largest holder's wallet, when that isn't the creator.
 //
 // Then the model reads what came back and writes a few plain sentences. It gets no tools, so nothing it reads can
-// make the agent pay for more. Token Lookup and Token Price would only repeat Token Risk's market numbers, and New
+// make the agent pay for more. Token Lookup would only repeat Token Risk's market numbers, and New
 // Launches, Page Reader, Ostrapad Offer Finder, Payment Check, Gas Now, Endpoint Health and Website Check have nothing
 // to say about one token, so they aren't called.
 //
