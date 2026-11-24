@@ -111,3 +111,8 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
 A plain Vercel project. Every gateway's upstream is `https://tools.autonomo.fun/v1` with auth header `x-api-key` and
 the `TOOLS_API_KEY` value; the Agent Playground and the Telegram bot add the right path for each slug above.
 Deploy from this folder: `npx vercel deploy --prod`.
+
+Pushes to the repo deploy it too, but only when something it is built from changed: this folder (its README and
+tests aside) or the repo's `.vercelignore`. Other pushes are skipped by `ignore-build.sh`, and the deployment that
+is live stays in place. If a change here doesn't show up, look for "Canceled by Ignored Build Step" on its
+deployment in Vercel.
