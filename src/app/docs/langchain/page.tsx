@@ -7,7 +7,7 @@ import { Code, Page, Section, Step, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Use Autonomo from LangChain",
-  description: `LangChain tools for Python and TypeScript: an agent finds the right Autonomo API for its task, checks the price and pays for the call in USDG or ${TOKEN.symbol} on ${TOKEN.chainName}, within your limits.`,
+  description: `LangChain tools for Python and TypeScript: an agent finds the right Autonomo API for its task, checks the price and pays for the call in USDG or ${TOKEN.symbol} on ${TOKEN.chainName} or USDC on Base, within your limits.`,
 };
 
 // The examples on this page are the files in sdk/langchain/*/examples, which are checked against LangChain itself.
@@ -49,13 +49,13 @@ export default function LangChainGuidePage() {
       <p>
         <code>langchain-autonomo</code> gives a LangChain or LangGraph agent Autonomo&apos;s APIs as tools, in Python and
         TypeScript. You give the agent a task, and it finds the right API, checks the price and pays for the call itself,
-        in USDG or {TOKEN.symbol} on {TOKEN.chainName}. You don&apos;t write code for each API: an API listed on Autonomo
-        tomorrow works the same way.
+        in USDG or {TOKEN.symbol} on {TOKEN.chainName}, or in USDC on Base. You don&apos;t write code for each API: an
+        API listed on Autonomo tomorrow works the same way.
       </p>
       <Table
         rows={[
           ["Works with", <>LangChain and LangGraph, in Python (3.10 or later) and TypeScript (Node 20 or later)</>],
-          ["The agent needs", <>A wallet just for it, with a little USDG. Most APIs cost 0.01 USDG</>],
+          ["The agent needs", <>A wallet just for it, with a little USDG, or USDC on Base. Most APIs cost 0.01 of either</>],
           ["Built on", <>The <Link href="/docs/sdk">Autonomo SDK</Link>, so it pays and keeps to limits the same way</>],
         ]}
       />
@@ -68,8 +68,9 @@ export default function LangChainGuidePage() {
         <Step n={2} title="Make a wallet for the agent">
           <p>
             Make a <b>new wallet just for the agent</b> and send it only what it may spend: a dollar of USDG on{" "}
-            {TOKEN.chainName} covers about 100 calls. Paying in {TOKEN.symbol} also needs a little ETH once, for a
-            Permit2 approval. Then set its key, and your model provider&apos;s key, in the terminal:
+            {TOKEN.chainName} covers about 100 calls, and so does a dollar of USDC on Base, from the same wallet. Paying
+            in {TOKEN.symbol} also needs a little ETH once, for a Permit2 approval. Then set its key, and your model
+            provider&apos;s key, in the terminal:
           </p>
           <Code code={KEYS} lang="bash" />
         </Step>
@@ -99,7 +100,8 @@ export default function LangChainGuidePage() {
         <Step n={3} title="It pays and reads the answer">
           <p>
             It pays 0.01 USDG with a signed x402 payment and gets the report back with a receipt that links the payment on
-            Blockscout. Autonomo settles it on-chain and pays the gas. If the API fails, the payment doesn&apos;t settle,
+            Blockscout, or on Basescan when it paid in USDC on Base. The payment is settled on-chain for the agent,
+            which pays no gas. If the API fails, the payment doesn&apos;t settle,
             so the agent isn&apos;t charged.
           </p>
         </Step>
@@ -115,8 +117,8 @@ export default function LangChainGuidePage() {
       <Section title="Limits">
         <Table
           rows={[
-            ["Per call", <>The most one call may cost. Default 0.05 USDG or 5,000 {TOKEN.symbol}</>],
-            ["Per day", <>Per UTC day, shared with the SDK in <code>~/.autonomo/spend.json</code>. Default 1 USDG or 10,000 {TOKEN.symbol}</>],
+            ["Per call", <>The most one call may cost. Default 0.05 USDG or USDC, or 5,000 {TOKEN.symbol}</>],
+            ["Per day", <>Per UTC day, shared with the SDK in <code>~/.autonomo/spend.json</code>. Default 1 in USDG and USDC together, or 10,000 {TOKEN.symbol}</>],
             [<><code>max_calls</code> / <code>maxCalls</code></>, "Paid calls through one toolkit, then the tool stops. Default 10; None or null for no limit"],
             [<><code>max_output_chars</code> / <code>maxOutputChars</code></>, "Longer answers are cut before they reach the model. Default 20,000 characters"],
           ]}
@@ -143,7 +145,7 @@ export default function LangChainGuidePage() {
             Prefer APIs marked <Link href="/docs/token">Verified</Link> with a good track record. Autonomo lists outside
             creators&apos; APIs too, and doesn&apos;t vouch for each one. The find tool tells the model to prefer verified ones.
           </li>
-          <li>Each paid call is public on {TOKEN.chainName}: the wallet, the amount and the API it paid.</li>
+          <li>Each paid call is public on {TOKEN.chainName} or Base: the wallet, the amount and the API it paid.</li>
           <li>
             The packages are open source: <code>langchain-autonomo</code> on PyPI and npm. Their tests run offline against
             a fake Autonomo and pay nothing.

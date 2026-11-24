@@ -5,6 +5,27 @@ repo gets a copy of each release.
 
 ## November 24, 2026
 
+- **The agent tools pay in USDC on Base.** The SDK for TypeScript and Python, the CLI, the MCP server, the LangChain
+  tools and the elizaOS plugin could only pay on Robinhood Chain, while the APIs also take USDC on Base. They now pay
+  there too, from the same wallet key. There is a new token choice, `usdc`, next to `usdg` and `autonomo`
+  (`payWith`, `pay_with`, `--pay-with`, `AUTONOMO_PAY_WITH`), and left alone a call pays with the first the wallet
+  can afford: USDG, then $AUTONOMO, then USDC on Base. So a wallet that holds USDG pays exactly as before, and one
+  that holds only USDC on Base just works. USDG and USDC are both dollars, so they share the per-call cap and the
+  daily budget. Receipts say which chain was paid on, and link to Basescan for Base.
+- **See what the agent's wallet holds.** `balances()` in both SDKs, `npx autonomo-sdk wallet` in the CLI and a free
+  `wallet_status` tool in the MCP server show USDG, $AUTONOMO and ETH on Robinhood Chain and USDC on Base. They only
+  read.
+- **More in the CLI and the MCP server.** The CLI has shortcuts for the newer official APIs (`holders`, `dev`,
+  `payment`, `gas`, `site`, `health`, `jobs`) and `--chain base` for the ones that read a chain. The MCP server
+  picks the token itself by default, takes its per-call caps as settings (`AUTONOMO_MAX_USDG_PER_CALL`,
+  `AUTONOMO_MAX_AUTONOMO_PER_CALL`), and signs only what it checked: the same token, chain, amount and payee as in
+  the price it read.
+- **The guides cover Base.** The [quickstart](https://autonomo.fun/docs/quickstart), the
+  [CLI](https://autonomo.fun/docs/cli#base), [SDK](https://autonomo.fun/docs/sdk#pay-on-base),
+  [agents](https://autonomo.fun/docs/agents), [LangChain](https://autonomo.fun/docs/langchain) and
+  [elizaOS](https://autonomo.fun/docs/eliza) guides and [llms.txt](https://autonomo.fun/llms.txt) explain paying in
+  USDC on Base. Versions: `autonomo-sdk` 0.1.4 on npm, `autonomo` 0.1.2 on PyPI, `autonomo-mcp` 0.1.3,
+  `langchain-autonomo` 0.1.1 and `elizaos-plugin-autonomo` 0.1.1.
 - **A slow Safe Swap quote says when to come back.** When a token's checks are still running, the quote answers
   `503` with a `Retry-After: 60` header and `retry_after_seconds` in the body, instead of only a message. Gateways
   now pass an API's `Retry-After` header through to the caller, for every API.

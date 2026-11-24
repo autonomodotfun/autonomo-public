@@ -7,7 +7,7 @@ import { Code, Page, Section, Step, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Pay for APIs in one call with the SDK",
-  description: `The Autonomo SDK for TypeScript and Python: one call finds the right API, pays in USDG or ${TOKEN.symbol} on ${TOKEN.chainName}, privately through Gloam or on Borro credit, within your limits, and returns a receipt.`,
+  description: `The Autonomo SDK for TypeScript and Python: one call finds the right API, pays in USDG or ${TOKEN.symbol} on ${TOKEN.chainName} or USDC on Base, privately through Gloam or on Borro credit, within your limits, and returns a receipt.`,
 };
 
 // The examples on this page are the files in sdk/*/examples, which are type-checked and run against the live site.
@@ -55,13 +55,13 @@ export default function SdkGuidePage() {
     <Page title="Pay for APIs in one call with the SDK">
       <p>
         The Autonomo SDK gives your agent one function, <code>call</code>. Say what you need, and it finds the right API on
-        Autonomo, pays for it on {TOKEN.chainName} and returns the answer with a receipt. It works the same in TypeScript
-        and Python.
+        Autonomo, pays for it on {TOKEN.chainName} or on Base and returns the answer with a receipt. It works the same in
+        TypeScript and Python.
       </p>
       <Table
         rows={[
           ["Finds the API", "From your words and the kind of input: a token or wallet address, a transaction hash or a link"],
-          ["Pays", <>In USDG, or {TOKEN.symbol} when the wallet has no USDG</>],
+          ["Pays", <>In USDG or {TOKEN.symbol} on {TOKEN.chainName}, or USDC on Base, whichever the wallet can afford</>],
           ["Privately", "Through Gloam, so the payment doesn't link to your wallet"],
           ["On credit", "Borrows from a Borro credit line when the wallet is short of USDG"],
           ["Within limits", "A most-per-call and a daily budget, checked before anything is signed"],
@@ -76,15 +76,16 @@ export default function SdkGuidePage() {
           TypeScript needs Node 20 or later, Python 3.10 or later. The Python SDK is also on PyPI as <code>autonomo</code>;
           either way, you import it from <code>autonomo</code>. Make a <b>new wallet just for your agent</b> and keep only
           what it may spend in it. Most APIs cost 0.01 USDG, so 1 USDG is about 100 calls. Paying in {TOKEN.symbol} needs a
-          little ETH once, for a Permit2 approval.
+          little ETH once, for a Permit2 approval. USDC on Base works from the same wallet, at the same dollar price,
+          and like USDG it needs no ETH.
         </p>
       </Section>
 
       <Section title="Pay from the agent's wallet">
         <p>
-          The usual way. The SDK pays in USDG if the wallet has enough, and otherwise in {TOKEN.symbol}. Set{" "}
-          <code>payWith</code> (<code>pay_with</code> in Python) to <code>&quot;usdg&quot;</code> or{" "}
-          <code>&quot;autonomo&quot;</code> to use only one.
+          The usual way. The SDK pays with the first the wallet can afford: USDG, then {TOKEN.symbol}, then USDC on
+          Base. Set <code>payWith</code> (<code>pay_with</code> in Python) to <code>&quot;usdg&quot;</code>,{" "}
+          <code>&quot;autonomo&quot;</code> or <code>&quot;usdc&quot;</code> to use only one.
         </p>
         <Code code={example("typescript", "pay")} lang="TypeScript" />
         <Code code={example("python", "pay")} lang="Python" />
@@ -104,6 +105,33 @@ export default function SdkGuidePage() {
             charged.
           </p>
         </Step>
+      </Section>
+
+      <Section id="pay-on-base" title="Pay with USDC on Base">
+        <p>
+          Most APIs on Autonomo also take USDC on Base, at the same dollar price. Nothing new to set up: the same
+          wallet key signs for Base, and a wallet that holds only USDC there pays with it. Set <code>payWith</code> to{" "}
+          <code>&quot;usdc&quot;</code> to pay on Base whatever else the wallet holds.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <code>balances()</code> returns what the wallet holds on both chains: USDG, {TOKEN.symbol} and ETH on{" "}
+            {TOKEN.chainName}, and USDC on Base. It only reads.
+          </li>
+          <li>
+            USDG and USDC are both dollars, so they share the per-call cap and the daily budget. An agent can&apos;t spend
+            its budget twice across two chains.
+          </li>
+          <li>
+            The receipt&apos;s <code>route</code> is <code>usdc</code>, its <code>chain</code> is <code>Base</code> and its
+            link goes to Basescan. A Base payment is settled by Coinbase&apos;s x402 facilitator, which pays the gas.
+          </li>
+          <li>
+            An API that doesn&apos;t take Base is never paid there: with <code>&quot;usdc&quot;</code> set, the call is
+            refused with <code>cannot_pay</code> and nothing is signed.
+          </li>
+          <li>Gloam and Borro pay in USDG on {TOKEN.chainName}, so those two routes don&apos;t use Base.</li>
+        </ul>
       </Section>
 
       <Section id="pay-privately-with-gloam" title="Pay privately with Gloam">
@@ -168,7 +196,7 @@ export default function SdkGuidePage() {
       <Section title="Try every route yourself">
         <p>
           One script tries each way to pay with one small call to{" "}
-          <Link href="/projects/new-launches">New Launches</Link>: 0.01 USDG, or 100 {TOKEN.symbol}. Each command prints
+          <Link href="/projects/new-launches">New Launches</Link>: 0.01 USDG or USDC, or 100 {TOKEN.symbol}. Each command prints
           the receipt with its transaction link, so you can check what happened on-chain. It&apos;s capped at 0.02 USDG a
           call and 0.10 USDG a day. It runs on Node, which Gloam&apos;s server needs anyway; the Python examples above do
           the same things.
@@ -181,17 +209,18 @@ export default function SdkGuidePage() {
           </p>
           <Code code="node try-every-route.mjs quote" lang="bash" />
         </Step>
-        <Step n={2} title="Pay from a wallet: usdg and autonomo">
+        <Step n={2} title="Pay from a wallet: usdg, autonomo and usdc">
           <p>
-            Use a <b>new wallet</b> with a few cents in it: 0.01 USDG for <code>usdg</code>, and 100 {TOKEN.symbol} plus
-            a little ETH (once, for the Permit2 approval) for <code>autonomo</code>. Set its key in the terminal only,
-            never in a file you share or commit.
+            Use a <b>new wallet</b> with a few cents in it: 0.01 USDG for <code>usdg</code>, 100 {TOKEN.symbol} plus
+            a little ETH (once, for the Permit2 approval) for <code>autonomo</code>, and 0.01 USDC on Base for{" "}
+            <code>usdc</code>. Set its key in the terminal only, never in a file you share or commit.
           </p>
           <Code code={TRY_KEYS} lang="bash" />
-          <Code code={"node try-every-route.mjs usdg\nnode try-every-route.mjs autonomo"} lang="bash" />
+          <Code code={"node try-every-route.mjs usdg\nnode try-every-route.mjs autonomo\nnode try-every-route.mjs usdc"} lang="bash" />
           <p>
             On Blockscout, the token moves from your wallet to the API&apos;s payment address. Autonomo&apos;s facilitator
-            sends the transaction and pays the gas, so your wallet spends no ETH on it. Anyone can see this wallet paid.
+            sends the transaction and pays the gas, so your wallet spends no ETH on it. A <code>usdc</code> payment shows
+            on Basescan instead, sent by Coinbase&apos;s facilitator. Anyone can see this wallet paid.
           </p>
         </Step>
         <Step n={3} title="Pay privately: gloam">
@@ -272,9 +301,11 @@ export default function SdkGuidePage() {
             ["find [words] [input]", "List APIs, best matches first"],
             ["quote <words> [input]", "The API a call would use, and its prices"],
             ["call <words> [input]", "Find the right API, pay for one call, print the answer"],
-            ["price, launches, risk, tx, portfolio, read", "Shortcuts for the official APIs"],
+            ["price, launches, risk, holders, dev, tx, payment, portfolio, gas, read, site, health, jobs", "Shortcuts for the official APIs"],
             ["spend", "Today's spending against your limits"],
-            ["--max, --daily", "The USDG limits for this call. --max-autonomo and --daily-autonomo for $AUTONOMO"],
+            ["wallet", "What the wallet holds on Robinhood Chain and Base"],
+            ["--max, --daily", "The dollar limits for this call, in USDG and USDC together. --max-autonomo and --daily-autonomo for $AUTONOMO"],
+            ["--pay-with", "usdg, autonomo, usdc (on Base) or auto"],
             ["--private", "Pay from your private Gloam balance, with no wallet key"],
             ["--dry-run", "Show the price instead of paying"],
             ["--json", "One object on stdout: the answer and the receipt"],
@@ -321,8 +352,8 @@ export default function SdkGuidePage() {
         <Table
           mono
           rows={[
-            ["perCall / per_call", "Most for one call. Default 0.05 USDG and 5,000 AUTONOMO"],
-            ["daily", "Most per UTC day. Default 1 USDG and 10,000 AUTONOMO. Gloam and Borro payments count as USDG"],
+            ["perCall / per_call", "Most for one call. Default 0.05 USDG and 5,000 AUTONOMO. The USDG cap covers USDC on Base too"],
+            ["daily", "Most per UTC day. Default 1 USDG and 10,000 AUTONOMO. USDC on Base, Gloam and Borro payments count as USDG"],
           ]}
         />
         <p>
@@ -336,10 +367,10 @@ export default function SdkGuidePage() {
           mono
           rows={[
             ["api", "The API's slug and name"],
-            ["route", "usdg, autonomo, gloam or borro"],
-            ["amount, token", "What was paid"],
+            ["route", "usdg, autonomo, usdc, gloam or borro"],
+            ["amount, token, chain", "What was paid, and on which chain: Robinhood Chain or Base"],
             ["payer, payTo", 'The wallet, or "private (Gloam)", and the API\'s payment address'],
-            ["tx, explorer", "The payment transaction and its Blockscout link"],
+            ["tx, explorer", "The payment transaction and its link on Blockscout, or on Basescan for Base"],
             ["borrowTxs, approveTx", "Borro borrows and the one-time Permit2 approval, when there were any"],
             ["spentToday", "Today's total against the daily budget"],
           ]}

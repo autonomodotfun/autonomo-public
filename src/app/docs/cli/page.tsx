@@ -5,7 +5,7 @@ import { Card, Cards, Code, Page, Section, Step, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Use Autonomo from your terminal",
-  description: `The Autonomo CLI: one command finds an x402 API, pays for the call in USDG or ${TOKEN.symbol} on ${TOKEN.chainName}, privately through Gloam or on Borro credit, within your limits, and prints the answer.`,
+  description: `The Autonomo CLI: one command finds an x402 API, pays for the call in USDG or ${TOKEN.symbol} on ${TOKEN.chainName} or USDC on Base, privately through Gloam or on Borro credit, within your limits, and prints the answer.`,
 };
 
 const TOKEN_EXAMPLE = "0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49";
@@ -17,6 +17,7 @@ const LOOK_OUTPUT = `Risk Checker (token-risk)
   https://autonomo.fun/x/token-risk/risk/${TOKEN_EXAMPLE}
   0.01 USDG
   100 AUTONOMO
+  0.01 USDC on Base
   0.010667 USDG  private, through Gloam`;
 
 const KEY = `# macOS and Linux
@@ -27,9 +28,9 @@ $env:AUTONOMO_WALLET_KEY = "0x…"`;
 
 const PAY = `npx autonomo-sdk risk ${TOKEN_EXAMPLE}`;
 
-const PAY_OUTPUT = `Risk Checker costs 0.01 USDG or 100 AUTONOMO. Pay from 0x…? [y/N] y
+const PAY_OUTPUT = `Risk Checker costs 0.01 USDG or 100 AUTONOMO or 0.01 USDC on Base. Pay from 0x…? [y/N] y
 { "token": "0x86b5…", "risk": { "level": "low", … }, … }
-Paid 0.01 USDG to Risk Checker. Today: 0.01 of 1 USDG.
+Paid 0.01 USDG to Risk Checker. Today: 0.01 of 1 USDG and USDC.
 https://robinhoodchain.blockscout.com/tx/0x…`;
 
 const CALL = `npx autonomo-sdk call "explain this transaction" 0x…
@@ -37,6 +38,20 @@ npx autonomo-sdk call --slug token-risk --path /risk/${TOKEN_EXAMPLE}`;
 
 const LIMITS = `npx autonomo-sdk risk ${TOKEN_EXAMPLE} --max 0.02 --daily 0.5
 npx autonomo-sdk spend`;
+
+const WALLET = "npx autonomo-sdk wallet";
+
+const WALLET_OUTPUT = `Wallet 0x…
+  Robinhood Chain  0 USDG, 0 AUTONOMO, 0 ETH
+  Base             1 USDC`;
+
+const PAY_BASE = `npx autonomo-sdk risk ${TOKEN_EXAMPLE} --pay-with usdc`;
+
+const PAY_BASE_OUTPUT = `Paid 0.01 USDC to Risk Checker. Today: 0.02 of 1 USDG and USDC.
+https://basescan.org/tx/0x…`;
+
+const READ_BASE = `npx autonomo-sdk risk 0x… --chain base
+npx autonomo-sdk gas --chain base`;
 
 const GLOAM_ENV = `GLOAM_NETWORK=robinhood-mainnet
 GLOAM_AGENT_PRIVATE_KEY=0x…
@@ -63,13 +78,15 @@ export default function CliGuidePage() {
   return (
     <Page title="Use Autonomo from your terminal">
       <p>
-        The Autonomo CLI is one command that finds an API on Autonomo, pays for the call on {TOKEN.chainName} and prints the
-        answer. There&apos;s nothing to install and no code to write, and looking around is free. It&apos;s part of the{" "}
+        The Autonomo CLI is one command that finds an API on Autonomo, pays for the call and prints the answer. It pays
+        on {TOKEN.chainName} or on Base, from the same wallet. There&apos;s nothing to install and no code to write, and looking around is free. It&apos;s part of the{" "}
         <Link href="/docs/sdk">SDK</Link>&apos;s npm package, so the same spending limits apply.
       </p>
       <Cards cols={2}>
         <Card title="Try it free" href="#try" body="Search the APIs and see prices. No wallet needed." />
         <Card title="Pay for a call" href="#pay" body="Set one wallet key and run a command." />
+        <Card title="Set limits" href="#limits" body="The most for one call and for one day, checked before anything is signed." />
+        <Card title="Pay on Base" href="#base" body="In USDC, from the same wallet and within the same limits." />
         <Card title="Pay privately" href="#private" body="From a private Gloam balance, with Gloam's own key." />
         <Card title="Scripts and agents" href="#scripts" body="JSON output, exit codes and no questions asked." />
       </Cards>
@@ -89,8 +106,9 @@ export default function CliGuidePage() {
       <Section id="pay" title="Pay for a call">
         <Step n={1} title="Make a wallet for the agent">
           <p>
-            Create a new wallet just for this, and send it a little USDG or {TOKEN.symbol} on {TOKEN.chainName}. Keep only
-            what it may spend in it. Paying in {TOKEN.symbol} also needs a little ETH once, for a one-time approval.
+            Create a new wallet just for this, and send it a little USDG or {TOKEN.symbol} on {TOKEN.chainName}, or USDC
+            on Base. The same wallet address works on both chains. Keep only what it may spend in it. Paying in{" "}
+            {TOKEN.symbol} also needs a little ETH once, for a one-time approval. USDG and USDC need none.
           </p>
         </Step>
         <Step n={2} title="Set its key">
@@ -115,16 +133,25 @@ export default function CliGuidePage() {
             ["quote <words> [input]", "The API a call would use, and its prices. Free"],
             ["call <words> [input]", "Find the right API, pay for one call, print the answer"],
             ["spend", "Today's spending against your limits. Free"],
-            ["price [token]", `${TOKEN.symbol}'s price, or any launchpad token's`],
+            ["wallet", `What the wallet holds on ${TOKEN.chainName} and Base. Free`],
+            ["price [token]", `${TOKEN.symbol}'s price, or any token's`],
             ["launches [how many]", "Newest token launches"],
             ["risk <token>", "Rug-risk check"],
+            ["holders <token>", "Top holders, bundles and snipers"],
+            ["dev <token>", "What the token's creator did"],
             ["tx <hash>", "A transaction in plain words"],
+            ["payment <hash>", "Did an x402 payment settle, and who paid whom"],
             ["portfolio <wallet>", "What a wallet holds"],
+            ["gas", "The gas price and what common actions cost"],
             ["read <https link>", "A web page's text"],
+            ["site <link or domain>", "Trust check for a website"],
+            ["health <https link>", "Is an x402 API up and payable"],
+            ["jobs <the work>", "Open paid jobs on Tokyo Futuro"],
           ]}
         />
         <p>
-          The last six are shortcuts for the <Link href="/docs/official-apis">official APIs</Link>. For any other API,
+          Everything from <code>price</code> down is a shortcut for one of the{" "}
+          <Link href="/docs/official-apis">official APIs</Link>. For any other API,
           say what you need with <code>call</code>, or name the API yourself with <code>--slug</code> and{" "}
           <code>--path</code>:
         </p>
@@ -142,10 +169,11 @@ export default function CliGuidePage() {
             ["--dry-run", "Show the price instead of paying"],
             ["--yes", "Don't ask before paying"],
             ["--json", "One object on stdout: the answer and the receipt"],
-            ["--max <usdg>", "Most to pay for one call. Default 0.05"],
-            ["--daily <usdg>", "Most to spend per UTC day. Default 1"],
+            ["--max <dollars>", "Most to pay for one call, in USDG or USDC. Default 0.05"],
+            ["--daily <dollars>", "Most to spend per UTC day, in USDG and USDC together. Default 1"],
             ["--max-autonomo, --daily-autonomo", `The same two limits in ${TOKEN.symbol}. Defaults 5,000 and 10,000`],
-            ["--pay-with <token>", "usdg, autonomo or auto. Default: USDG, then " + TOKEN.symbol],
+            ["--pay-with <token>", `usdg, autonomo, usdc or auto. Default: USDG, then ${TOKEN.symbol}, then USDC on Base`],
+            ["--chain <chain>", "robinhood or base: the chain an API reads. See Pay on Base"],
             ["--private", "Pay from your private Gloam balance"],
             ["--retry-header <header>", "With --private: finish a call that was paid but not answered"],
             ["--borro <credit line>", "Borrow from this Borro line when the wallet is short of USDG"],
@@ -158,10 +186,51 @@ export default function CliGuidePage() {
       <Section id="limits" title="Limits">
         <p>
           Two limits are checked before anything is signed: the most for one call, and the most per UTC day. A call over
-          either is refused, not paid. Today&apos;s spending is kept in <code>~/.autonomo/spend.json</code>, shared with
-          the SDK on the same machine.
+          either is refused, not paid. USDG and USDC on Base are both dollars, so they share the two limits: paying on a
+          second chain doesn&apos;t give an agent a second budget. Today&apos;s spending is kept in{" "}
+          <code>~/.autonomo/spend.json</code>, shared with the SDK on the same machine.
         </p>
         <Code code={LIMITS} lang="bash" />
+      </Section>
+
+      <Section id="base" title="Pay on Base">
+        <p>
+          Most APIs on Autonomo also take USDC on Base, at the same dollar price. The same wallet key pays there, with
+          one signature and no ETH. <code>wallet</code> shows what the wallet holds on each chain. It only reads, and
+          signs nothing:
+        </p>
+        <Code code={WALLET} lang="bash" />
+        <Code code={WALLET_OUTPUT} lang="output" />
+        <p>
+          You don&apos;t have to choose. Left alone, a call pays with the first the wallet can afford: USDG, then{" "}
+          {TOKEN.symbol}, then USDC on Base. So a wallet that holds only USDC on Base just works, and a wallet that
+          holds USDG pays as before. To pay on Base whatever else it holds, say so:
+        </p>
+        <Code code={PAY_BASE} lang="bash" />
+        <Code code={PAY_BASE_OUTPUT} lang="output" />
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <b>The receipt links to Basescan</b>, and with <code>--json</code> its <code>chain</code> says{" "}
+            <code>Base</code>.
+          </li>
+          <li>
+            <b>An API that doesn&apos;t take Base is never paid there.</b> With <code>--pay-with usdc</code> the call is
+            refused instead, and nothing is signed. <code>--dry-run</code> shows every price an API takes.
+          </li>
+          <li>
+            <b>Gloam and Borro pay in USDG</b> on {TOKEN.chainName}, so <code>--private</code> and{" "}
+            <code>--borro</code> don&apos;t use Base.
+          </li>
+        </ul>
+        <p>
+          Reading Base is a separate choice from paying on it. Many of the{" "}
+          <Link href="/docs/official-apis">official APIs</Link> read both chains, and <code>--chain</code> picks one for
+          the shortcuts that read a chain: <code>price</code> with a token,{" "}
+          <code>launches</code>, <code>risk</code>, <code>holders</code>, <code>dev</code>, <code>tx</code>,{" "}
+          <code>payment</code>, <code>portfolio</code> and <code>gas</code>. Left out, they read {TOKEN.chainName}, and
+          Base when the token, wallet or transaction is only there.
+        </p>
+        <Code code={READ_BASE} lang="bash" />
       </Section>
 
       <Section id="private" title="Pay privately with Gloam">
@@ -216,7 +285,7 @@ export default function CliGuidePage() {
           <code>AUTONOMO_BORRO_ACCOUNT</code>. <code>AUTONOMO_WALLET_KEY</code> is the agent wallet set on that line.
         </p>
         <Code code={BORRO} lang="bash" />
-        <p className="text-sm text-muted">Borrowed payments count against the USDG limits like any other.</p>
+        <p className="text-sm text-muted">Borrowed payments count against the dollar limits like any other.</p>
       </Section>
 
       <Section id="scripts" title="For scripts and agents">
@@ -250,7 +319,8 @@ export default function CliGuidePage() {
             After <code>npm install -g autonomo-sdk</code> the command is just <code>autonomo</code>.
           </li>
           <li>
-            <b>It only pays Autonomo&apos;s gateways,</b> on {TOKEN.chainName}, in USDG or {TOKEN.symbol}.
+            <b>It only pays Autonomo&apos;s gateways,</b> in USDG or {TOKEN.symbol} on {TOKEN.chainName}, or USDC on
+            Base.
           </li>
           <li>
             <b>A wallet payment only settles after the API answers,</b> so a call it fails to answer isn&apos;t

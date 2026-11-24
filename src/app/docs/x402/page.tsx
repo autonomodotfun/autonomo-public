@@ -35,8 +35,9 @@ export default function X402Page() {
       <Section id="on-autonomo" title="On Autonomo">
         <p>
           Every API launched here sits behind a gateway that does steps 2 and 4: it quotes the price in USDG or{" "}
-          {TOKEN.symbol} on {TOKEN.chainName}, checks the payment and forwards the request to the API. Autonomo settles
-          the payment on-chain and pays the gas. If the API fails, the payment doesn&apos;t settle, so the agent
+          {TOKEN.symbol} on {TOKEN.chainName}, and in USDC on Base when the API takes it, checks the payment and forwards
+          the request to the API. The payment is settled on-chain and the agent pays no gas: Autonomo&apos;s facilitator
+          does it on {TOKEN.chainName}, Coinbase&apos;s on Base. If the API fails, the payment doesn&apos;t settle, so the agent
           isn&apos;t charged.
         </p>
         <p>

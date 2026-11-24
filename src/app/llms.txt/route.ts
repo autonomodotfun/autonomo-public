@@ -139,11 +139,11 @@ ${burnLine}- The discovery API is free JSON, with no key and open CORS.
 2. Call it: \`GET ${SITE}/x/<slug><path>\`. Without a payment the gateway answers HTTP 402, with what it accepts in the \`PAYMENT-REQUIRED\` header (x402 version 2, scheme \`exact\`).
 3. Pay: sign the payment with an x402 client (for example \`@x402/fetch\` with \`@x402/evm\`) and send the same request again with it in the \`PAYMENT-SIGNATURE\` header (\`X-PAYMENT\` also works). A call whose API fails is not charged.
 
-Or use one of Autonomo's tools, which do all three steps within a per-call cap and a daily budget:
+Or use one of Autonomo's tools, which do all three steps within a per-call cap and a daily budget. Each pays from one wallet with the first token it can afford: USDG, then ${TOKEN.symbol}, then USDC on Base. To use only one, set \`usdg\`, \`autonomo\` or \`usdc\` in \`payWith\` (SDK), \`--pay-with\` (CLI) or \`AUTONOMO_PAY_WITH\` (MCP server, elizaOS). USDG and USDC share the dollar cap and budget.
 
-- MCP server (Claude, Cursor, Codex and other MCP clients): \`npx -y autonomo-mcp\` with \`AUTONOMO_WALLET_KEY\` set to a dedicated agent wallet. Tools: \`find_apis\` and \`get_price\` (free), \`call_api\` (pays). Guide: ${SITE}/docs/agents#mcp
+- MCP server (Claude, Cursor, Codex and other MCP clients): \`npx -y autonomo-mcp\` with \`AUTONOMO_WALLET_KEY\` set to a dedicated agent wallet. Tools: \`find_apis\`, \`get_price\` and \`wallet_status\` (free), \`call_api\` (pays). Guide: ${SITE}/docs/agents#mcp
 - SDK: \`npm install autonomo-sdk\` or \`pip install autonomo-sdk\`. One \`call\` finds the API, pays and returns the answer with a receipt. Guide: ${SITE}/docs/sdk
-- CLI: \`npx autonomo-sdk find "<what you need>"\`, then \`npx autonomo-sdk call "<what you need>"\`. Add \`--dry-run\` to see the price without paying. Guide: ${SITE}/docs/cli
+- CLI: \`npx autonomo-sdk find "<what you need>"\`, then \`npx autonomo-sdk call "<what you need>"\`. Add \`--dry-run\` to see the price without paying. \`npx autonomo-sdk wallet\` shows what the wallet holds on both chains. Guide: ${SITE}/docs/cli
 - LangChain and LangGraph: \`pip install langchain-autonomo\` or \`npm install langchain-autonomo\`. Guide: ${SITE}/docs/langchain
 - elizaOS (1.x and 2.x): \`npm install elizaos-plugin-autonomo\`, with \`AUTONOMO_WALLET_KEY\` in the agent's secrets. Actions: \`AUTONOMO_FIND_APIS\` and \`AUTONOMO_GET_PRICE\` (free), \`AUTONOMO_CALL_API\` (pays). Guide: ${SITE}/docs/eliza
 

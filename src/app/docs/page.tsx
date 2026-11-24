@@ -23,7 +23,7 @@ export default async function DocsPage() {
     <Page eyebrow="Docs" title="Autonomo docs">
       <p>
         Autonomo is the agentic x402 launchpad for APIs. Agents find an API here and pay for each call from their own
-        wallet, in USDG or {TOKEN.symbol} on {TOKEN.chainName}, with no API keys, accounts or invoices. Creators put a
+        wallet, in USDG or {TOKEN.symbol} on {TOKEN.chainName} or USDC on Base, with no API keys, accounts or invoices. Creators put a
         price on an API and get paid per call.
       </p>
       <p className="text-sm text-muted">

@@ -1,8 +1,9 @@
-// Try every way the SDK pays, one small call at a time, on the New Launches API (0.01 USDG or 100 $AUTONOMO a call).
+// Try every way the SDK pays, one small call at a time, on the New Launches API (0.01 USDG or USDC, or 100 $AUTONOMO a call).
 //
 //   node try-every-route.mjs quote               free: the API it would use and every price it takes
 //   node try-every-route.mjs usdg                pay in USDG from the wallet
 //   node try-every-route.mjs autonomo            pay in $AUTONOMO from the wallet (first time: one Permit2 approval)
+//   node try-every-route.mjs usdc                pay in USDC on Base from the same wallet
 //   node try-every-route.mjs gloam-shield 0.05   move 0.05 USDG into the Gloam agent's private balance
 //   node try-every-route.mjs gloam-balance       show that private balance
 //   node try-every-route.mjs gloam               pay privately through Gloam
@@ -10,10 +11,11 @@
 //   node try-every-route.mjs borro               borrow what the wallet is short from a Borro credit line, then pay
 //
 // Set in the terminal, never in a file you share or commit:
-//   AUTONOMO_WALLET_KEY   usdg and autonomo: the wallet that pays. borro: the agent wallet set on the credit line
+//   AUTONOMO_WALLET_KEY   usdg, autonomo and usdc: the wallet that pays. borro: the agent wallet set on the credit line
 //   BORRO_CREDIT_LINE     the Borro credit line's address (borro)
 // Gloam needs no wallet key here: it reads its own key and limits from ~/.gloam/agent.env. Every paid command is capped
-// at 0.02 USDG or 150 $AUTONOMO a call and 0.10 USDG or 500 $AUTONOMO a day, and prints the receipt with its transaction link.
+// at 0.02 USDG or 150 $AUTONOMO a call and 0.10 USDG or 500 $AUTONOMO a day (USDC on Base counts as USDG), and prints the
+// receipt with its transaction link.
 import { Autonomo, AutonomoError } from "autonomo-sdk";
 
 const QUERY = "newest launches";
@@ -72,7 +74,7 @@ try {
     const q = await new Autonomo().quote(QUERY);
     console.log(`${q.api.name}: ${q.url}`);
     for (const o of q.offers) console.log(`  ${o.amount} ${o.token}${o.private ? " (private, through Gloam)" : ""}`);
-  } else if (route === "usdg" || route === "autonomo") {
+  } else if (route === "usdg" || route === "autonomo" || route === "usdc") {
     show(await wallet().call(QUERY));
   } else if (route === "borro") {
     const account = need("BORRO_CREDIT_LINE");
@@ -94,7 +96,7 @@ try {
   } else if (route === "gloam") {
     show(await withGloam((call) => new Autonomo({ gloam: { fetchPaid: (a) => call("gloam_fetch_paid", a) }, limits }).call(QUERY, { private: true })));
   } else {
-    console.log("Use one of: quote, usdg, autonomo, gloam-shield <amount>, gloam-balance, gloam, gloam-retry <header>, borro");
+    console.log("Use one of: quote, usdg, autonomo, usdc, gloam-shield <amount>, gloam-balance, gloam, gloam-retry <header>, borro");
   }
 } catch (e) {
   if (!(e instanceof AutonomoError)) throw e;

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "autonomo"
 version = "0.1.2"
-description = "One call for AI agents: find the right paid API on Autonomo, pay in USDG or $AUTONOMO (privately through Gloam, or on Borro credit), within spending caps, and get a receipt."
+description = "One call for AI agents: find the right paid API on Autonomo, pay in USDG or $AUTONOMO on Robinhood Chain or USDC on Base (privately through Gloam, or on Borro credit), within spending caps, and get a receipt."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

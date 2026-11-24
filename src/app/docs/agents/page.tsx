@@ -5,7 +5,7 @@ import { Card, Cards, Code, Page, Section, Step, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Use Autonomo from your agent",
-  description: `Let Claude, Cursor, Codex or your own code find APIs on Autonomo and pay per call in USDG or ${TOKEN.symbol}, or try the Agent Playground and the Telegram bot.`,
+  description: `Let Claude, Cursor, Codex or your own code find APIs on Autonomo and pay per call in USDG, ${TOKEN.symbol} or USDC on Base, or try the Agent Playground and the Telegram bot.`,
 };
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun";
@@ -26,7 +26,8 @@ const MCP_JSON = `{
 const MCP_TOOLS: [string, string][] = [
   ["find_apis", "Search Autonomo's official APIs, and optionally the whole x402 directory. Free."],
   ["get_price", "Call an API without paying and show what it asks for. Free."],
-  ["call_api", "Pay for one call and return the answer, with the payment link on Blockscout."],
+  ["wallet_status", "What the wallet holds on both chains, what it has spent today and its limits. Free."],
+  ["call_api", "Pay for one call and return the answer, with the payment link on Blockscout or Basescan."],
 ];
 
 const DISCOVER_CODE = `const res = await fetch(
@@ -46,7 +47,7 @@ import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { privateKeyToAccount } from "viem/accounts";
 
 // A dedicated agent wallet with a small balance: USDG or $AUTONOMO on Robinhood Chain
-// for Autonomo gateways, or USDC for most other x402 APIs (often on Base).
+// (or USDC on Base) for Autonomo gateways, or USDC for most other x402 APIs (often on Base).
 const signer = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as \`0x\${string}\`);
 
 const client = new x402Client();
@@ -63,8 +64,8 @@ export default function AgentsGuidePage() {
   return (
     <Page title="Use Autonomo from your agent">
       <p>
-        Agents pay for each API call themselves, in USDG or {TOKEN.symbol} on {TOKEN.chainName}. There are no API keys or
-        accounts, just a wallet. Pick the way that fits you:
+        Agents pay for each API call themselves, in USDG or {TOKEN.symbol} on {TOKEN.chainName}, or in USDC on Base.
+        There are no API keys or accounts, just a wallet. Pick the way that fits you:
       </p>
       <Cards>
         <Card title="MCP server" href="#mcp" body="Claude, Cursor, Codex and other AI apps find and pay APIs for you." />
@@ -81,8 +82,9 @@ export default function AgentsGuidePage() {
         <Table mono rows={MCP_TOOLS} />
         <Step n={1} title="Fund a wallet for your agent">
           <p>
-            Make a new wallet just for your agent and send it a little USDG or {TOKEN.symbol} on {TOKEN.chainName}. Paying
-            in {TOKEN.symbol} also needs a little ETH once, for the Permit2 approval.
+            Make a new wallet just for your agent and send it a little USDG or {TOKEN.symbol} on {TOKEN.chainName}, or
+            USDC on Base. The same wallet works on both chains. Paying in {TOKEN.symbol} also needs a little ETH once,
+            for the Permit2 approval. USDG and USDC need none.
           </p>
         </Step>
         <Step n={2} title="Add the server to your app">
@@ -104,9 +106,11 @@ export default function AgentsGuidePage() {
           </p>
         </Step>
         <p className="text-sm text-muted">
-          The server only pays Autonomo gateways, caps each call, and stops at a daily budget (set with{" "}
-          <code>AUTONOMO_DAILY_USDG</code> and <code>AUTONOMO_DAILY_AUTONOMO</code>). Use a new wallet with a small
-          balance, never your main one.
+          The server pays with the first the wallet can afford: USDG, then {TOKEN.symbol}, then USDC on Base. Set{" "}
+          <code>AUTONOMO_PAY_WITH</code> to <code>usdg</code>, <code>autonomo</code> or <code>usdc</code> to use only
+          one. It only pays Autonomo gateways, caps each call, and stops at a daily budget (set with{" "}
+          <code>AUTONOMO_DAILY_USDG</code>, which covers USDG and USDC together, and{" "}
+          <code>AUTONOMO_DAILY_AUTONOMO</code>). Use a new wallet with a small balance, never your main one.
         </p>
       </Section>
 
@@ -141,6 +145,14 @@ export default function AgentsGuidePage() {
         <p>
           USDG (Global Dollar) on {TOKEN.chainName} supports EIP-3009, so each payment is a single signature: no approval
           step and no gas for the agent. Hold USDG on {TOKEN.chainName} and the x402 client above handles the rest.
+        </p>
+        <h3 className="pt-2 font-medium">Paying with USDC on Base</h3>
+        <p>
+          Most Autonomo APIs also list USDC on Base in their <code>402</code>, at the same dollar price. It works like
+          USDG: one EIP-3009 signature, no approval and no gas, settled by Coinbase&apos;s x402 facilitator. An x402
+          client pays the first option it can sign, and USDG is listed first, so a wallet that only holds USDC on Base
+          needs a client told to pick the Base option: <code>x402Client</code> takes a function for that. The{" "}
+          <Link href="/docs/sdk#pay-on-base">SDK</Link> does this for you.
         </p>
         <h3 className="pt-2 font-medium">Paying with {TOKEN.symbol}</h3>
         <p>

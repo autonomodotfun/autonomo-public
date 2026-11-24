@@ -5,7 +5,7 @@ import { Code, Page, Section, Step, Table } from "../ui";
 
 export const metadata: Metadata = {
   title: "Use Autonomo from elizaOS",
-  description: `An elizaOS plugin: your agent finds the right Autonomo API for what it's asked, checks the price and pays for the call in USDG or ${TOKEN.symbol} on ${TOKEN.chainName}, within the limits in its settings.`,
+  description: `An elizaOS plugin: your agent finds the right Autonomo API for what it's asked, checks the price and pays for the call in USDG or ${TOKEN.symbol} on ${TOKEN.chainName} or USDC on Base, within the limits in its settings.`,
 };
 
 const INSTALL = "npm install elizaos-plugin-autonomo";
@@ -49,13 +49,13 @@ export default function ElizaGuidePage() {
       <p>
         <code>elizaos-plugin-autonomo</code> gives an <a href="https://elizaos.ai">elizaOS</a> agent Autonomo&apos;s
         APIs as actions. Someone asks the agent &quot;is this token safe?&quot;, and it finds the right API, checks the
-        price and pays for the call itself, in USDG or {TOKEN.symbol} on {TOKEN.chainName}. You don&apos;t write code
-        for each API: an API listed on Autonomo tomorrow works the same way.
+        price and pays for the call itself, in USDG or {TOKEN.symbol} on {TOKEN.chainName}, or in USDC on Base. You
+        don&apos;t write code for each API: an API listed on Autonomo tomorrow works the same way.
       </p>
       <Table
         rows={[
           ["Works with", <>elizaOS 1.x (1.7 or later) and 2.x, from one package</>],
-          ["The agent needs", <>A wallet just for it, with a little USDG. Most APIs cost 0.01 USDG</>],
+          ["The agent needs", <>A wallet just for it, with a little USDG, or USDC on Base. Most APIs cost 0.01 of either</>],
           ["Built on", <>The <Link href="/docs/sdk">Autonomo SDK</Link>, so it pays and keeps to limits the same way</>],
         ]}
       />
@@ -70,8 +70,9 @@ export default function ElizaGuidePage() {
         <Step n={3} title="Give the agent a wallet">
           <p>
             Make a <b>new wallet just for the agent</b> and send it only what it may spend: a dollar of USDG on{" "}
-            {TOKEN.chainName} covers about 100 calls. Paying in {TOKEN.symbol} also needs a little ETH once, for a
-            Permit2 approval. Put its key in the character&apos;s secrets:
+            {TOKEN.chainName} covers about 100 calls, and so does a dollar of USDC on Base, from the same wallet. Paying
+            in {TOKEN.symbol} also needs a little ETH once, for a Permit2 approval. Put its key in the character&apos;s
+            secrets:
           </p>
           <Code code={SECRETS} lang="JSON" />
           <p>
@@ -98,7 +99,8 @@ export default function ElizaGuidePage() {
         <Step n={3} title="It pays and answers">
           <p>
             It pays 0.01 USDG with a signed x402 payment, answers from the report and adds what it paid, with a link to
-            the payment on Blockscout. Autonomo settles it on-chain and pays the gas. If the API fails, the payment
+            the payment on Blockscout, or on Basescan when it paid in USDC on Base. The payment is settled on-chain for
+            the agent, which pays no gas. If the API fails, the payment
             doesn&apos;t settle, so the agent isn&apos;t charged.
           </p>
         </Step>
@@ -120,10 +122,10 @@ export default function ElizaGuidePage() {
           mono
           rows={[
             ["AUTONOMO_WALLET_KEY", "The agent wallet's private key. Without it, the free actions only"],
-            ["AUTONOMO_PAY_WITH", `usdg, autonomo, or auto: USDG first, then ${TOKEN.symbol}. Default auto`],
-            ["AUTONOMO_MAX_USDG_PER_CALL", "The most one call may cost in USDG. Default 0.05"],
+            ["AUTONOMO_PAY_WITH", `usdg, autonomo, usdc (on Base), or auto: USDG first, then ${TOKEN.symbol}, then USDC on Base. Default auto`],
+            ["AUTONOMO_MAX_USDG_PER_CALL", "The most one call may cost in USDG or USDC. Default 0.05"],
             ["AUTONOMO_MAX_AUTONOMO_PER_CALL", `The most one call may cost in ${TOKEN.symbol}. Default 5000`],
-            ["AUTONOMO_DAILY_USDG", "The most to spend per UTC day in USDG. Default 1"],
+            ["AUTONOMO_DAILY_USDG", "The most to spend per UTC day in USDG and USDC together. Default 1"],
             ["AUTONOMO_DAILY_AUTONOMO", `The most to spend per UTC day in ${TOKEN.symbol}. Default 10000`],
             ["AUTONOMO_BORRO_ACCOUNT", "A Borro credit line to borrow from when the wallet is short of USDG"],
             ["AUTONOMO_MAX_OUTPUT_CHARS", "Longer answers are cut before they reach the model or the chat. Default 8000"],
@@ -165,7 +167,7 @@ export default function ElizaGuidePage() {
             Prefer APIs marked <Link href="/docs/token">Verified</Link> with a good track record. Autonomo lists outside
             creators&apos; APIs too, and doesn&apos;t vouch for each one.
           </li>
-          <li>Each paid call is public on {TOKEN.chainName}: the wallet, the amount and the API it paid.</li>
+          <li>Each paid call is public on {TOKEN.chainName} or Base: the wallet, the amount and the API it paid.</li>
           <li>
             The plugin is open source and its tests run offline against a fake Autonomo, paying nothing. Not on elizaOS?
             Use <Link href="/docs/langchain">LangChain</Link>, the <Link href="/docs/sdk">SDK</Link>, or the{" "}

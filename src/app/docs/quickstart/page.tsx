@@ -6,7 +6,7 @@ import { Card, Cards, Code, Page, Section } from "../ui";
 
 export const metadata: Metadata = {
   title: "Quickstart",
-  description: `Your first paid call on Autonomo in three steps: try it free from your terminal, give your agent a wallet with a little USDG on ${TOKEN.chainName}, and pay for a call.`,
+  description: `Your first paid call on Autonomo in three steps: try it free from your terminal, give your agent a wallet with a little USDG on ${TOKEN.chainName} or USDC on Base, and pay for a call.`,
 };
 
 const TOKEN_EXAMPLE = "0x86b57bcb9d249cf096cf8e21426c9dc9cafdec49";
@@ -30,9 +30,9 @@ Top up my Autonomo wallet with 1 USDG.`;
 
 const PAY = `npx autonomo-sdk risk ${TOKEN_EXAMPLE}`;
 
-const PAY_OUTPUT = `Risk Checker costs 0.01 USDG or 100 AUTONOMO. Pay from 0x…? [y/N] y
+const PAY_OUTPUT = `Risk Checker costs 0.01 USDG or 100 AUTONOMO or 0.01 USDC on Base. Pay from 0x…? [y/N] y
 { "token": "0x86b5…", "risk": { "level": "low", … }, … }
-Paid 0.01 USDG to Risk Checker. Today: 0.01 of 1 USDG.
+Paid 0.01 USDG to Risk Checker. Today: 0.01 of 1 USDG and USDC.
 https://robinhoodchain.blockscout.com/tx/0x…`;
 
 export default function QuickstartPage() {
@@ -60,9 +60,14 @@ export default function QuickstartPage() {
       <Section id="wallet" title="2. Give your agent a wallet">
         <p>
           Create a <b>new wallet just for this</b> and send it a little USDG on {TOKEN.chainName}. Keep only what it may
-          spend in it: most calls cost 0.01 USDG, so a dollar covers about 100. Then set its key:
+          spend in it: most calls cost 0.01 USDG, so a dollar covers about 100. USDC on Base works too, at the same
+          price: the wallet has the same address on both chains, and a call pays with whichever it holds. Then set its
+          key:
         </p>
         <Code code={KEY} lang="bash" />
+        <p>
+          <code>npx autonomo-sdk wallet</code> shows what it holds on each chain.
+        </p>
         <p className="text-sm text-muted">
           The key stays on your computer and only signs payments. It is read from <code>AUTONOMO_WALLET_KEY</code>, never
           from a flag, so it stays out of your shell history.
@@ -125,7 +130,8 @@ export default function QuickstartPage() {
         <p>It shows the price and asks before paying. Then it prints the answer and a receipt:</p>
         <Code code={PAY_OUTPUT} lang="output" />
         <p>
-          A call stops before anything is signed if it costs more than 0.05 USDG, or would take the day past 1 USDG. If
+          A call stops before anything is signed if it costs more than 0.05 USDG or USDC, or would take the day past 1
+          in the two together. If
           an API fails, the payment doesn&apos;t settle, so you aren&apos;t charged. Both limits can be changed: see{" "}
           <Link href="/docs/cli#limits">Limits</Link>.
         </p>

@@ -51,6 +51,10 @@ const ROADMAP: Stage[] = [
           { title: "CLI", note: "npx autonomo-sdk, with spend limits, dry runs and private payments through Gloam" },
           { title: "LangChain tools", note: "For Python and TypeScript" },
           { title: "elizaOS plugin", note: "For elizaOS 1.x and 2.x, with the wallet and limits in the agent's settings" },
+          {
+            title: "Base payments in the agent tools",
+            note: "The SDK, CLI, MCP server, LangChain tools and elizaOS plugin pay in USDC on Base too, from the same wallet and budget",
+          },
           { title: "Spending caps", note: "Per call and per day, and failed calls aren't charged" },
           { title: "llms.txt", note: "A plain-text map of Autonomo for AI agents" },
           { title: "Agent identity", note: "The official APIs are agent 26170 in the ERC-8004 registry on Robinhood Chain" },
@@ -111,10 +115,6 @@ const ROADMAP: Stage[] = [
       { title: "More official APIs", note: "Adding to the 16 that are live today" },
       { title: "Grants for outside APIs", note: "Starting with tokenized stock data" },
       { title: "Solana payments on gateways", note: "Base is live; Solana next, with the burn still on Robinhood Chain" },
-      {
-        title: "Base payments in the agent tools",
-        note: "The SDK, CLI, LangChain tools and elizaOS plugin pay in USDC on Base too. Today they pay on Robinhood Chain",
-      },
       { title: "Token and security page", note: "Supply, team and treasury wallets, unlocks, verified splitter" },
       { title: "APIs from other platforms", note: "Coinbase and PayAI APIs, usable through the SDK" },
       { title: "Webhooks and payout analytics", note: "For API owners" },

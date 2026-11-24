@@ -29,7 +29,7 @@ const LAUNCH_STEPS = [
 const AGENT_STEPS = [
   {
     title: "Give it a wallet",
-    body: "Make a new wallet just for your agent and send it a little USDG or $AUTONOMO on Robinhood Chain.",
+    body: "Make a new wallet just for your agent and send it a little USDG or $AUTONOMO on Robinhood Chain, or USDC on Base.",
   },
   {
     title: "Connect Autonomo",

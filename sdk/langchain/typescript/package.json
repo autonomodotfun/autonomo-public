@@ -1,7 +1,7 @@
 {
   "name": "langchain-autonomo",
   "version": "0.1.1",
-  "description": "LangChain.js tools for Autonomo: an agent finds the right paid API, sees its price and pays for a call in USDG or $AUTONOMO on Robinhood Chain, within spending caps.",
+  "description": "LangChain.js tools for Autonomo: an agent finds the right paid API, sees its price and pays for a call in USDG or $AUTONOMO on Robinhood Chain, or USDC on Base, within spending caps.",
   "homepage": "https://autonomo.fun/docs/langchain",
   "author": "Autonomo (https://autonomo.fun)",
   "license": "MIT",
