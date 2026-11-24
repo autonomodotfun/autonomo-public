@@ -11,6 +11,7 @@ import { ApisTab, type ApiFilter } from "./apis";
 import { DirectoryTab } from "./directory";
 import { HistoryTab } from "./history";
 import { ReviewTab } from "./review";
+import { RouterTab } from "./router";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
@@ -30,9 +31,10 @@ type SearchParams = Promise<{
   listingNote?: string;
   moveUrl?: string;
   moveMethod?: string;
+  routerNote?: string;
 }>;
 
-const TABS = { review: "Review", apis: "All APIs", directory: "Directory", payouts: "Payouts", history: "History" } as const;
+const TABS = { review: "Review", apis: "All APIs", router: "Router", directory: "Directory", payouts: "Payouts", history: "History" } as const;
 type Tab = keyof typeof TABS;
 const API_FILTERS: ApiFilter[] = ["all", "listed", "pending", "unlisted", "rejected", "paused"];
 
@@ -94,6 +96,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Search
           </>
         )}
         {tab === "directory" && <DirectoryTab listing={params.listing} message={params.listingNote} move={params.moveUrl ? { url: params.moveUrl, method: params.moveMethod ?? "GET" } : undefined} />}
+        {tab === "router" && <RouterTab message={params.routerNote?.slice(0, 600)} />}
         {tab === "history" && <HistoryTab group={params.group ?? "all"} />}
       </div>
     </div>

@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/cron/import", "schedule": "0 3 */3 * *" },
     { "path": "/api/cron/burn", "schedule": "0 4 * * *" },
-    { "path": "/api/cron/reprice", "schedule": "15 0 * * *" }
+    { "path": "/api/cron/reprice", "schedule": "15 0 * * *" },
+    { "path": "/api/cron/router", "schedule": "*/5 * * * *" }
   ]
 }

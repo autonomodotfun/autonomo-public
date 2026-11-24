@@ -49,6 +49,7 @@ export const TX_DEADLINE_SEC = 120; // the swap reverts on-chain if mined later 
 export const DEFAULT_SLIPPAGE_BPS = 100; // 1%
 export const MAX_SLIPPAGE_BPS = 500; // 5% hard cap
 const CHECKS_DEADLINE_MS = 21_000; // the gateway waits 25 s; past this the quote answers 503 instead of timing out
+export const CHECKS_RETRY_SEC = 60; // sent as Retry-After with that 503, the same minute its message asks for
 
 // Caution and block thresholds, in percent: a first proposal, to tune with real quotes.
 export const T = {
@@ -345,7 +346,12 @@ export async function quote(query, now = Date.now(), checksFor = runChecks) {
     buying ? checksFor(tokenOut) : null,
     route(tokenIn, tokenOut, amountIn, taker).then((r) => ({ r }), (e) => ({ e })),
   ]);
-  if (checks?.late) return fail(503, "checks_slow", "The token checks are taking longer than usual. Try again in a minute: they'll be ready.");
+  if (checks?.late) {
+    return {
+      ...fail(503, "checks_slow", "The token checks are taking longer than usual. Try again in a minute: they'll be ready.", { retry_after_seconds: CHECKS_RETRY_SEC }),
+      retryAfter: CHECKS_RETRY_SEC,
+    };
+  }
   const assessed = checks ? assessToken(checks, now) : { flags: [], reports: null };
   if (assessed.notFound) return fail(404, "not_found", "No token found at token_out on Robinhood Chain.");
   if (assessed.failed) return fail(503, "checks_failed", `The ${assessed.failed} check couldn't run right now, and a token isn't quoted unchecked. Try again shortly.`);
@@ -527,6 +533,8 @@ export default async function handler(req, res) {
     if (step === "quote") {
       if (!process.env.BLOCKSCOUT_KEY?.trim()) return sendJson(res, 503, { error: "not_configured", message: "This API isn't set up yet." });
       const r = await quote(req.query);
+      // "Not ready yet": the standard header for it, which Autonomo's router reads so the wait isn't held against this API.
+      if (r.retryAfter) res.setHeader("Retry-After", String(r.retryAfter));
       return sendJson(res, r.status, r.body);
     }
     if (step === "build") {

@@ -13,6 +13,9 @@ import { editListing as saveListing, parseListingFields } from "@/lib/directory/
 import { TOKEN } from "@/lib/constants";
 import { gatewayNetworks, gatewayOffers, payeeOf, syncGatewayNetworks } from "@/lib/gateway/gateway";
 import { applyPayTo } from "@/lib/payments/pay-to";
+import { ROUTER } from "@/lib/router/router";
+import { parseRouteSettings, type RouteSettings } from "@/lib/router/router-apis";
+import { runRouterJobs, saveRouteSettings, stopRouting, testAndEnable } from "@/lib/router/router-gateway";
 import { USDG } from "@/lib/payments/payments";
 import { slugify } from "@/lib/directory/slug";
 import { revalidateCatalog } from "@/lib/directory/queries";
@@ -342,4 +345,84 @@ export async function editListing(form: FormData) {
   }
   const listingNote = result.ok ? result.message : result.error;
   redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#edit`);
+}
+
+// ---------- the Router tab ----------
+
+const routerBack = (message: string) => `/admin?${new URLSearchParams({ tab: "router", routerNote: message })}`;
+
+/** Runs the format test on one API with a real call. If it passes, the API is switched on for routing. */
+export async function testRouting(form: FormData) {
+  await requireAdmin();
+  const id = Number(form.get("id"));
+  let message: string;
+  try {
+    const result = await testAndEnable(id);
+    if (!result) message = "That API wasn't found.";
+    else if (result.test.ok) {
+      message = `/x/${result.slug} passed the format test${result.test.ms === null ? "" : ` in ${result.test.ms} ms`}. It is on for routing and will be picked once it has ${ROUTER.measuredWindow} measured calls.`;
+      await logAdmin({ kind: "routing_enabled", subject: `/x/${result.slug}`, gatewayId: id });
+    } else if (result.test.wait !== undefined) {
+      message = `/x/${result.slug} says it is not ready yet. Run the test again in ${result.test.wait} seconds. Nothing was changed.`;
+    } else {
+      message = `/x/${result.slug} did not pass the format test: ${result.test.reason}. Nothing was changed.`;
+    }
+  } catch (e) {
+    console.error("format test failed", e);
+    message = "The test couldn't be run just now. Try again.";
+  }
+  revalidatePath("/admin");
+  redirect(routerBack(message));
+}
+
+/** Takes one API out of routing. It stays callable by name. */
+export async function stopRoutingApi(form: FormData) {
+  await requireAdmin();
+  const id = Number(form.get("id"));
+  const slug = await stopRouting(id);
+  if (slug) await logAdmin({ kind: "routing_stopped", subject: `/x/${slug}`, gatewayId: id });
+  revalidatePath("/admin");
+  redirect(routerBack(slug ? `/x/${slug} is out of routing. It can still be called by name.` : "That API wasn't found."));
+}
+
+/** Saves an API's capability, path and mapping, or clears them. The API then has to pass the format test again. */
+export async function saveRouting(form: FormData) {
+  await requireAdmin();
+  const slug = String(form.get("slug") ?? "").trim().toLowerCase();
+  const capability = String(form.get("capability") ?? "").trim();
+  const db = await getDb();
+  const [g] = await db.select({ id: schema.gateways.id }).from(schema.gateways).where(eq(schema.gateways.slug, slug)).limit(1);
+  if (!g) redirect(`${routerBack(`No API at /x/${slug}.`)}#routing-settings`);
+
+  let settings: RouteSettings | null = null;
+  if (capability) {
+    const parsed = parseRouteSettings(capability, String(form.get("path") ?? ""), String(form.get("mapping") ?? ""));
+    if (!parsed.ok) redirect(`${routerBack(parsed.error)}#routing-settings`);
+    settings = parsed.settings;
+  }
+  await saveRouteSettings(g.id, settings);
+  await logAdmin({ kind: "routing_settings", subject: `/x/${slug}`, detail: settings ? `${settings.capability} ${settings.path}` : "cleared", gatewayId: g.id });
+  revalidatePath("/admin");
+  redirect(routerBack(settings ? `Saved for /x/${slug}. Run its format test to switch it on.` : `Routing settings cleared for /x/${slug}.`));
+}
+
+/** Runs the probes that are due right now, without waiting for the scheduled run. */
+export async function runRouterJobsNow() {
+  await requireAdmin();
+  let message: string;
+  try {
+    const run = await runRouterJobs(40_000);
+    const failed = run.probes.failed.map((f) => `${f.slug} (${f.reason})`).join(", ");
+    message =
+      `Ran ${run.probes.run} ${run.probes.run === 1 ? "probe" : "probes"} and ${run.uptime.checked} uptime ${run.uptime.checked === 1 ? "check" : "checks"}.` +
+      (failed ? ` Failed: ${failed}.` : "") +
+      (run.probes.waiting.length ? ` Not ready yet, asked again on a later run: ${run.probes.waiting.join(", ")}.` : "") +
+      (run.uptime.down.length ? ` Down: ${run.uptime.down.join(", ")}.` : "") +
+      (run.probes.left ? ` ${run.probes.left} left for the next run.` : "");
+  } catch (e) {
+    console.error("router jobs failed", e);
+    message = "The probes couldn't be run just now. Try again.";
+  }
+  revalidatePath("/admin");
+  redirect(routerBack(message));
 }

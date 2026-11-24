@@ -113,6 +113,27 @@
       "when": 1795233634186,
       "tag": "0015_bonded_wallets",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795435753103,
+      "tag": "0016_router",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795439070882,
+      "tag": "0017_router_hits",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795491110117,
+      "tag": "0018_router_stats",
+      "breakpoints": true
     }
   ]
 }

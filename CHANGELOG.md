@@ -3,6 +3,12 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 24, 2026
+
+- **A slow Safe Swap quote says when to come back.** When a token's checks are still running, the quote answers
+  `503` with a `Retry-After: 60` header and `retry_after_seconds` in the body, instead of only a message. Gateways
+  now pass an API's `Retry-After` header through to the caller, for every API.
+
 ## November 23, 2026
 
 - **Priors and Oak Agent Kit join the partners**, on [/partners](https://autonomo.fun/partners) and in the homepage's

@@ -28,6 +28,9 @@ export const ADMIN_EVENT_LABELS = {
   endpoint_detached: "Endpoint removed from a listing",
   endpoint_moved: "Endpoint moved to another listing",
   listing_edited: "Listing edited",
+  routing_enabled: "Routing switched on",
+  routing_stopped: "Routing switched off",
+  routing_settings: "Routing settings saved",
 } as const;
 export type AdminEventKind = keyof typeof ADMIN_EVENT_LABELS;
 export type AdminEvent = typeof adminEvents.$inferSelect;

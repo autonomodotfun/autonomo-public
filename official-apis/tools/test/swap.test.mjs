@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { encodeFunctionData } from "viem";
 import {
-  assessToken, build, buildSlippageBps, MAX_SLIPPAGE_BPS, NATIVE, normalizeToken, quote, readQuote, routerAbi, signQuote,
+  assessToken, build, buildSlippageBps, CHECKS_RETRY_SEC, MAX_SLIPPAGE_BPS, NATIVE, normalizeToken, quote, readQuote, routerAbi, signQuote,
   swapTxProblem, verdictOf,
 } from "../api/swap.js";
 
@@ -331,6 +331,19 @@ async function buyWithRouteBack(back) {
   return quote({ token_in: USDG, token_out: TOKEN, amount_in: "1000000", taker: TAKER }, NOW, healthy);
 }
 const answer = (body, status = 200) => new Response(JSON.stringify(body), { status });
+
+test("checks that are still running: a 503 that says to come back in a minute", async () => {
+  stub();
+  const r = await quote({ token_in: USDG, token_out: TOKEN, amount_in: "1000000", taker: TAKER }, NOW, async () => ({ late: true }));
+  assert.equal(r.status, 503, JSON.stringify(r.body));
+  assert.equal(r.body.error, "checks_slow");
+  assert.equal(r.retryAfter, CHECKS_RETRY_SEC, "sent as the Retry-After header");
+  assert.equal(r.body.retry_after_seconds, 60);
+  // A check that failed is a different answer, with no promise that waiting helps.
+  const failed = await quote({ token_in: USDG, token_out: TOKEN, amount_in: "1000000", taker: TAKER }, NOW, async () => ({ holders: holders(), dev: { status: 503, body: {} }, risk: risk() }));
+  assert.equal(failed.body.error, "checks_failed");
+  assert.equal(failed.retryAfter, undefined);
+});
 
 test("buying a healthy token is ok, with the round trip measured", async () => {
   const r = await buyWithRouteBack(() => answer({ code: 0, data: { routerAddress: ROUTER, routeSummary: { amountOut: "960000" } } }));

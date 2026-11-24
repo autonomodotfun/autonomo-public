@@ -89,7 +89,8 @@ export async function checkUpstream(raw: string): Promise<{ ok: true; url: URL }
 // ---------- forwarding ----------
 
 const FORWARD_REQUEST_HEADERS = ["accept", "accept-language", "content-type", "user-agent"];
-const FORWARD_RESPONSE_HEADERS = ["content-type", "content-language", "etag", "last-modified"];
+// retry-after: an API's "not ready yet, come back in N seconds", which the router reads (src/lib/router/router.ts).
+const FORWARD_RESPONSE_HEADERS = ["content-type", "content-language", "etag", "last-modified", "retry-after"];
 
 async function readCapped(body: ReadableStream<Uint8Array> | null, limit: number) {
   if (!body) return new Uint8Array();

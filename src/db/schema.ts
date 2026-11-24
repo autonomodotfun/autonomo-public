@@ -4,6 +4,7 @@ import {
   boolean,
   customType,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -160,6 +161,18 @@ export const gateways = pgTable(
     // USDC on Base at priceUsd, paid to the creator's splitter on Base. Only offered while Base is set up and the
     // payee can be paid there (see basePayToFor in the gateway route).
     acceptBase: boolean("accept_base").notNull().default(true),
+    // The router (src/lib/router/router.ts). The service this API serves, such as "token-price"; null means it is only
+    // callable by name.
+    routeCapability: text("route_capability"),
+    // How a routed request becomes a call to this API: its path with the capability's inputs in braces, such as
+    // "/v1/price/{token}?chain={chain}".
+    routePath: text("route_path"),
+    // Standard field name -> where it is in this API's own answer, such as { "price_usd": "priceUsd" }. Null when the
+    // API already answers with the standard field names.
+    routeMapping: jsonb("route_mapping").$type<Record<string, string>>(),
+    // Passed the format test for its capability, and when: that starts its week of three paid probes a day.
+    routeFormatOk: boolean("route_format_ok").notNull().default(false),
+    routeListedAt: timestamp("route_listed_at", { withTimezone: true }),
     status: text("status").$type<GatewayStatus>().notNull().default("active"),
     listing: text("listing").$type<GatewayListing>().notNull().default("unlisted"),
     projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
@@ -405,3 +418,106 @@ export const gloamPayments = pgTable("gloam_payments", {
   lockedUntil: timestamp("locked_until", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------- the router (src/lib/router/router.ts, read and written by src/lib/router/router-store.ts) ----------
+
+// One row per measured call: a call the router sent to an API, or a paid probe. Direct calls by name are not here.
+// The answer rate that decides whether an API is routed is taken from these rows.
+export const routerCalls = pgTable(
+  "router_calls",
+  {
+    id: serial("id").primaryKey(),
+    // The gateway's slug.
+    slug: text("slug").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+    valid: boolean("valid").notNull(),
+    // How long the API took; null when it never answered.
+    ms: integer("ms"),
+    kind: text("kind").$type<"routed" | "probe">().notNull(),
+    // Lowercased payer wallet, "" for a probe.
+    payer: text("payer").notNull().default(""),
+    settled: boolean("settled").notNull().default(false),
+    reason: text("reason").notNull().default(""),
+    // False for a "no answer for this input" (a 4xx), which is kept but is not part of the answer rate.
+    counted: boolean("counted").notNull().default(true),
+  },
+  (t) => [index("router_calls_slug_at_idx").on(t.slug, t.at)],
+);
+
+// One row per free uptime probe, sent straight to an API's own server every 15 minutes.
+export const routerUptime = pgTable(
+  "router_uptime",
+  {
+    id: serial("id").primaryKey(),
+    slug: text("slug").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+    up: boolean("up").notNull(),
+  },
+  (t) => [index("router_uptime_slug_at_idx").on(t.slug, t.at)],
+);
+
+// Executed slashes of the provider bond. A slash hits the pay-to wallet, so none of its APIs is routed for 30 days.
+export const routerSlashes = pgTable(
+  "router_slashes",
+  {
+    id: serial("id").primaryKey(),
+    slug: text("slug").notNull(),
+    // Lowercased pay-to wallet.
+    payTo: text("pay_to").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("router_slashes_slug_idx").on(t.slug), index("router_slashes_pay_to_idx").on(t.payTo)],
+);
+
+// Payers whose settlement failed after an API answered. The router refuses them until `until`.
+export const routerBlockedPayers = pgTable("router_blocked_payers", {
+  // Lowercased wallet address.
+  payer: text("payer").primaryKey(),
+  until: timestamp("until", { withTimezone: true }).notNull(),
+});
+
+// One row per 402 the router answered: which API was chosen for the request, so the paid request goes to the API the
+// agent saw the price of. Valid for 60 seconds and used once.
+export const routerRoutes = pgTable("router_routes", {
+  id: text("id").primaryKey(),
+  capability: text("capability").notNull(),
+  inputs: jsonb("inputs").$type<Record<string, string>>().notNull(),
+  slug: text("slug").notNull(),
+  // The APIs already tried for this request, and whether each said it had no answer for the input. `readyAt` is the
+  // time an API that said "not ready yet" asked to be called again.
+  tried: jsonb("tried").$type<{ slug: string; noData: boolean; readyAt?: number }[]>().notNull(),
+  expires: timestamp("expires", { withTimezone: true }).notNull(),
+  used: boolean("used").notNull().default(false),
+});
+
+// Requests to /route counted per caller and minute, for the rate limit. `key` is "ip:<address>" or "payer:<wallet>".
+export const routerHits = pgTable(
+  "router_hits",
+  {
+    key: text("key").notNull(),
+    // The start of the minute.
+    minute: timestamp("minute", { withTimezone: true }).notNull(),
+    n: integer("n").notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.key, t.minute] })],
+);
+
+// Each routable API's stats as last worked out from the tables above, so a request reads one row per API instead of
+// counting its calls again. A copy only: the row is removed whenever the API's record changes, and one older than
+// 15 minutes is not used (src/lib/router/router.ts).
+export const routerStats = pgTable(
+  "router_stats",
+  {
+    slug: text("slug").primaryKey(),
+    // Lowercased pay-to wallet, so a slash can clear the rows of every API it covers.
+    payTo: text("pay_to").notNull(),
+    measured: integer("measured").notNull(),
+    valid: integer("valid").notNull(),
+    medianMs: doublePrecision("median_ms"),
+    uptime: doublePrecision("uptime").notNull(),
+    lastSlash: timestamp("last_slash", { withTimezone: true }),
+    // When these stats were worked out.
+    at: timestamp("at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("router_stats_pay_to_idx").on(t.payTo)],
+);

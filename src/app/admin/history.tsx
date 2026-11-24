@@ -8,6 +8,7 @@ const GROUPS: Record<string, { label: string; kinds?: AdminEventKind[] }> = {
   apis: { label: "Pauses and visibility", kinds: ["api_paused", "api_resumed", "project_hidden", "project_shown", "project_featured", "project_unfeatured"] },
   directory: { label: "Directory submissions", kinds: ["submission_approved", "submission_rejected"] },
   payouts: { label: "Payouts and wallets", kinds: ["pay_to_set", "pay_to_request_approved", "pay_to_request_rejected", "wallet_switched"] },
+  router: { label: "Router", kinds: ["routing_enabled", "routing_stopped", "routing_settings"] },
 };
 const LIMIT = 200;
 const WARN: AdminEventKind[] = ["listing_rejected", "submission_rejected", "pay_to_request_rejected", "api_paused", "project_hidden"];
