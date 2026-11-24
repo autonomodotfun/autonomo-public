@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { CATEGORIES } from "@/lib/constants";
-import { CATEGORY_INFO } from "@/lib/categories";
+import { CATEGORY_INFO } from "@/lib/directory/categories";
 import { submitProject, type SubmitState } from "./actions";
 
 export function SubmitForm({ claim }: { claim?: string }) {

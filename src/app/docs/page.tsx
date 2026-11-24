@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { compact } from "@/components/project-row";
 import { TOKEN } from "@/lib/constants";
-import { getStats } from "@/lib/queries";
+import { getStats } from "@/lib/directory/queries";
 import { group, type NavItem } from "./nav";
 import { Card, Cards, Code, Page, Section } from "./ui";
 

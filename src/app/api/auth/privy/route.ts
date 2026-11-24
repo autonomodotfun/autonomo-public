@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ownerFromPrivyToken, privyEnabled } from "@/lib/privy";
-import { authEnabled, sessionCookie } from "@/lib/session";
+import { ownerFromPrivyToken, privyEnabled } from "@/lib/auth/privy";
+import { authEnabled, sessionCookie } from "@/lib/auth/session";
 
 // Exchanges a Privy access token (Authorization: Bearer …) for an Autonomo owner session.
 export async function POST(request: NextRequest) {

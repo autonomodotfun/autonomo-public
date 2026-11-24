@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { researchFreeDaily, webFreeDaily } from "@/lib/agent-limits";
-import { shelve } from "@/lib/api-shelves";
-import { exampleQuestion } from "@/lib/playground";
-import { playgroundPaymentsEnabled } from "@/lib/playground-pay";
-import { listAutonomoGateways } from "@/lib/queries";
-import { researchSampleMode, SAMPLE_PRICE } from "@/lib/research-sample";
+import { researchFreeDaily, webFreeDaily } from "@/lib/agent/agent-limits";
+import { shelve } from "@/lib/directory/api-shelves";
+import { exampleQuestion } from "@/lib/agent/playground";
+import { playgroundPaymentsEnabled } from "@/lib/agent/playground-pay";
+import { listAutonomoGateways } from "@/lib/directory/queries";
+import { researchSampleMode, SAMPLE_PRICE } from "@/lib/agent/research-sample";
 import { Playground, type ApiShelf, type AvailableApi } from "./playground";
 import type { ResearchPrice } from "./research";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     "Ask about tokens, creators, holders, wallets, transactions, payments and gas on Robinhood Chain, check a website or an x402 endpoint, or paste a token for a full research report, and watch an AI agent pay for the x402 APIs it needs in $AUTONOMO.",
 };
 
-/** What one research report pays for, in order (see src/lib/research.ts). */
+/** What one research report pays for, in order (see src/lib/agent/research.ts). */
 const REPORT_CALLS: { step: ResearchPrice["step"]; slug: string }[] = [
   { step: "risk", slug: "token-risk" },
   { step: "dev", slug: "dev-wallet" },

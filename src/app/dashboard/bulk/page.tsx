@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { secretsEnabled } from "@/lib/gateway";
-import { currentOwner } from "@/lib/session";
+import { secretsEnabled } from "@/lib/gateway/gateway";
+import { currentOwner } from "@/lib/auth/session";
 import { BulkForm } from "./bulk-form";
-import { dayPriceOrNull } from "@/lib/pool-price";
+import { dayPriceOrNull } from "@/lib/payments/pool-price";
 
 export const metadata: Metadata = { title: "Launch several APIs", robots: { index: false } };
 

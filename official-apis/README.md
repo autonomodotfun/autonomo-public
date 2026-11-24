@@ -23,7 +23,7 @@ in its README.
 
 Token Price (`autonomo.fun/x/token-price`) was retired on Nov 23, 2026: Token Lookup answers the same for $AUTONOMO at
 `autonomo.fun/x/token-lookup/price/0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96`. Its gateway is paused and answers
-410 with that address (`src/lib/retired.ts`); the gateway row and its upstream route stay, so it can be turned back on
+410 with that address (`src/lib/gateway/retired.ts`); the gateway row and its upstream route stay, so it can be turned back on
 from /admin.
 
 ## Adding a new official API
@@ -33,4 +33,4 @@ from /admin.
 3. Launch a gateway on autonomo.fun/dashboard with upstream `https://tools.autonomo.fun/v1`, auth header
    `x-api-key` and the `TOOLS_API_KEY` value. Use a keyword-rich description so the agent can find it.
 4. Request listing and approve it in /admin.
-5. Teach the agent the path for the new slug in `src/lib/playground.ts` (`GATEWAY_PATHS`, `intentKeywords`, `answerFrom`).
+5. Teach the agent the path for the new slug in `src/lib/agent/playground.ts` (`GATEWAY_PATHS`, `intentKeywords`, `answerFrom`).

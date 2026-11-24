@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { bondEnabled } from "@/lib/bond";
-import { burnFactory } from "@/lib/burn";
+import { bondEnabled } from "@/lib/trust/bond";
+import { burnFactory } from "@/lib/payments/burn";
 import { TOKEN } from "@/lib/constants";
 import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";

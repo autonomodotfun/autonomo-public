@@ -1,5 +1,5 @@
-import { formatUsd, networkLabel } from "@/lib/networks";
-import { DIRECT, listingEndpoints } from "@/lib/attach-endpoint";
+import { formatUsd, networkLabel } from "@/lib/payments/networks";
+import { DIRECT, listingEndpoints } from "@/lib/directory/attach-endpoint";
 import { Avatar } from "@/components/project-row";
 import { attachListingEndpoint, detachListingEndpoint, editListing, moveListingEndpoint } from "./actions";
 

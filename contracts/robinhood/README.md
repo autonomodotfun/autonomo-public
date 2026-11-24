@@ -13,7 +13,7 @@ The burn, the mirror burn for Base payments, the rewards vesting, and the provid
 
 Every burn is an on-chain event: `Flushed(token, toRecipient, toBurn)` on splitters and `BoughtAndBurned(usdgIn, ethIn, autonomoBurned)` on the buyback.
 
-The app (`src/lib/burn.ts`) flushes a payee's splitter once a payment takes it to 1,000 $AUTONOMO or 0.10 USDG, and a daily run (`/api/cron/burn`) flushes anything from 100 $AUTONOMO or 0.10 USDG. It buys back once the buyback holds at least 0.1 USDG, swapping at most 100 USDG per run because the token's pool is thin (100 USDG moves the price by about 1%, 1,000 by about 8%). Anything above that waits for later runs.
+The app (`src/lib/payments/burn.ts`) flushes a payee's splitter once a payment takes it to 1,000 $AUTONOMO or 0.10 USDG, and a daily run (`/api/cron/burn`) flushes anything from 100 $AUTONOMO or 0.10 USDG. It buys back once the buyback holds at least 0.1 USDG, swapping at most 100 USDG per run because the token's pool is thin (100 USDG moves the price by about 1%, 1,000 by about 8%). Anything above that waits for later runs.
 
 Deployed on Nov 4, 2026 with the Foundry script, in block 105635227:
 
@@ -178,7 +178,7 @@ Its constructor takes, in order:
 | `token_` | $AUTONOMO | `0xE83C85E1eaD16FCFe85401E2b337Fb4FB5B5cC96` |
 | `owner_` | A Safe used for nothing else. Cancels slashes, replaces the slasher, changes the settings | To come |
 | `slasher_` | A separate wallet that proposes slashes, its key kept off the server | To come |
-| `minBond_` | The floor `isBonded` applies on-chain, in the token's 18 decimals. The site's Bonded badge asks for about $100 of $AUTONOMO instead, set weekly from the previous week's average price and locked per wallet like Verified (`src/lib/bond.ts`), and never less than this floor | `100000000000000000000000` (100,000 tokens) |
+| `minBond_` | The floor `isBonded` applies on-chain, in the token's 18 decimals. The site's Bonded badge asks for about $100 of $AUTONOMO instead, set weekly from the previous week's average price and locked per wallet like Verified (`src/lib/trust/bond.ts`), and never less than this floor | `100000000000000000000000` (100,000 tokens) |
 | `cooldown_` | Seconds between asking to withdraw and withdrawing | `1209600` (14 days) |
 | `disputeWindow_` | Seconds a slash waits before it can run | `259200` (3 days) |
 | `maxSlashBps_` | Most one slash can take | `2000` (20% of the bond) |

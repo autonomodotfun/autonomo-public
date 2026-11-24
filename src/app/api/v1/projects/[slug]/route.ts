@@ -1,5 +1,5 @@
 import { json, options, withUpdating } from "@/lib/api";
-import { getProject } from "@/lib/queries";
+import { getProject } from "@/lib/directory/queries";
 
 export { options as OPTIONS };
 

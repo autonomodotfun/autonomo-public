@@ -3,11 +3,11 @@
 import { inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
-import { checkUpstream, encryptSecret, ownerPayTo, RESERVED_SLUGS, secretsEnabled, testUpstream } from "@/lib/gateway";
-import { autonomoAmountFor, headerNameValid, slugError, testVerdict, usdPriceValid } from "@/lib/gateway-rules";
-import { dayPriceUsd } from "@/lib/pool-price";
-import { revalidateCatalog } from "@/lib/queries";
-import { currentOwner } from "@/lib/session";
+import { checkUpstream, encryptSecret, ownerPayTo, RESERVED_SLUGS, secretsEnabled, testUpstream } from "@/lib/gateway/gateway";
+import { autonomoAmountFor, headerNameValid, slugError, testVerdict, usdPriceValid } from "@/lib/gateway/gateway-rules";
+import { dayPriceUsd } from "@/lib/payments/pool-price";
+import { revalidateCatalog } from "@/lib/directory/queries";
+import { currentOwner } from "@/lib/auth/session";
 
 const { gateways } = schema;
 
@@ -21,7 +21,7 @@ const TESTS_AT_ONCE = 4;
 const recentChecks = new Map<string, number[]>();
 
 export type BulkShared = { upstreamUrl: string; authHeader: string; authSecret: string };
-// One dollar price per API; the $AUTONOMO price follows it (src/lib/gateway-rules.ts).
+// One dollar price per API; the $AUTONOMO price follows it (src/lib/gateway/gateway-rules.ts).
 export type BulkApi = { name: string; slug: string; description: string; priceUsd: string; acceptUsdg: boolean; acceptAutonomo: boolean; path: string };
 export type BulkApiResult = { slug: string; problems: string[]; test: { pass: boolean; text: string } | null };
 export type BulkResult = {

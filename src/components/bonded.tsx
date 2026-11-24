@@ -1,8 +1,8 @@
 import Link from "next/link";
-import type { SlashRecord, WalletBond } from "@/lib/bond";
-import { openSlashStatus } from "@/lib/bond-rules";
+import type { SlashRecord, WalletBond } from "@/lib/trust/bond";
+import { openSlashStatus } from "@/lib/trust/bond-rules";
 import { TOKEN } from "@/lib/constants";
-import { fmtAutonomo, shortAddr } from "@/lib/gateway-format";
+import { fmtAutonomo, shortAddr } from "@/lib/gateway/gateway-format";
 
 // What the public sees of the provider bond: the badge, an API's bond, and the list of slashes.
 

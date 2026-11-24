@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { CreatorRecord, HoldersCheck, LaunchCheck, Receipt, Report, ResearchEvent, ResearchStep, Verdict, WalletCheck } from "@/lib/research";
+import type { CreatorRecord, HoldersCheck, LaunchCheck, Receipt, Report, ResearchEvent, ResearchStep, Verdict, WalletCheck } from "@/lib/agent/research";
 
 // The Playground's Research mode: paste a token, watch the agent pay each official API that knows something about
-// it, and read one report. The server side is /api/research and src/lib/research.ts.
+// it, and read one report. The server side is /api/research and src/lib/agent/research.ts.
 
 /** The APIs one report pays, in order, for the page to show their prices before anything runs. */
 export type ResearchPrice = { step: ResearchStep; api: string; autonomo: string };
@@ -87,7 +87,7 @@ const stopSteps = (run: Run): Run => ({
   ) as Record<ResearchStep, StepState>,
 });
 
-/** Sample-mode addresses: the last character picks the story (see src/lib/research-sample.ts). */
+/** Sample-mode addresses: the last character picks the story (see src/lib/agent/research-sample.ts). */
 const SAMPLES: [string, string][] = [
   ["Risky token", `0x${"1".repeat(40)}`],
   ["High risk, launch check fails", `0x${"1".repeat(39)}8`],

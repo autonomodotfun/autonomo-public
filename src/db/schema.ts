@@ -131,7 +131,7 @@ export const submissions = pgTable(
 
 // Hosted x402 gateways: an owner puts an existing API behind autonomo.fun/x/<slug>, priced per call.
 // Payments go straight to the owner's wallet, or to payTo when one is set, unless burning is on: then they go through
-// that wallet's burn splitter (src/lib/burn.ts). Autonomo never holds funds.
+// that wallet's burn splitter (src/lib/payments/burn.ts). Autonomo never holds funds.
 export const GATEWAY_STATUSES = ["active", "paused"] as const;
 export type GatewayStatus = (typeof GATEWAY_STATUSES)[number];
 export const GATEWAY_LISTINGS = ["unlisted", "pending", "listed", "rejected"] as const;
@@ -229,7 +229,7 @@ export const adminEvents = pgTable(
   (t) => [index("admin_events_created_idx").on(t.createdAt), index("admin_events_gateway_idx").on(t.gatewayId)],
 );
 
-// Every burn, copied from the chain's events by the burn keeper for the public /burn page. See src/lib/burn.ts.
+// Every burn, copied from the chain's events by the burn keeper for the public /burn page. See src/lib/payments/burn.ts.
 export const burnReceipts = pgTable(
   "burn_receipts",
   {
@@ -296,7 +296,7 @@ export const playgroundPayments = pgTable(
   (t) => [index("playground_payments_visitor_created_idx").on(t.visitor, t.createdAt)],
 );
 
-// The $AUTONOMO amount a wallet is held to for Verified, saved when it first qualifies. See src/lib/verified.ts.
+// The $AUTONOMO amount a wallet is held to for Verified, saved when it first qualifies. See src/lib/trust/verified.ts.
 export const verifiedWallets = pgTable("verified_wallets", {
   // Lowercased wallet address.
   owner: text("owner").primaryKey(),
@@ -307,7 +307,7 @@ export const verifiedWallets = pgTable("verified_wallets", {
 });
 
 // The $AUTONOMO amount a wallet's provider bond is held to for Bonded, saved when it first qualifies. Like
-// verified_wallets: it never goes up for that wallet, and it is dropped when the bond falls below it. See src/lib/bond.ts.
+// verified_wallets: it never goes up for that wallet, and it is dropped when the bond falls below it. See src/lib/trust/bond.ts.
 export const bondedWallets = pgTable("bonded_wallets", {
   // Lowercased wallet address: the wallet the APIs pay, which is the wallet that bonds.
   wallet: text("wallet").primaryKey(),
@@ -324,7 +324,7 @@ export const agentQuestions = pgTable(
     id: serial("id").primaryKey(),
     // "web" or "telegram".
     surface: text("surface").notNull(),
-    // Keyed hash of the visitor's IP or Telegram id, never the id itself. See src/lib/agent-limits.ts.
+    // Keyed hash of the visitor's IP or Telegram id, never the id itself. See src/lib/agent/agent-limits.ts.
     subject: text("subject").notNull(),
     // "answer" or "fail".
     outcome: text("outcome").notNull(),
@@ -349,7 +349,7 @@ export const agentLimits = pgTable("agent_limits", {
   count: integer("count").notNull().default(0),
 });
 
-// The agent's recent conversations, so follow-up questions have context. See src/lib/agent-conversations.ts.
+// The agent's recent conversations, so follow-up questions have context. See src/lib/agent/agent-conversations.ts.
 export const agentConversations = pgTable(
   "agent_conversations",
   {
@@ -364,7 +364,7 @@ export const agentConversations = pgTable(
   (t) => [index("agent_conversations_updated_idx").on(t.updatedAt)],
 );
 
-// Gloam cash-out payments (see src/lib/gloam.ts). An agent pays from its private Gloam balance by cashing out an exact
+// Gloam cash-out payments (see src/lib/payments/gloam.ts). An agent pays from its private Gloam balance by cashing out an exact
 // amount to the gateway's splitter. Each 402 issues a quote; the retry names the quote and the cash-out transaction.
 export const gloamQuotes = pgTable(
   "gloam_quotes",

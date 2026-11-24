@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BURN_BPS, burnFactory } from "@/lib/burn";
+import { BURN_BPS, burnFactory } from "@/lib/payments/burn";
 import { TOKEN } from "@/lib/constants";
-import { baseCoverage } from "@/lib/gateway";
+import { baseCoverage } from "@/lib/gateway/gateway";
 import { Faq, Page } from "../ui";
 
 export const metadata: Metadata = {

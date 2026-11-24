@@ -2,9 +2,9 @@ import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { getDb, schema } from "@/db";
 import { TOKEN } from "@/lib/constants";
-import { shortAddr } from "@/lib/gateway-format";
-import { privyEnabled } from "@/lib/privy";
-import { safeInfo } from "@/lib/verified";
+import { shortAddr } from "@/lib/gateway/gateway-format";
+import { privyEnabled } from "@/lib/auth/privy";
+import { safeInfo } from "@/lib/trust/verified";
 import { cancelPayToRequest, requestPayTo } from "./actions";
 import { FirstSafeBrowser, FirstSafePrivy } from "./first-safe";
 

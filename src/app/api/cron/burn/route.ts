@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { burnEnabled, runBurnKeeper } from "@/lib/burn";
+import { burnEnabled, runBurnKeeper } from "@/lib/payments/burn";
 
 // Daily backup for the burn (scheduled in vercel.json): a payment flushes its payee's splitter at a threshold, and this
 // catches anyone below it. It flushes each payee's burn splitter, which burns 5% of $AUTONOMO and sends

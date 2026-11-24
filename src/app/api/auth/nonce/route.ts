@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateSiweNonce } from "viem/siwe";
-import { authEnabled, cookieOptions, NONCE_COOKIE, NONCE_TTL_S, seal } from "@/lib/session";
+import { authEnabled, cookieOptions, NONCE_COOKIE, NONCE_TTL_S, seal } from "@/lib/auth/session";
 
 // Issues a one-time nonce for Sign-In with Ethereum, bound to this browser by a signed cookie.
 export async function GET() {

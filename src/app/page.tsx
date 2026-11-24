@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { TOKEN } from "@/lib/constants";
-import { baseCoverage } from "@/lib/gateway";
-import { formatUsd } from "@/lib/networks";
-import { getStats, getTrackRecords, listAutonomoGateways, searchProjects } from "@/lib/queries";
+import { baseCoverage } from "@/lib/gateway/gateway";
+import { formatUsd } from "@/lib/payments/networks";
+import { getStats, getTrackRecords, listAutonomoGateways, searchProjects } from "@/lib/directory/queries";
 import { ApiCard, mostPaid, paidCalls, type AutonomoApi } from "@/components/api-card";
 import { Avatar, compact, ProjectList } from "@/components/project-row";
 import { Tabs, type TabItem } from "@/components/tabs";

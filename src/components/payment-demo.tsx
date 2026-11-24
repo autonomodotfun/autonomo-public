@@ -1,7 +1,7 @@
 import Link from "next/link";
-import examples from "@/lib/bazaar-examples.json";
-import { formatUsd } from "@/lib/networks";
-import { listAutonomoGateways } from "@/lib/queries";
+import examples from "@/lib/gateway/bazaar-examples.json";
+import { formatUsd } from "@/lib/payments/networks";
+import { listAutonomoGateways } from "@/lib/directory/queries";
 
 // The homepage's picture of the product: one paid call to Safe Swap, an official API, line by line. The path is the
 // API's real one, the price is read from its gateway, and the answer is the API's own example answer (the one its

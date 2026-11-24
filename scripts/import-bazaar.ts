@@ -1,7 +1,7 @@
 // Imports x402 resources from facilitator discovery ("Bazaar") endpoints and groups them into projects by host.
 // Usage: npm run db:import [-- --dry-run] [-- --max=5000]
 import "./env";
-import { importBazaar } from "../src/lib/bazaar-import";
+import { importBazaar } from "../src/lib/directory/bazaar-import";
 
 const args = process.argv.slice(2);
 const summary = await importBazaar({

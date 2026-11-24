@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { shelve } from "@/lib/api-shelves";
-import { bondEnabled } from "@/lib/bond";
-import { BURN_BPS, burnFactory } from "@/lib/burn";
-import { baseCoverage } from "@/lib/gateway";
+import { shelve } from "@/lib/directory/api-shelves";
+import { bondEnabled } from "@/lib/trust/bond";
+import { BURN_BPS, burnFactory } from "@/lib/payments/burn";
+import { baseCoverage } from "@/lib/gateway/gateway";
 import { TOKEN } from "@/lib/constants";
-import { GATEWAY_USAGE } from "@/lib/playground";
-import { listAutonomoGateways } from "@/lib/queries";
+import { GATEWAY_USAGE } from "@/lib/agent/playground";
+import { listAutonomoGateways } from "@/lib/directory/queries";
 import { metadata as agents } from "../docs/agents/page";
 import { metadata as borro } from "../docs/borro/page";
 import { metadata as cli } from "../docs/cli/page";
@@ -32,7 +32,7 @@ import { metadata as numbers } from "../numbers/page";
 import { metadata as partners } from "../partners/page";
 import { metadata as playground } from "../playground/page";
 import { metadata as roadmap } from "../roadmap/page";
-import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway-rules";
+import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway/gateway-rules";
 
 // /llms.txt (https://llmstxt.org): a plain-text map of Autonomo for AI agents and LLMs. Nothing here is written twice:
 // page titles and descriptions come from each page's own metadata, the official APIs and their prices from the same

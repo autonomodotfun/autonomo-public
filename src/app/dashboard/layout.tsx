@@ -1,4 +1,4 @@
-import { privyAppId } from "@/lib/privy-config";
+import { privyAppId } from "@/lib/auth/privy-config";
 import { Providers } from "./privy";
 
 // Privy loads only on the dashboard, and only when it's configured.

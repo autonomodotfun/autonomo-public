@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CATEGORIES, type Category } from "@/db/schema";
-import { shelve } from "@/lib/api-shelves";
-import { CATEGORY_INFO } from "@/lib/categories";
+import { shelve } from "@/lib/directory/api-shelves";
+import { CATEGORY_INFO } from "@/lib/directory/categories";
 import { TOKEN } from "@/lib/constants";
-import { networkLabel } from "@/lib/networks";
+import { networkLabel } from "@/lib/payments/networks";
 import {
   getDirectoryFacets,
   getStats,
@@ -15,12 +15,12 @@ import {
   type DirectoryFacets,
   type ProjectQuery,
   type Sort,
-} from "@/lib/queries";
-import { PRICE_BANDS, priceBand, topic, TOPICS } from "@/lib/topics";
+} from "@/lib/directory/queries";
+import { PRICE_BANDS, priceBand, topic, TOPICS } from "@/lib/directory/topics";
 import { ApiCard, mostPaid, type AutonomoApi } from "@/components/api-card";
 import { FilterSheet } from "@/components/filter-sheet";
 import { compact, ProjectList } from "@/components/project-row";
-import { baseCoverage } from "@/lib/gateway";
+import { baseCoverage } from "@/lib/gateway/gateway";
 
 // The Explore page has three tabs. "All APIs" lists the paid services, live ones first, with filters beside the
 // list. "Autonomo" shows Autonomo's own APIs on their shelves. "Ecosystem" holds everything that isn't a paid

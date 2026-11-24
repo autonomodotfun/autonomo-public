@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { bondEnabled } from "@/lib/bond";
+import { bondEnabled } from "@/lib/trust/bond";
 
 export const metadata: Metadata = {
   title: "Roadmap",

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TOKEN } from "@/lib/constants";
-import { baseCoverage } from "@/lib/gateway";
-import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
+import { baseCoverage } from "@/lib/gateway/gateway";
+import { verifiedAmount, verifiedEnabled } from "@/lib/trust/verified";
 import { GroupLabel } from "../docs-nav";
 import { NAV } from "../nav";
 import { Section, Step } from "../ui";

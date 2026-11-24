@@ -6,16 +6,16 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAddress } from "viem";
 import { getDb, schema } from "@/db";
-import { isAuthorized } from "@/lib/admin-auth";
-import { logAdmin } from "@/lib/admin-log";
-import { attachEndpoint as attach, detachEndpoint as detach, moveEndpoint as move } from "@/lib/attach-endpoint";
-import { editListing as saveListing, parseListingFields } from "@/lib/edit-listing";
+import { isAuthorized } from "@/lib/admin/admin-auth";
+import { logAdmin } from "@/lib/admin/admin-log";
+import { attachEndpoint as attach, detachEndpoint as detach, moveEndpoint as move } from "@/lib/directory/attach-endpoint";
+import { editListing as saveListing, parseListingFields } from "@/lib/directory/edit-listing";
 import { TOKEN } from "@/lib/constants";
-import { gatewayNetworks, gatewayOffers, payeeOf, syncGatewayNetworks } from "@/lib/gateway";
-import { applyPayTo } from "@/lib/pay-to";
-import { USDG } from "@/lib/payments";
-import { slugify } from "@/lib/slug";
-import { revalidateCatalog } from "@/lib/queries";
+import { gatewayNetworks, gatewayOffers, payeeOf, syncGatewayNetworks } from "@/lib/gateway/gateway";
+import { applyPayTo } from "@/lib/payments/pay-to";
+import { USDG } from "@/lib/payments/payments";
+import { slugify } from "@/lib/directory/slug";
+import { revalidateCatalog } from "@/lib/directory/queries";
 
 // Server actions can be invoked from any route, so each one re-checks auth rather than trusting the proxy.
 async function requireAdmin() {
@@ -281,7 +281,7 @@ export async function setApiStatus(form: FormData) {
   revalidateCatalog();
 }
 
-// Adds an x402 endpoint to a directory listing from its own 402 answer (see src/lib/attach-endpoint.ts).
+// Adds an x402 endpoint to a directory listing from its own 402 answer (see src/lib/directory/attach-endpoint.ts).
 export async function attachListingEndpoint(form: FormData) {
   await requireAdmin();
   const slug = String(form.get("slug") ?? "").trim();
@@ -322,7 +322,7 @@ export async function moveListingEndpoint(form: FormData) {
   redirect(`/admin?${new URLSearchParams({ tab: "directory", listing: slug, listingNote })}#endpoints`);
 }
 
-// Edits a listing's description, links and logo (see src/lib/edit-listing.ts).
+// Edits a listing's description, links and logo (see src/lib/directory/edit-listing.ts).
 export async function editListing(form: FormData) {
   await requireAdmin();
   const slug = String(form.get("slug") ?? "").trim();

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { BondedBadge, fmtBond, fmtDay } from "@/components/bonded";
-import { bondUsd, walletBondOrNull } from "@/lib/bond";
-import { shortOfMinimum } from "@/lib/bond-rules";
+import { bondUsd, walletBondOrNull } from "@/lib/trust/bond";
+import { shortOfMinimum } from "@/lib/trust/bond-rules";
 import { TOKEN } from "@/lib/constants";
-import { privyEnabled } from "@/lib/privy";
-import { isContractWallet } from "@/lib/verified";
+import { privyEnabled } from "@/lib/auth/privy";
+import { isContractWallet } from "@/lib/trust/verified";
 import { BondStepsBrowser, BondStepsManual, BondStepsPrivy, type BondStepsProps } from "./bond-steps";
 
 /**

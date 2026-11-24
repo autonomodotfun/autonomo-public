@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { shelve } from "@/lib/api-shelves";
+import { shelve } from "@/lib/directory/api-shelves";
 import { TOKEN } from "@/lib/constants";
-import { baseCoverage } from "@/lib/gateway";
+import { baseCoverage } from "@/lib/gateway/gateway";
 import { Page, Section, Table } from "../ui";
 
 export const metadata: Metadata = {

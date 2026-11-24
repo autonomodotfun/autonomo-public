@@ -1,8 +1,8 @@
 import { isAddress } from "viem";
-import { reserveReport, returnReport, webVisitorId } from "@/lib/agent-limits";
-import { playgroundPaymentsEnabled } from "@/lib/playground-pay";
-import { checkWallet } from "@/lib/research";
-import { researchSampleMode, sampleDeps } from "@/lib/research-sample";
+import { reserveReport, returnReport, webVisitorId } from "@/lib/agent/agent-limits";
+import { playgroundPaymentsEnabled } from "@/lib/agent/playground-pay";
+import { checkWallet } from "@/lib/agent/research";
+import { researchSampleMode, sampleDeps } from "@/lib/agent/research-sample";
 
 // One payment to Wallet Portfolio.
 export const maxDuration = 60;

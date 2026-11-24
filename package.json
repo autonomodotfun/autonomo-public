@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
+    "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\"",
+    "test:tools": "node --test \"official-apis/tools/test/*.test.mjs\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed-curated.ts",

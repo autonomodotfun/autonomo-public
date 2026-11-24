@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
-import { bondEnabled } from "@/lib/bond";
-import { burnEnabled } from "@/lib/burn";
-import { getAllSlugs } from "@/lib/queries";
+import { bondEnabled } from "@/lib/trust/bond";
+import { burnEnabled } from "@/lib/payments/burn";
+import { getAllSlugs } from "@/lib/directory/queries";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";

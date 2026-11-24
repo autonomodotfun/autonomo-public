@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { repriceAll } from "@/lib/reprice";
+import { repriceAll } from "@/lib/payments/reprice";
 
 // Daily $AUTONOMO repricing (scheduled in vercel.json, just after midnight UTC): every API's $AUTONOMO price follows its
 // dollar price, 20% lower, at the previous day's average token price. Vercel calls it with

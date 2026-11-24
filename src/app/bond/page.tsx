@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BondedBadge, fmtBond, SlashList } from "@/components/bonded";
-import { bondContract, bondEnabled, bondRefundWallet, bondUsd, getBondRequirement, getBondSettings, slashesOrNull } from "@/lib/bond";
-import { BURN_DEAD } from "@/lib/burn";
+import { bondContract, bondEnabled, bondRefundWallet, bondUsd, getBondRequirement, getBondSettings, slashesOrNull } from "@/lib/trust/bond";
+import { BURN_DEAD } from "@/lib/payments/burn";
 import { TOKEN } from "@/lib/constants";
-import { getGatewayBonds } from "@/lib/queries";
+import { getGatewayBonds } from "@/lib/directory/queries";
 
 export const metadata: Metadata = {
   title: "Provider bond",

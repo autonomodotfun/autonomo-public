@@ -1,14 +1,14 @@
 import { isAddress } from "viem";
-import { researchFreeDaily, reserveReport, returnReport, webVisitorId } from "@/lib/agent-limits";
-import { playgroundPaymentsEnabled } from "@/lib/playground-pay";
-import { researchToken, type ResearchEvent } from "@/lib/research";
-import { researchSampleMode, sampleDeps } from "@/lib/research-sample";
+import { researchFreeDaily, reserveReport, returnReport, webVisitorId } from "@/lib/agent/agent-limits";
+import { playgroundPaymentsEnabled } from "@/lib/agent/playground-pay";
+import { researchToken, type ResearchEvent } from "@/lib/agent/research";
+import { researchSampleMode, sampleDeps } from "@/lib/agent/research-sample";
 
 // Up to four payments one after another, a first-time Permit2 approval at most, and the written summary.
 export const maxDuration = 120;
 
 // The research agent behind the Playground's Research mode: one free token report per request, paid by the
-// Playground's wallet, streamed to the page as NDJSON (see ResearchEvent in src/lib/research.ts).
+// Playground's wallet, streamed to the page as NDJSON (see ResearchEvent in src/lib/agent/research.ts).
 // Like /api/playground, the real per-minute limit is a Vercel Firewall rule; this in-memory count covers local dev.
 
 const MINUTE = 60_000;

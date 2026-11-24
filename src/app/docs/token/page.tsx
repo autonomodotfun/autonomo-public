@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CopyButton } from "@/components/copy-button";
-import { BURN_BPS, BURN_DEAD, burnFactory, buybackBurner } from "@/lib/burn";
+import { BURN_BPS, BURN_DEAD, burnFactory, buybackBurner } from "@/lib/payments/burn";
 import { TOKEN } from "@/lib/constants";
-import { bondEnabled } from "@/lib/bond";
-import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
+import { bondEnabled } from "@/lib/trust/bond";
+import { verifiedAmount, verifiedEnabled } from "@/lib/trust/verified";
 import { Page, Section } from "../ui";
 
 export const metadata: Metadata = {

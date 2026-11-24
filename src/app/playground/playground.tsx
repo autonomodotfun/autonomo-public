@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { MAX_PAID_CALLS, plainAnswer, type AgentEvent, type AgentReceipt } from "@/lib/agent-events";
+import { MAX_PAID_CALLS, plainAnswer, type AgentEvent, type AgentReceipt } from "@/lib/agent/agent-events";
 import { ResearchPanel, type ResearchPrice } from "./research";
 
 /** A listed Autonomo gateway the agent can pay in $AUTONOMO, with a question that uses it. */

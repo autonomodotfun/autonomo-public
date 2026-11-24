@@ -1,7 +1,7 @@
 import { and, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 import Link from "next/link";
 import { getDb, schema } from "@/db";
-import { payeeOf } from "@/lib/gateway";
+import { payeeOf } from "@/lib/gateway/gateway";
 import { setApiStatus, setProjectFlags } from "./actions";
 import { when } from "./ui";
 

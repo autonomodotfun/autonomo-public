@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { compact } from "@/components/project-row";
-import { CATEGORY_INFO } from "@/lib/categories";
+import { CATEGORY_INFO } from "@/lib/directory/categories";
 import { CATEGORIES } from "@/lib/constants";
-import { getStats } from "@/lib/queries";
-import { verifiedEnabled } from "@/lib/verified";
+import { getStats } from "@/lib/directory/queries";
+import { verifiedEnabled } from "@/lib/trust/verified";
 import { Code, Page, Section, Table } from "../ui";
 
 export const metadata: Metadata = {

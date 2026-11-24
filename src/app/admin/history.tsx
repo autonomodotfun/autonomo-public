@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ADMIN_EVENT_LABELS, recentAdminEvents, type AdminEventKind } from "@/lib/admin-log";
+import { ADMIN_EVENT_LABELS, recentAdminEvents, type AdminEventKind } from "@/lib/admin/admin-log";
 import { when } from "./ui";
 
 const GROUPS: Record<string, { label: string; kinds?: AdminEventKind[] }> = {

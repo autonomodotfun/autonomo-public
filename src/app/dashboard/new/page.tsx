@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { baseCoverage, ownerPayTo, secretsEnabled } from "@/lib/gateway";
-import { currentOwner } from "@/lib/session";
+import { baseCoverage, ownerPayTo, secretsEnabled } from "@/lib/gateway/gateway";
+import { currentOwner } from "@/lib/auth/session";
 import { VerifiedPanel } from "@/components/verified";
-import { burnPercent } from "@/lib/burn";
-import { dayPriceOrNull } from "@/lib/pool-price";
+import { burnPercent } from "@/lib/payments/burn";
+import { dayPriceOrNull } from "@/lib/payments/pool-price";
 import { GatewayForm } from "../gateway-form";
 
 export const metadata: Metadata = { title: "Launch an API", robots: { index: false } };

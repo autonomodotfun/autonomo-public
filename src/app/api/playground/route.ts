@@ -1,12 +1,12 @@
-import { askAgentWithLimits } from "@/lib/agent-ai";
-import type { AgentEvent } from "@/lib/agent-events";
-import { webVisitorId } from "@/lib/agent-limits";
+import { askAgentWithLimits } from "@/lib/agent/agent-ai";
+import type { AgentEvent } from "@/lib/agent/agent-events";
+import { webVisitorId } from "@/lib/agent/agent-limits";
 
 // One question can take several model turns and on-chain payments, and the first run may also send the one-time
 // Permit2 approval.
 export const maxDuration = 120;
 
-// Agent Playground: streams the agent's progress (src/lib/agent-ai.ts) to the page as NDJSON. Spending and daily
+// Agent Playground: streams the agent's progress (src/lib/agent/agent-ai.ts) to the page as NDJSON. Spending and daily
 // limits live in the agent.
 //
 // Questions per minute: the real limit is a Vercel Firewall rate limit rule on /api/playground. The in-memory count

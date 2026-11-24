@@ -2,24 +2,24 @@ import { after, NextResponse, type NextRequest } from "next/server";
 import { withX402 } from "@x402/next";
 import type { Gateway } from "@/db/schema";
 import { updating } from "@/lib/api";
-import { bazaarRouteFields } from "@/lib/bazaar";
-import { baseStatus } from "@/lib/base-pay";
-import { BURN_BPS, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/burn";
-import { forward, gatewayOffers, getGateway, isOfficial, recordCall, payeeOf } from "@/lib/gateway";
-import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/gloam";
-import { GLOAM_USDG, GLOAM_VAULT } from "@/lib/gloam-check";
-import { acceptsFor, railForAsset, x402Server } from "@/lib/payments";
-import { retiredAnswer } from "@/lib/retired";
+import { bazaarRouteFields } from "@/lib/gateway/bazaar";
+import { baseStatus } from "@/lib/payments/base-pay";
+import { BURN_BPS, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/payments/burn";
+import { forward, gatewayOffers, getGateway, isOfficial, recordCall, payeeOf } from "@/lib/gateway/gateway";
+import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/payments/gloam";
+import { GLOAM_USDG, GLOAM_VAULT } from "@/lib/payments/gloam-check";
+import { acceptsFor, railForAsset, x402Server } from "@/lib/payments/payments";
+import { retiredAnswer } from "@/lib/gateway/retired";
 
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
-// Payments go to the owner's wallet, or to its burn splitter when burning is on (src/lib/burn.ts); the upstream is
+// Payments go to the owner's wallet, or to its burn splitter when burning is on (src/lib/payments/burn.ts); the upstream is
 // only called after the payment verifies, and the payment only settles when the upstream answers below 400.
-// Gateways that accept USDG also offer a Gloam cash-out (src/lib/gloam.ts), where the payment lands
+// Gateways that accept USDG also offer a Gloam cash-out (src/lib/payments/gloam.ts), where the payment lands
 // before the call; its transaction is only marked used once the upstream answers below 400.
-// APIs also take USDC on Base, settled by Coinbase's facilitator (src/lib/payments.ts). Official APIs are paid
+// APIs also take USDC on Base, settled by Coinbase's facilitator (src/lib/payments/payments.ts). Official APIs are paid
 // straight to Autonomo's Safe there; creator APIs to the creator's splitter on Base, which keeps 5% for the mirror
-// burn (src/lib/burn.ts). The burn itself happens on Robinhood Chain, from the mirror burn pot. Owners can switch
-// Base off per API (acceptBase); where Base is paid, and why it's off, is worked out in src/lib/base-pay.ts.
+// burn (src/lib/payments/burn.ts). The burn itself happens on Robinhood Chain, from the mirror burn pot. Owners can switch
+// Base off per API (acceptBase); where Base is paid, and why it's off, is worked out in src/lib/payments/base-pay.ts.
 
 // Upstream calls may take up to 25 s (see forward()); leave headroom for payment verification and settlement.
 export const maxDuration = 60;
@@ -87,7 +87,7 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
   }
   if (!g) return withHeaders(Response.json({ error: "not_found" }, { status: 404 }));
   if (g.status !== "active") {
-    // A retired API points to the one that replaced it (src/lib/retired.ts).
+    // A retired API points to the one that replaced it (src/lib/gateway/retired.ts).
     const retired = retiredAnswer(g.slug, process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin);
     if (retired) return withHeaders(retired, slug);
     return withHeaders(Response.json({ error: "gateway_paused", message: "This API is paused by its owner." }, { status: 503 }), slug);

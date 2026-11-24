@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TOKEN } from "@/lib/constants";
-import { BURN_BPS, BURN_DEAD, baseSplitterFactory, burnEnabled, burnFactory, buybackBurner, getBurns, getMirror, mirrorPot, previousBurnFactory } from "@/lib/burn";
-import { baseCoverage } from "@/lib/gateway";
-import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway-format";
+import { BURN_BPS, BURN_DEAD, baseSplitterFactory, burnEnabled, burnFactory, buybackBurner, getBurns, getMirror, mirrorPot, previousBurnFactory } from "@/lib/payments/burn";
+import { baseCoverage } from "@/lib/gateway/gateway";
+import { fmtAutonomo, fmtUsdg, shortAddr } from "@/lib/gateway/gateway-format";
 
 export const metadata: Metadata = {
   title: "Burn",

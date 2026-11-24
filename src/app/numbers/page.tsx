@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { retrySoon } from "@/lib/prerender";
-import { getTrackRecords } from "@/lib/queries";
-import { OFFICIAL_OWNER, TRACK_RECORD_DAYS } from "@/lib/track-record";
+import { getTrackRecords } from "@/lib/directory/queries";
+import { OFFICIAL_OWNER, TRACK_RECORD_DAYS } from "@/lib/directory/track-record";
 
 export const metadata: Metadata = {
   title: "Numbers",

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { TOKEN } from "@/lib/constants";
-import { offersBase } from "@/lib/gateway";
-import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway-rules";
-import { formatUsd } from "@/lib/networks";
-import type { getTrackRecords, listAutonomoGateways } from "@/lib/queries";
-import { shelve } from "@/lib/api-shelves";
+import { offersBase } from "@/lib/gateway/gateway";
+import { AUTONOMO_DISCOUNT_LABEL } from "@/lib/gateway/gateway-rules";
+import { formatUsd } from "@/lib/payments/networks";
+import type { getTrackRecords, listAutonomoGateways } from "@/lib/directory/queries";
+import { shelve } from "@/lib/directory/api-shelves";
 import { Avatar } from "@/components/project-row";
 
 // An Autonomo API as a card: its name, what it does and what a call costs. Used on the homepage and the Explore page.

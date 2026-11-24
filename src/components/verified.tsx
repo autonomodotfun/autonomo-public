@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { TOKEN } from "@/lib/constants";
-import { verifiedAmount, verifiedEnabled, verifiedStatus } from "@/lib/verified";
+import { verifiedAmount, verifiedEnabled, verifiedStatus } from "@/lib/trust/verified";
 
 export function VerifiedBadge() {
   return (

@@ -1,9 +1,9 @@
 import { after } from "next/server";
-import { runAgent } from "@/lib/agent";
-import { exampleQuestion } from "@/lib/playground";
-import { listAutonomoGateways } from "@/lib/queries";
-import { isRetired } from "@/lib/retired";
-import { editMessage, esc, freeDaily, Progress, recordAnswer, sendMessage, telegramEnabled, usedToday, validSecret } from "@/lib/telegram";
+import { runAgent } from "@/lib/agent/agent";
+import { exampleQuestion } from "@/lib/agent/playground";
+import { listAutonomoGateways } from "@/lib/directory/queries";
+import { isRetired } from "@/lib/gateway/retired";
+import { editMessage, esc, freeDaily, Progress, recordAnswer, sendMessage, telegramEnabled, usedToday, validSecret } from "@/lib/agent/telegram";
 
 // Telegram webhook for the Autonomo agent bot. Telegram posts every update here with our secret header; we
 // answer 200 at once and do the work after the response (paying can take a few seconds).

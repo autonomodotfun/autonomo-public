@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { json, options, withUpdating } from "@/lib/api";
-import { parseProjectQuery, searchProjects } from "@/lib/queries";
+import { parseProjectQuery, searchProjects } from "@/lib/directory/queries";
 
 export { options as OPTIONS };
 

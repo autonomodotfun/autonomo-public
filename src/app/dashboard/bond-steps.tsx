@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useWallets } from "@privy-io/react-auth";
 import { formatUnits, parseUnits } from "viem";
 import { CopyButton } from "@/components/copy-button";
-import { cancelWithdrawCall, depositCalls, requestWithdrawCall, withdrawCall, type BondCall } from "@/lib/bond-rules";
+import { cancelWithdrawCall, depositCalls, requestWithdrawCall, withdrawCall, type BondCall } from "@/lib/trust/bond-rules";
 import { TOKEN } from "@/lib/constants";
 
 // The dashboard's bond actions. A Safe (or any wallet that isn't the sign-in wallet) gets the exact transactions to

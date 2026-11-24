@@ -2,8 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { UpstreamTest } from "@/lib/gateway";
-import { AUTONOMO_DISCOUNT_LABEL, AUTONOMO_PRICE_NOTE, autonomoAmountFor, autonomoUsdHint, usdPriceValid } from "@/lib/gateway-rules";
+import type { UpstreamTest } from "@/lib/gateway/gateway";
+import { AUTONOMO_DISCOUNT_LABEL, AUTONOMO_PRICE_NOTE, autonomoAmountFor, autonomoUsdHint, usdPriceValid } from "@/lib/gateway/gateway-rules";
 import { checkLaunchStep, saveGateway, testApi, type GatewayFormState } from "./actions";
 
 export type GatewayDefaults = {

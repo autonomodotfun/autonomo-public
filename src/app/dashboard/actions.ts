@@ -5,13 +5,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAddress, isHex, verifyMessage, type Hex } from "viem";
 import { getDb, schema } from "@/db";
-import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo, syncGatewayNetworks, testUpstream, type UpstreamTest } from "@/lib/gateway";
-import { autonomoAmountFor, headerNameValid, slugError, usdPriceValid } from "@/lib/gateway-rules";
-import { dayPriceUsd } from "@/lib/pool-price";
-import { applyPayTo, firstSafeMessage } from "@/lib/pay-to";
-import { currentOwner, seal, unseal } from "@/lib/session";
-import { revalidateCatalog } from "@/lib/queries";
-import { safeInfo } from "@/lib/verified";
+import { checkUpstream, encryptSecret, RESERVED_SLUGS, secretsEnabled, ownerPayTo, syncGatewayNetworks, testUpstream, type UpstreamTest } from "@/lib/gateway/gateway";
+import { autonomoAmountFor, headerNameValid, slugError, usdPriceValid } from "@/lib/gateway/gateway-rules";
+import { dayPriceUsd } from "@/lib/payments/pool-price";
+import { applyPayTo, firstSafeMessage } from "@/lib/payments/pay-to";
+import { currentOwner, seal, unseal } from "@/lib/auth/session";
+import { revalidateCatalog } from "@/lib/directory/queries";
+import { safeInfo } from "@/lib/trust/verified";
 
 const { gateways, payToRequests } = schema;
 

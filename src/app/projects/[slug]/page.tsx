@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CATEGORY_INFO } from "@/lib/categories";
+import { CATEGORY_INFO } from "@/lib/directory/categories";
 import { TOKEN } from "@/lib/constants";
-import { formatUsd, isTestnet, networkLabel } from "@/lib/networks";
+import { formatUsd, isTestnet, networkLabel } from "@/lib/payments/networks";
 import { retrySoon } from "@/lib/prerender";
-import { bondRefundWallet, slashesOrNull } from "@/lib/bond";
-import { getGatewayBonds, getProject, getTrackRecords, getVerifiedGateways } from "@/lib/queries";
+import { bondRefundWallet, slashesOrNull } from "@/lib/trust/bond";
+import { getGatewayBonds, getProject, getTrackRecords, getVerifiedGateways } from "@/lib/directory/queries";
 import { BondBlock, BondedBadge } from "@/components/bonded";
 import { VerifiedBadge } from "@/components/verified";
 import { Avatar, compact, NetworkChips } from "@/components/project-row";

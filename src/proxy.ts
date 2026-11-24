@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isAuthorized } from "@/lib/admin-auth";
+import { isAuthorized } from "@/lib/admin/admin-auth";
 
 export function proxy(request: NextRequest) {
   if (isAuthorized(request.headers.get("authorization"))) return NextResponse.next();

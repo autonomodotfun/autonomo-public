@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { CATEGORY_INFO } from "@/lib/categories";
-import { formatUsd, isTestnet, networkLabel } from "@/lib/networks";
-import { getGatewayBonds, getVerifiedGateways, type ProjectListItem } from "@/lib/queries";
+import { CATEGORY_INFO } from "@/lib/directory/categories";
+import { formatUsd, isTestnet, networkLabel } from "@/lib/payments/networks";
+import { getGatewayBonds, getVerifiedGateways, type ProjectListItem } from "@/lib/directory/queries";
 import { BondedBadge } from "@/components/bonded";
 import { VerifiedBadge } from "@/components/verified";
 

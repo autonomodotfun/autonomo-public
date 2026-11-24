@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { bondEnabled } from "@/lib/bond";
-import { burnFactory } from "@/lib/burn";
+import { bondEnabled } from "@/lib/trust/bond";
+import { burnFactory } from "@/lib/payments/burn";
 import { TOKEN } from "@/lib/constants";
 import { Logo } from "@/components/logo";
 import { TokenBar } from "@/components/token-bar";

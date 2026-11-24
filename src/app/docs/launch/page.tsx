@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { burnPercent } from "@/lib/burn";
+import { burnPercent } from "@/lib/payments/burn";
 import { TOKEN } from "@/lib/constants";
-import { baseCoverage } from "@/lib/gateway";
-import { privyEnabled } from "@/lib/privy";
-import { verifiedAmount, verifiedEnabled } from "@/lib/verified";
+import { baseCoverage } from "@/lib/gateway/gateway";
+import { privyEnabled } from "@/lib/auth/privy";
+import { verifiedAmount, verifiedEnabled } from "@/lib/trust/verified";
 import { GroupLabel } from "../docs-nav";
 import { NAV } from "../nav";
 import { Section, Shot, Step } from "../ui";

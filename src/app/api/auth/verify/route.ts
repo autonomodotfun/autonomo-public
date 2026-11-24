@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAddress, isHex, verifyMessage } from "viem";
 import { parseSiweMessage, validateSiweMessage } from "viem/siwe";
-import { authEnabled, NONCE_COOKIE, sessionCookie, unseal } from "@/lib/session";
+import { authEnabled, NONCE_COOKIE, sessionCookie, unseal } from "@/lib/auth/session";
 
 // Verifies a signed SIWE message and starts a session for that wallet (EOA signatures).
 export async function POST(request: NextRequest) {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { AUTONOMO_DISCOUNT_LABEL, AUTONOMO_PRICE_NOTE, autonomoAmountFor, usdPriceValid } from "@/lib/gateway-rules";
+import { AUTONOMO_DISCOUNT_LABEL, AUTONOMO_PRICE_NOTE, autonomoAmountFor, usdPriceValid } from "@/lib/gateway/gateway-rules";
 import { checkMany, launchMany, type BulkApi, type BulkResult } from "./actions";
 
 const BLANK: BulkApi = { name: "", slug: "", description: "", priceUsd: "0.01", acceptUsdg: true, acceptAutonomo: true, path: "" };

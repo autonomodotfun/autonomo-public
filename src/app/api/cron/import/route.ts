@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
-import { importBazaar } from "@/lib/bazaar-import";
-import { revalidateCatalog } from "@/lib/queries";
+import { importBazaar } from "@/lib/directory/bazaar-import";
+import { revalidateCatalog } from "@/lib/directory/queries";
 
 // Directory refresh every 3 days (scheduled in vercel.json): re-imports the Coinbase CDP and PayAI discovery catalogs so
 // project counts, prices and 30-day call numbers stay current. Vercel calls it with `Authorization: Bearer

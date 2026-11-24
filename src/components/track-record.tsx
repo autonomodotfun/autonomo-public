@@ -1,4 +1,4 @@
-import { MIN_OUTSIDE_PAYERS, type TrackRecord } from "@/lib/track-record";
+import { MIN_OUTSIDE_PAYERS, type TrackRecord } from "@/lib/directory/track-record";
 
 const dateFmt = new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
