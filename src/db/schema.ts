@@ -521,3 +521,23 @@ export const routerStats = pgTable(
   },
   (t) => [index("router_stats_pay_to_idx").on(t.payTo)],
 );
+
+// Inputs APIs answered validly on routed calls, which later probes use instead of one fixed input per service
+// (src/lib/router/router.ts, REPLAY_INPUTS). One row per service, inputs and API. Only public chain data is kept: a
+// token or a transaction, and the chain.
+export const routerProbeInputs = pgTable(
+  "router_probe_inputs",
+  {
+    id: serial("id").primaryKey(),
+    capability: text("capability").notNull(),
+    // The inputs as one text, the same whatever order they were given in.
+    key: text("key").notNull(),
+    inputs: jsonb("inputs").$type<Record<string, string>>().notNull(),
+    // The API that answered.
+    slug: text("slug").notNull(),
+    // Lowercased wallet of the agent that paid for the call; "" when the answer was to a probe.
+    payer: text("payer").notNull().default(""),
+    at: timestamp("at", { withTimezone: true }).notNull(),
+  },
+  (t) => [uniqueIndex("router_probe_inputs_one_idx").on(t.capability, t.key, t.slug), index("router_probe_inputs_capability_at_idx").on(t.capability, t.at)],
+);

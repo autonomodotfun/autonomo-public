@@ -109,8 +109,10 @@ export default async function BondPage() {
           against the page as it was that day.
         </li>
         <li>
-          A single bad answer that the creator fixes or refunds. The creator is told first and has 48 hours. A slash is for
-          an API that keeps charging for such answers, or that was built to.
+          A single bad answer that the creator fixes or refunds. The creator is told first and has 48 hours. Each creator
+          gets this notice once in any 30 days: another bad answer inside those 30 days can be slashed with no further
+          notice, so nobody can charge for bad answers and refund only when caught. A slash is for an API that keeps
+          charging for such answers, or that was built to.
         </li>
       </ul>
       <p className="mt-4 text-muted">How a slash runs:</p>

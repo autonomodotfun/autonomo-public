@@ -416,7 +416,9 @@ export async function runRouterJobsNow() {
     message =
       `Ran ${run.probes.run} ${run.probes.run === 1 ? "probe" : "probes"} and ${run.uptime.checked} uptime ${run.uptime.checked === 1 ? "check" : "checks"}.` +
       (failed ? ` Failed: ${failed}.` : "") +
+      (run.probes.real ? ` ${run.probes.real} used an input an agent paid for.` : "") +
       (run.probes.waiting.length ? ` Not ready yet, asked again on a later run: ${run.probes.waiting.join(", ")}.` : "") +
+      (run.probes.noAnswer.length ? ` No answer for an agent's input, not counted: ${run.probes.noAnswer.join(", ")}.` : "") +
       (run.uptime.down.length ? ` Down: ${run.uptime.down.join(", ")}.` : "") +
       (run.slashed.length ? ` Slashed, not routed for 30 days: ${run.slashed.join(", ")}.` : "") +
       (run.probes.left ? ` ${run.probes.left} left for the next run.` : "");

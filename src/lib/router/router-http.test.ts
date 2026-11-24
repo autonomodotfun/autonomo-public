@@ -126,6 +126,8 @@ test("a paid request is answered by that API, settled and logged", async () => {
   assert.deepEqual(w.settled, [slug]);
   assert.deepEqual(w.calls, [`${slug}/price/0xabc?chain=base`], "the inputs became that API's own path");
   assert.deepEqual(w.logged, [200]);
+  assert.deepEqual(await w.store.probeInputs("token-price", 0, 50, 3), [{ token: "0xabc", chain: "base" }], "its inputs are kept for later probes");
+  assert.equal(await w.store.answeredBefore("token-price", { token: "0xabc", chain: "base" }, slug), true);
   assert.equal((await w.pay(first)).status, 400, "the route id is used up");
 });
 
@@ -218,6 +220,7 @@ test("a failed settlement returns no answer and pauses the wallet", async () => 
   const again = await w.pay(await w.ask(), { payer: "0xbad" });
   assert.equal(again.status, 403);
   assert.deepEqual(w.settled, []);
+  assert.deepEqual(await w.store.probeInputs("token-price", 0, 50, 3), [], "a call that didn't settle leaves no probe input");
   assert.equal((await w.pay(await w.ask(), { payer: "0xgood" })).status, 200, "other wallets are not affected");
 });
 
@@ -364,9 +367,27 @@ test("each official mapping fits that API's published example answer", () => {
 test("a probe fails on a bad answer, a 4xx or an answer slower than the gateway's limit", async () => {
   const s = OFFICIAL_ROUTES["token-risk"];
   const good = { risk: { score: 12, level: "low", flags: [] } };
-  assert.deepEqual(await probeApi(s, async () => ({ status: 200, body: good, ms: 300 })), { valid: true, reason: "ok", ms: 300, notReady: false });
-  assert.equal((await probeApi(s, async () => ({ status: 404, body: { error: "not_found" }, ms: 300 }))).valid, false, "the input is known, so a 4xx is a failure");
-  assert.deepEqual(await probeApi(s, async () => ({ status: 200, body: good, ms: ROUTER.gatewayLimitMs + 1 })), { valid: false, reason: "too slow", ms: ROUTER.gatewayLimitMs + 1, notReady: false });
+  const fixed = { notReady: false, noData: false, real: null };
+  assert.deepEqual(await probeApi(s, async () => ({ status: 200, body: good, ms: 300 })), { valid: true, reason: "ok", ms: 300, ...fixed });
+  const notFound = await probeApi(s, async () => ({ status: 404, body: { error: "not_found" }, ms: 300 }));
+  assert.deepEqual([notFound.valid, notFound.noData], [false, true], "on the fixed input a 4xx is a failure; recordProbe() decides for an agent's input");
+  assert.equal((await probeApi(s, async () => ({ status: 429, body: null, ms: 300 }))).noData, false, "too many requests is the API's own problem");
+  assert.deepEqual(await probeApi(s, async () => ({ status: 200, body: good, ms: ROUTER.gatewayLimitMs + 1 })), { valid: false, reason: "too slow", ms: ROUTER.gatewayLimitMs + 1, ...fixed });
+});
+
+test("a probe asks for an agent's input when it has one, and for the fixed input otherwise", async () => {
+  const s = OFFICIAL_ROUTES["token-risk"];
+  const good = { risk: { score: 12, level: "low", flags: [] } };
+  const paths: string[] = [];
+  const call = async (path: string) => (paths.push(path), { status: 200, body: good, ms: 300 });
+  const inputs = { token: "0xabc", chain: "base" };
+  assert.deepEqual((await probeApi(s, call, inputs)).real, { capability: "token-risk", inputs });
+  assert.equal((await probeApi(s, call, null)).real, null);
+  // Inputs the API's path can't be filled from: the fixed input, not a failed probe.
+  const fallback = await probeApi(s, call, { chain: "base" });
+  assert.deepEqual([fallback.valid, fallback.real], [true, null]);
+  const fixedPath = `/risk/${PROBE_INPUTS["token-risk"].token}?chain=robinhood`;
+  assert.deepEqual(paths, ["/risk/0xabc?chain=base", fixedPath, fixedPath]);
 });
 
 test("a probe and the format test tell \"not ready yet\" from a failure", async () => {

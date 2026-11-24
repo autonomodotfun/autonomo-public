@@ -99,6 +99,46 @@ for (const [name, open] of stores) {
     assert.equal((await store.countedCalls(slug, NOW - DAY, 100, 1)).length, 1);
   });
 
+  test(`${name}: probe inputs are kept once per API, and the pool takes at most three from one payer`, async () => {
+    const store = await open();
+    // The pool is per capability, so each test has its own.
+    const cap = fresh("cap");
+    const save = (token: string, payer: string, at: number, slug = "a") => store.saveProbeInput({ capability: cap, inputs: { token }, slug, payer, at });
+    const pool = async (limit = 50) => (await store.probeInputs(cap, NOW - 30 * DAY, limit, 3)).map((i) => i.token);
+    assert.deepEqual(await pool(), []);
+    for (let i = 0; i < 10; i++) await save(`0x${i}`, "0xFlood", NOW + i);
+    await save("0xreal", "0xagent", NOW - 3600 * SECOND);
+    await save("0xreal", "0xagent2", NOW - 7200 * SECOND, "b"); // the same input, answered by another API
+    await save("0xold", "0xagent", NOW - 40 * DAY);
+    await save("0xprobe", "", NOW + 20); // an answer to a probe adds nothing to the pool
+    assert.deepEqual(await pool(), ["0x9", "0x8", "0x7", "0xreal"], "newest first, three from the flooding payer, each input once");
+    assert.deepEqual(await pool(2), ["0x9", "0x8"]);
+    assert.deepEqual(await store.probeInputs(fresh("cap"), 0, 50, 3), [], "another service has its own pool");
+
+    assert.equal(await store.answeredBefore(cap, { token: "0xreal" }, "a"), true);
+    assert.equal(await store.answeredBefore(cap, { token: "0xreal" }, "b"), true);
+    assert.equal(await store.answeredBefore(cap, { token: "0xreal" }, "c"), false);
+    assert.equal(await store.answeredBefore(cap, { token: "0xprobe" }, "a"), true, "what an API answered to a probe is remembered");
+    assert.equal(await store.answeredBefore(fresh("cap"), { token: "0xreal" }, "a"), false);
+  });
+
+  test(`${name}: the same inputs are one row, whatever their order, with the newest time and the agent's wallet`, async () => {
+    const store = await open();
+    const cap = fresh("cap");
+    const read = () => store.probeInputs(cap, NOW - DAY, 50, 3);
+    await store.saveProbeInput({ capability: cap, inputs: { token: "0xabc", chain: "base" }, slug: "a", payer: "0xAgent", at: NOW - 2 * DAY });
+    assert.deepEqual(await read(), [], "older than the window");
+    await store.saveProbeInput({ capability: cap, inputs: { chain: "base", token: "0xabc" }, slug: "a", payer: "0xagent", at: NOW });
+    assert.deepEqual(await read(), [{ token: "0xabc", chain: "base" }]);
+    // A probe's answer for the same inputs keeps the agent's wallet, and an older time doesn't move the row back.
+    await store.saveProbeInput({ capability: cap, inputs: { token: "0xabc", chain: "base" }, slug: "a", payer: "", at: NOW - 3 * DAY });
+    assert.equal((await read()).length, 1);
+    await Promise.all(Array.from({ length: 20 }, () => store.saveProbeInput({ capability: cap, inputs: { token: "0xsame" }, slug: "a", payer: "0xother", at: NOW })));
+    assert.equal((await read()).length, 2, "saved at the same moment, still one row");
+    assert.equal(await store.answeredBefore(cap, { chain: "base", token: "0xabc" }, "a"), true);
+    assert.equal(await store.answeredBefore(cap, { token: "0xabc" }, "a"), false, "without the chain it is another input");
+  });
+
   test(`${name}: slashes from the bond contract are recorded once per wallet, and only for that wallet`, async () => {
     const store = await open();
     const [w1, w2] = [fresh("0xw"), fresh("0xw")];
@@ -321,8 +361,14 @@ test("database: the tidy-up removes only what the router no longer reads", async
   const stats: Stats = { measured: 20, valid: 20, answerRate: 1, medianMs: 500, uptime: 1, lastSlash: null };
   await store.saveStats(gone, stats, NOW - 2 * DAY);
   await store.saveStats(live, stats, NOW - 3600 * SECOND);
+  const cap = fresh("cap");
+  await store.saveProbeInput({ capability: cap, inputs: { token: "0xold" }, slug, payer: "0xagent", at: NOW - 31 * DAY });
+  await store.saveProbeInput({ capability: cap, inputs: { token: "0xnew" }, slug, payer: "0xagent", at: NOW - DAY });
 
   await pruneRouterRecord(db, NOW);
+
+  assert.equal(await store.answeredBefore(cap, { token: "0xold" }, slug), false, "probe inputs older than 30 days are gone");
+  assert.equal(await store.answeredBefore(cap, { token: "0xnew" }, slug), true);
 
   assert.deepEqual([...(await store.savedStats([gone.slug, live.slug], 0)).keys()], [live.slug], "saved stats nothing refreshed for a day are for an API that is gone");
   assert.deepEqual(await store.uptime(slug, 0), { up: 1, total: 1 });

@@ -171,7 +171,7 @@ export async function handleRoute<G>(request: Request, capability: string, deps:
   // A wallet is only paused when the failure is its own doing: the money or the signature was no longer there when
   // it came to settling. If the payment service itself failed, the agent gets no answer but keeps its access.
   const payerFault = PAYER_FAULT.test(String(settlement?.errorReason ?? ""));
-  const finished = await finishRoute(router, api, payer, served.ms, settled, now, payerFault);
+  const finished = await finishRoute(router, api, payer, served.ms, settled, now, payerFault, route);
   // The answer only goes out once the money moved. If the wrapper already answered with the failure, that is kept.
   if (!finished.ok) return res.status >= 400 ? res : json(finished.outcome);
   return withHeaders(res, finished.headers);

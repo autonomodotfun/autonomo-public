@@ -5,8 +5,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  CAPABILITIES, ROUTER, cachedBond, candidates, checkAnswer, createRouter, eligible, fillPath, mapAnswer, memoryStore, notReadyWait, openRouteByPayment,
-  parseRetryAfter, pick, probesDue, recordMeasured, recordProbe, recordSlashes, refreshStats, routePaidCall, speed, startRoute, statsFor, uptimeDue,
+  CAPABILITIES, NO_ANSWER, ROUTER, cachedBond, candidates, checkAnswer, createRouter, eligible, fillPath, mapAnswer, memoryStore, notReadyWait, openRouteByPayment,
+  parseRetryAfter, pick, probeInputFor, probesDue, recordMeasured, recordProbe, recordSlashes, refreshStats, replayable, routePaidCall, speed, startRoute, statsFor,
+  uptimeDue,
   type Outcome, type RoutableApi, type RouteHooks, type RouterStore,
 } from "@/lib/router/router";
 
@@ -603,18 +604,18 @@ test("a probe that hears \"not ready yet\" is asked once more, and the second an
   const notReady = { valid: false, reason: "the API says it is not ready yet", ms: 21_000, notReady: true };
   const MINUTE = 60 * SECOND;
   assert.deepEqual(await due(NOW), ["a"]);
-  assert.equal(await recordProbe(w.router, "a", notReady, NOW), true, "waiting for a second answer");
+  assert.deepEqual(await recordProbe(w.router, "a", notReady, NOW), { waiting: true, counted: false }, "waiting for a second answer");
   assert.equal(await rate(NOW + SECOND), 1, "not marked down");
   assert.deepEqual(await due(NOW + MINUTE), [], "not before the longest wait an API may ask for");
   assert.deepEqual(await due(NOW + 2 * MINUTE), ["a"]);
   // Ready the second time: back to one probe a day.
-  assert.equal(await recordProbe(w.router, "a", { valid: true, reason: "ok", ms: 800, notReady: false }, NOW + 5 * MINUTE), false);
+  assert.deepEqual(await recordProbe(w.router, "a", { valid: true, reason: "ok", ms: 800, notReady: false }, NOW + 5 * MINUTE), { waiting: false, counted: true });
   assert.equal(await rate(NOW + 6 * MINUTE), 1);
   assert.deepEqual(await due(NOW + 10 * MINUTE), []);
   // Two days later it says "not ready yet" twice in a row: the second one is a failed probe.
   const t = NOW + 2 * DAY;
-  assert.equal(await recordProbe(w.router, "a", notReady, t), true);
-  assert.equal(await recordProbe(w.router, "a", notReady, t + 5 * MINUTE), false);
+  assert.equal((await recordProbe(w.router, "a", notReady, t)).waiting, true);
+  assert.deepEqual(await recordProbe(w.router, "a", notReady, t + 5 * MINUTE), { waiting: false, counted: true });
   assert.ok(Math.abs((await rate(t + 6 * MINUTE)) - 0.95) < 1e-9);
   assert.equal((await w.store.lastProbe("a"))?.reason, "not ready after waiting");
 });
@@ -772,6 +773,81 @@ test("an API that fell out is probed three times a day, and is back in about a w
   // Back on its record: one probe a day again.
   await probe(t, true);
   assert.deepEqual(await probesDue(w.router, t + 9 * HOUR), []);
+});
+
+// ---------- probe inputs ----------
+
+// Agreed on November 24, 2026: a probe uses an input an agent really paid for, so an API can't learn the probe's
+// input (the fixed ones are in the public repo) and answer well for that one alone.
+test("only public chain inputs are kept for probes", () => {
+  const token = `0xAbC${"1".repeat(37)}`;
+  assert.deepEqual(replayable("token-risk", { token, chain: " base ", wallet: "0xme", note: "x" }), { token: token.toLowerCase(), chain: "base" });
+  assert.deepEqual(replayable("token-price", { token: "AUTONOMO" }), { token: "AUTONOMO" }, "only hex is written in lower case");
+  assert.deepEqual(replayable("payment-check", { tx_hash: "0xDEAD" }), { tx_hash: "0xdead" });
+  assert.equal(replayable("website-check", { url: "https://example.com" }), null, "a site address is the agent's own business");
+  assert.equal(replayable("swap-quote", { token_in: "0xa", token_out: "0xb", amount: "1", taker: "0xme" }), null, "so is a wallet");
+  assert.equal(replayable("token-risk", { chain: "base" }), null, "the required input is missing");
+  assert.equal(replayable("token-risk", { token: `0x${"a".repeat(200)}` }), null, "too long to be an address");
+  assert.equal(replayable("nope", { token: "0xabc" }), null);
+});
+
+test("the inputs of a paid routed call become probe inputs, once the money moved", async () => {
+  const f = await ready(flow());
+  const pool = () => f.w.store.probeInputs(PRICE, 0, 50, 3);
+  const a = f.w.bySlug("a")!;
+  assert.equal(await probeInputFor(f.w.router, a, NOW), null, "nobody has paid yet: the probe uses the fixed input");
+  f.settleOk = false;
+  assert.equal((await f.pay(await f.start(), { payer: "0xNoMoney" })).status, 402);
+  assert.deepEqual(await pool(), [], "a call that didn't settle adds nothing");
+  f.settleOk = true;
+  assert.equal((await f.pay(await f.start(), { payer: "0xAgent" })).status, 200);
+  assert.deepEqual(await pool(), [{ token: "0xabc" }]);
+  assert.deepEqual(await probeInputFor(f.w.router, a, NOW), { token: "0xabc" });
+  const served = f.settled.at(-1)!;
+  const other = f.w.apis.find((x) => x.slug !== served)!.slug;
+  assert.equal(await f.w.store.answeredBefore(PRICE, { token: "0xabc" }, served), true);
+  assert.equal(await f.w.store.answeredBefore(PRICE, { token: "0xabc" }, other), false);
+  assert.equal(await probeInputFor(f.w.router, { capability: "website-check" }, NOW), null, "a service that isn't replayed");
+  assert.equal(await probeInputFor(f.w.router, a, NOW + 31 * DAY), null, "an input nobody paid for in 30 days is not used");
+  // A pool that can't be read (its table isn't there yet) leaves the probe on the fixed input, and a paid call unharmed.
+  const broken = { ...f.w.store, probeInputs: () => Promise.reject(new Error("no table")), saveProbeInput: () => Promise.reject(new Error("no table")) };
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    assert.equal(await probeInputFor({ ...f.w.router, store: broken }, a, NOW), null);
+    f.w.router.store = broken;
+    assert.equal((await f.pay(await f.start(), { payer: "0xAgent2" })).status, 200);
+  } finally {
+    console.error = quiet;
+  }
+});
+
+test("a probe with an agent's input: no answer is a failure only once the API has answered that input", async () => {
+  const w = world([api("a")]);
+  await w.history("a", 20, { at: NOW - 2 * DAY });
+  const due = async (now: number) => (await probesDue(w.router, now)).map((x) => x.slug);
+  const real = { capability: PRICE, inputs: { token: "0xabc" } };
+  const noAnswer = { valid: false, reason: "the API answered 404", ms: 300, notReady: false, noData: true, real };
+  const fails = async () => (await w.store.countedCalls("a", NOW - DAY, 100, 1)).filter((r) => !r.valid).length;
+  assert.deepEqual(await due(NOW), ["a"]);
+  // It never answered this input: it may not cover that token. Kept, not counted, and not asked again in two minutes.
+  assert.deepEqual(await recordProbe(w.router, "a", noAnswer, NOW), { waiting: false, counted: false });
+  assert.equal((await w.store.lastProbe("a"))?.reason, NO_ANSWER);
+  assert.equal(await fails(), 0);
+  assert.deepEqual(await due(NOW + 5 * 60 * SECOND), [], "it had its probe: the next one is on the normal schedule");
+  // A fault on an agent's input counts, whatever the API answered before.
+  assert.deepEqual(await recordProbe(w.router, "a", { ...noAnswer, reason: "the API answered 500", noData: false }, NOW + DAY), { waiting: false, counted: true });
+  assert.equal(await fails(), 1);
+  // It answers the input once. That is remembered, and adds nothing to the pool: only paid calls do.
+  assert.deepEqual(await recordProbe(w.router, "a", { valid: true, reason: "ok", ms: 300, notReady: false, noData: false, real }, NOW + 2 * DAY), { waiting: false, counted: true });
+  assert.equal(await w.store.answeredBefore(PRICE, { token: "0xabc" }, "a"), true);
+  assert.deepEqual(await w.store.probeInputs(PRICE, 0, 50, 3), []);
+  // From here "no answer" for that input is a failure.
+  assert.deepEqual(await recordProbe(w.router, "a", noAnswer, NOW + 3 * DAY), { waiting: false, counted: true });
+  assert.equal(await fails(), 2);
+  // On the fixed input a 4xx is always a failure: that input is known to have an answer.
+  assert.deepEqual(await recordProbe(w.router, "a", { ...noAnswer, real: null }, NOW + 4 * DAY), { waiting: false, counted: true });
+  assert.equal(await fails(), 3);
 });
 
 test("uptime is probed every 15 minutes and feeds the score", async () => {

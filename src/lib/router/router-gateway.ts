@@ -11,7 +11,8 @@ import { BURN_BPS, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/paymen
 import { checkUpstream, forward, gatewayOffers, payeeOf, recordCall } from "@/lib/gateway/gateway";
 import { acceptsFor, railForAsset, USDC_BASE, x402Server } from "@/lib/payments/payments";
 import {
-  cachedBond, createRouter, eligible, parseRetryAfter, probesDue, recordProbe, recordSlashes, refreshStats, statsFor, uptimeDue, STILL_NOT_READY,
+  cachedBond, createRouter, eligible, parseRetryAfter, probeInputFor, probesDue, recordProbe, recordSlashes, refreshStats, statsFor, uptimeDue,
+  STILL_NOT_READY,
   type Router, type Stats,
 } from "@/lib/router/router";
 import { formatTest, probeApi, toRoutableApi, type FormatTest, type RouteSettings } from "@/lib/router/router-apis";
@@ -332,8 +333,12 @@ export type RouterJobs = {
   /** Wallets whose slash on the bond contract was put on the record on this run: their APIs leave routing for 30 days. */
   slashed: string[];
   uptime: { checked: number; down: string[] };
-  /** `waiting`: APIs that said "not ready yet" and will be asked once more on a later run. */
-  probes: { run: number; failed: { slug: string; reason: string }[]; waiting: string[]; left: number };
+  /**
+   * `waiting`: APIs that said "not ready yet" and will be asked once more on a later run. `real`: how many probes
+   * used an input an agent paid for instead of the fixed one. `noAnswer`: APIs that had no answer for such an input
+   * and had never answered it, which is kept but not counted.
+   */
+  probes: { run: number; real: number; failed: { slug: string; reason: string }[]; waiting: string[]; noAnswer: string[]; left: number };
   /** How many APIs had their saved stats worked out again. */
   refreshed: number;
   ms: number;
@@ -345,8 +350,9 @@ export type RouterJobs = {
  * often as wanted, since each API is only probed when its own time has come. What doesn't fit in `budgetMs` is left
  * for the next run.
  *
- * A probe calls the API the way a routed call does, through the gateway's own forwarding, with the known input for
- * its capability, and is not paid: the API can't tell it from a paid call, since it never sees the payer.
+ * A probe calls the API the way a routed call does, through the gateway's own forwarding, and is not paid: the API
+ * can't tell it from a paid call, since it never sees the payer. Its input is one an agent paid for on that service
+ * when there is one, so the API can't know the input either; otherwise the fixed input for its capability.
  */
 export async function runRouterJobs(budgetMs = 45_000): Promise<RouterJobs> {
   const started = Date.now();
@@ -374,13 +380,18 @@ export async function runRouterJobs(budgetMs = 45_000): Promise<RouterJobs> {
 
   const failed: RouterJobs["probes"]["failed"] = [];
   const waiting: string[] = [];
+  const noAnswer: string[] = [];
+  let real = 0;
   const due = await probesDue(r, started);
   const run = await pooled(due, 4, deadline, async (api) => {
     const row = bySlug.get(api.slug);
     if (!row) return;
-    const probe = await probeApi(row.settings, (path) => callGateway(row.gateway, path));
+    const probe = await probeApi(row.settings, (path) => callGateway(row.gateway, path), await probeInputFor(r, api, Date.now()));
+    if (probe.real) real += 1;
     // An API that says "not ready yet" is asked once more on a later run, and only that second answer counts.
-    if (await recordProbe(r, api.slug, probe, Date.now())) waiting.push(api.slug);
+    const recorded = await recordProbe(r, api.slug, probe, Date.now());
+    if (recorded.waiting) waiting.push(api.slug);
+    else if (!recorded.counted) noAnswer.push(api.slug);
     else if (!probe.valid) failed.push({ slug: api.slug, reason: probe.notReady ? STILL_NOT_READY : probe.reason });
   });
 
@@ -388,5 +399,5 @@ export async function runRouterJobs(budgetMs = 45_000): Promise<RouterJobs> {
   const refreshed = await pooled(all, 8, deadline, async (row) => void (await refreshStats(r.store, row.api, Date.now())));
 
   await pruneRouterRecord(await getDb(), started).catch((e) => console.error("router tidy-up failed", e));
-  return { slashed, uptime, probes: { run, failed, waiting, left: due.length - run }, refreshed, ms: Date.now() - started };
+  return { slashed, uptime, probes: { run, real, failed, waiting, noAnswer, left: due.length - run }, refreshed, ms: Date.now() - started };
 }

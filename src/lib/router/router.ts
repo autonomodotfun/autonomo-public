@@ -36,6 +36,16 @@ export const ROUTER = {
   probesPerDayNew: 10,
   probesPerDayCatchingUp: 3,
   probesPerDay: 1,
+  /**
+   * A probe uses an input an agent really paid for, so an API can't learn the probe's input and answer well for that
+   * one alone. The pool for a service is its newest 50 inputs of the last 30 days, at most 3 from one payer, so one
+   * wallet can't fill the pool with inputs of its choosing. See REPLAY_INPUTS for what is kept.
+   */
+  probeInputMaxAgeMs: 30 * DAY,
+  probeInputPool: 50,
+  probeInputsPerPayer: 3,
+  /** An input longer than this is not kept for probes. A token address is 42 characters, a transaction hash 66. */
+  probeInputMaxLength: 100,
   uptimeProbeEveryMs: 15 * MINUTE,
   weights: { answer: 0.6, speed: 0.3, uptime: 0.1 },
   /** Full marks for speed at 1 s or less, none at 10 s. A service that is slower by nature has its own marks: CAPABILITY_SPEED. */
@@ -165,6 +175,14 @@ export function checkAnswer(capability: string, answer: unknown): AnswerCheck {
 
 export const NOT_READY = "not ready yet";
 export const STILL_NOT_READY = "not ready after waiting";
+/** A probe with an agent's input that the API had no answer for, and had never answered: kept, not counted. */
+export const NO_ANSWER = "no answer for this input";
+
+/**
+ * A 4xx means the API has no answer for this input (unknown token, bad address). Except 408 and 429: a timeout or
+ * "too many requests" is the API's own problem.
+ */
+export const isNoData = (status: number) => status >= 400 && status < 500 && status !== 408 && status !== 429;
 
 /** A Retry-After header as seconds. Only a plain number of seconds is read, not a date. */
 export function parseRetryAfter(value: string | null | undefined): number | null {
@@ -235,6 +253,30 @@ export type Route = {
   expires: number;
 };
 
+/** Inputs an API answered validly: `payer` is the agent that paid for the call, "" when it was a probe. */
+export type ProbeInput = { capability: string; inputs: Record<string, string>; slug: string; payer: string; at: number };
+
+/** Inputs as one text, the same whatever order they were given in. */
+export const inputsKey = (inputs: Record<string, string>) => JSON.stringify(Object.entries(inputs).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+
+/**
+ * The pool of probe inputs from kept rows, which must come newest first: each input once, at most `perPayer` from
+ * one payer, at most `limit`. Both stores read their rows and hand them to this, so they can't pick differently.
+ */
+export function probePool(rows: Pick<ProbeInput, "inputs" | "payer">[], limit: number, perPayer: number): Record<string, string>[] {
+  const pool = new Map<string, Record<string, string>>();
+  const fromPayer = new Map<string, number>();
+  for (const row of rows) {
+    if (pool.size >= limit) break;
+    const key = inputsKey(row.inputs);
+    const n = fromPayer.get(row.payer) ?? 0;
+    if (!row.payer || pool.has(key) || n >= perPayer) continue;
+    pool.set(key, row.inputs);
+    fromPayer.set(row.payer, n + 1);
+  }
+  return [...pool.values()];
+}
+
 /**
  * Where the router's record is kept: memoryStore() below, and the database one in router-store.ts. Both are held to
  * the same tests (router-store.test.ts).
@@ -264,6 +306,18 @@ export interface RouterStore {
   recordUptime(slug: string, up: boolean, at: number): Promise<void>;
   uptime(slug: string, since: number): Promise<{ up: number; total: number }>;
   lastUptime(slug: string): Promise<number | null>;
+  /**
+   * Keeps the inputs an API answered validly, to probe with later. The same inputs for the same API are kept once,
+   * with the newest time. `payer` is "" when the answer was to a probe.
+   */
+  saveProbeInput(row: ProbeInput): Promise<void>;
+  /**
+   * The inputs agents paid for on a capability since a time: newest first, each once, at most `limit`, and at most
+   * `perPayer` from one payer. Answers to probes don't add to it.
+   */
+  probeInputs(capability: string, since: number, limit: number, perPayer: number): Promise<Record<string, string>[]>;
+  /** Whether this API gave a valid answer for these inputs before, to an agent or to a probe. */
+  answeredBefore(capability: string, inputs: Record<string, string>, slug: string): Promise<boolean>;
   recordSlash(slug: string, payTo: string, at: number): Promise<void>;
   /** The latest slash of this API or of its pay-to wallet. A slash hits the wallet, so it covers all its APIs. */
   lastSlash(slug: string, payTo: string): Promise<number | null>;
@@ -283,6 +337,7 @@ export function memoryStore(): RouterStore {
   const calls: MeasuredCall[] = [];
   const uptime: { slug: string; at: number; up: boolean }[] = [];
   const slashes: { slug: string; payTo: string; at: number }[] = [];
+  const probeInputs: ProbeInput[] = [];
   const blocked = new Map<string, number>();
   const routes = new Map<string, Route & { used: boolean }>();
   const hits = new Map<string, number>();
@@ -337,6 +392,28 @@ export function memoryStore(): RouterStore {
     },
     async lastUptime(slug) {
       return max(uptime.filter((u) => u.slug === slug).map((u) => u.at));
+    },
+    async saveProbeInput(row) {
+      const key = inputsKey(row.inputs);
+      const payer = row.payer.toLowerCase();
+      const hit = probeInputs.find((r) => r.capability === row.capability && r.slug === row.slug && inputsKey(r.inputs) === key);
+      if (!hit) probeInputs.push({ ...row, inputs: { ...row.inputs }, payer });
+      else {
+        hit.at = Math.max(hit.at, row.at);
+        if (payer) hit.payer = payer;
+      }
+    },
+    async probeInputs(capability, since, limit, perPayer) {
+      const rows = probeInputs
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => r.capability === capability && r.payer !== "" && r.at >= since)
+        .sort((a, b) => b.r.at - a.r.at || b.i - a.i)
+        .map(({ r }) => r);
+      return probePool(rows, limit, perPayer).map((inputs) => ({ ...inputs }));
+    },
+    async answeredBefore(capability, inputs, slug) {
+      const key = inputsKey(inputs);
+      return probeInputs.some((r) => r.capability === capability && r.slug === slug && inputsKey(r.inputs) === key);
     },
     async recordSlash(slug, payTo, at) {
       const wallet = payTo.toLowerCase();
@@ -566,7 +643,7 @@ export async function probesDue(router: Router, now: number): Promise<RoutableAp
     if (!api.launched || !api.formatOk || api.unlisted) continue;
     // Its last probe heard "not ready yet": it is asked once more, after the longest wait an API may ask for.
     const last = await router.store.lastProbe(api.slug);
-    if (last && !last.counted) {
+    if (last && !last.counted && last.reason === NOT_READY) {
       if (now - last.at >= ROUTER.notReadyMaxWaitMs) due.push(api);
       continue;
     }
@@ -579,18 +656,102 @@ export async function probesDue(router: Router, now: number): Promise<RoutableAp
   return due;
 }
 
+/** What a probe came back with. `real` is set when it used an agent's input instead of the service's fixed one. */
+export type ProbeOutcome = {
+  valid: boolean;
+  reason: string;
+  ms: number | null;
+  notReady?: boolean;
+  /** The API said it has no answer for the input (a 4xx). */
+  noData?: boolean;
+  real?: { capability: string; inputs: Record<string, string> } | null;
+};
+
 /**
- * Puts a probe on the record. An API that says "not ready yet" isn't marked down for it the first time: that probe
- * is kept but not counted, and probesDue() asks once more after the wait. The second answer counts whatever it is,
- * so an API can't stay "not ready" for ever. Returns true when the probe is waiting for that second answer.
+ * Puts a probe on the record, and says what became of it.
+ *
+ * `waiting`: an API that says "not ready yet" isn't marked down for it the first time. That probe is kept but not
+ * counted, and probesDue() asks once more after the wait. The second answer counts whatever it is, so an API can't
+ * stay "not ready" for ever.
+ *
+ * `counted` is false as well for a probe with an agent's input that the API has no answer for and never answered
+ * before: the API may simply not cover that token, and an honest API with a narrow range would be marked down for
+ * what it never claimed. Once it has answered an input, a "no answer" for the same input counts.
  */
-export async function recordProbe(router: Router, slug: string, probe: { valid: boolean; reason: string; ms: number | null; notReady?: boolean }, now: number) {
+export async function recordProbe(router: Router, slug: string, probe: ProbeOutcome, now: number): Promise<{ waiting: boolean; counted: boolean }> {
   const last = probe.notReady ? await router.store.lastProbe(slug) : null;
-  const askedBefore = last !== null && !last.counted;
+  const askedBefore = last !== null && !last.counted && last.reason === NOT_READY;
   const waiting = probe.notReady === true && !askedBefore;
-  const reason = waiting ? NOT_READY : probe.notReady ? STILL_NOT_READY : probe.reason;
-  await recordMeasured(router.store, { slug, at: now, valid: probe.valid && !probe.notReady, ms: probe.ms, kind: "probe", payer: "", settled: false, reason, counted: !waiting });
-  return waiting;
+  const real = probe.real ?? null;
+  const uncovered =
+    !probe.notReady && !probe.valid && probe.noData === true && real !== null && !(await router.store.answeredBefore(real.capability, real.inputs, slug));
+  const reason = waiting ? NOT_READY : probe.notReady ? STILL_NOT_READY : uncovered ? NO_ANSWER : probe.reason;
+  const valid = probe.valid && !probe.notReady;
+  const counted = !waiting && !uncovered;
+  await recordMeasured(router.store, { slug, at: now, valid, ms: probe.ms, kind: "probe", payer: "", settled: false, reason, counted });
+  // What it answered is remembered, so a later "no answer" for the same input counts.
+  if (valid && real) await router.store.saveProbeInput({ ...real, slug, payer: "", at: now });
+  return { waiting, counted };
+}
+
+// ---------- probe inputs ----------
+
+/**
+ * Which inputs of a paid routed call may be used again to probe, by service. Only what is public on a chain anyway:
+ * a token or a transaction, and the chain. A service that is not here is always probed with its fixed input: a site
+ * address or a wallet is the agent's own business, and a probe would hand it to every API of the service.
+ */
+export const REPLAY_INPUTS: Partial<Record<Capability, string[]>> = {
+  "token-price": ["token", "chain"],
+  "token-risk": ["token", "chain"],
+  "token-holders": ["token", "chain"],
+  "dev-wallet": ["token", "chain"],
+  "payment-check": ["tx_hash", "chain"],
+};
+
+const HEX = /^0x[0-9a-f]+$/i;
+
+/**
+ * The part of a call's inputs that may be probed with again: the inputs named for its service, trimmed, hex written
+ * in lower case so one token is one input. Null when the service isn't replayed, a required input is missing, or a
+ * value is too long to be an address or a hash.
+ */
+export function replayable(capability: string, inputs: Record<string, string>): Record<string, string> | null {
+  if (!isCapability(capability)) return null;
+  const names = REPLAY_INPUTS[capability];
+  if (!names) return null;
+  const kept: Record<string, string> = {};
+  for (const name of names) {
+    const value = inputs[name]?.trim() ?? "";
+    if (!value) continue;
+    if (value.length > ROUTER.probeInputMaxLength) return null;
+    kept[name] = HEX.test(value) ? value.toLowerCase() : value;
+  }
+  return missingInputs(capability, kept).length ? null : kept;
+}
+
+/**
+ * Keeps the inputs of a call an agent paid for, for later probes. It runs beside a paid call, so it never throws:
+ * a call that was answered and paid for must not fail over this.
+ */
+export async function keepProbeInput(store: RouterStore, route: Pick<Route, "capability" | "inputs">, slug: string, payer: string, at: number) {
+  const inputs = replayable(route.capability, route.inputs);
+  if (!inputs || !payer) return;
+  await store.saveProbeInput({ capability: route.capability, inputs, slug, payer: payer.toLowerCase(), at }).catch((e) => console.error("probe input not kept", e));
+}
+
+/**
+ * An input to probe an API with: one that agents paid for on its service, picked at random. Null when its service
+ * isn't replayed, or nobody has paid for a call on it in the last 30 days: the probe then uses the fixed input.
+ */
+export async function probeInputFor(router: Router, api: Pick<RoutableApi, "capability">, now: number): Promise<Record<string, string> | null> {
+  if (!isCapability(api.capability) || !REPLAY_INPUTS[api.capability]) return null;
+  // If the pool can't be read, the probe still runs, on the fixed input: a probe is never lost over this.
+  const pool = await router.store
+    .probeInputs(api.capability, now - ROUTER.probeInputMaxAgeMs, ROUTER.probeInputPool, ROUTER.probeInputsPerPayer)
+    .catch((e): Record<string, string>[] => (console.error("probe inputs not read", e), []));
+  if (!pool.length) return null;
+  return pool[Math.min(pool.length - 1, Math.floor(router.random() * pool.length))];
 }
 
 // ---------- slashes ----------
@@ -846,9 +1007,7 @@ export async function serveRoute<Payment>(
   }
   const raw = called.body ?? null;
   const answer = raw === null ? null : mapAnswer(raw, api.mapping);
-  // A 4xx means the API has no answer for this input (unknown token, bad address). Except 408 and 429: a timeout or
-  // "too many requests" is the API's own problem.
-  const noData = status >= 400 && status < 500 && status !== 408 && status !== 429;
+  const noData = isNoData(status);
   let check: AnswerCheck = status >= 200 && status < 300 && raw !== null ? checkAnswer(api.capability, answer) : { valid: false, reason: `status ${status}` };
   if (check.valid && ms !== null && ms > ROUTER.gatewayLimitMs) check = { valid: false, reason: "too slow" };
   // "Not ready yet" a second time, after the wait it asked for: a failure like any other.
@@ -862,8 +1021,8 @@ export async function serveRoute<Payment>(
 
   // An API fault (5xx, timeout, empty or broken answer) counts against the API. A "no answer for this input" is
   // kept on the record but not counted: the input may be the problem, and counting it would let anyone push an API
-  // out with junk inputs. Paid probes use inputs that always have an answer, so an API that answers 4xx to
-  // everything still fails its probes.
+  // out with junk inputs. Probes catch an API that answers 4xx to everything: the fixed input always has an answer,
+  // and so does an agent's input the API answered before (see recordProbe).
   await recordMeasured(router.store, { slug: api.slug, at: now, ms, kind: "routed", payer, valid: false, settled: false, reason: check.reason, counted: !noData });
   const tried = [...route.tried.filter((t) => t.slug !== api.slug), { slug: api.slug, noData }];
   const failed = `${api.slug} failed (${check.reason}), nothing was charged`;
@@ -878,7 +1037,8 @@ export async function serveRoute<Payment>(
 export type Finished = { ok: true; headers: Record<string, string> } | { ok: false; outcome: Outcome };
 
 /**
- * After settling a served answer. If the money moved, the call goes on the record and the answer can be returned.
+ * After settling a served answer. If the money moved, the call goes on the record, its inputs are kept for later
+ * probes when `route` is given, and the answer can be returned.
  * If it didn't, there is no answer and the wallet is paused, so it can't make APIs work for free on purpose.
  * `pausePayer` is false when the failure wasn't the payer's doing, such as the payment service being down.
  */
@@ -890,12 +1050,15 @@ export async function finishRoute(
   settled: boolean,
   now: number,
   pausePayer = true,
+  route?: Pick<Route, "capability" | "inputs">,
 ): Promise<Finished> {
   await recordMeasured(router.store, { slug: api.slug, at: now, ms, kind: "routed", payer, valid: true, settled, reason: settled ? "ok" : "settlement failed" });
   if (!settled) {
     if (pausePayer) await router.store.blockPayer(payer, now + ROUTER.payerBlockMs);
     return { ok: false, outcome: { status: 402, body: { error: "settlement failed, no answer returned" }, headers: {} } };
   }
+  // Only once the money moved: an input costs its sender a paid call, so the pool can't be filled for free.
+  if (route) await keepProbeInput(router.store, route, api.slug, payer, now);
   const bonded = !api.official && (await router.isBonded(api.payTo, now));
   return { ok: true, headers: { "X-Autonomo-Routed-To": api.slug, "X-Autonomo-Bonded": bonded ? "true" : "false" } };
 }
@@ -919,7 +1082,7 @@ export async function routePaidCall<Payment>(
   if (!ok) return refusePayment(router, route, api, now, hooks);
   const served = await serveRoute(router, route, api, payer, now, hooks);
   if (!served.ok) return served.outcome;
-  const finished = await finishRoute(router, api, payer, served.ms, await hooks.settle(payment, api), now);
+  const finished = await finishRoute(router, api, payer, served.ms, await hooks.settle(payment, api), now, true, route);
   if (!finished.ok) return finished.outcome;
   return { status: 200, body: served.body, headers: finished.headers };
 }

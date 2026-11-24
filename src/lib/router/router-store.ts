@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
 import { schema, type DB } from "@/db";
-import type { MeasuredCall, Route, RouterStore, Stats } from "@/lib/router/router";
+import { inputsKey, probePool, type MeasuredCall, type Route, type RouterStore, type Stats } from "@/lib/router/router";
 
 // The router's record in the database (tables router_* in src/db/schema.ts). The rules are in router.ts; this file
 // only saves rows and reads them back, and is held to the same tests as the in-memory store (router-store.test.ts).
@@ -8,7 +8,11 @@ import type { MeasuredCall, Route, RouterStore, Stats } from "@/lib/router/route
 // The site talks to the database one statement at a time, with no transactions, so anything that must not happen
 // twice is a single statement: using a route id is one UPDATE that only matches while the id is unused.
 
-const { routerCalls, routerUptime, routerSlashes, routerBlockedPayers, routerRoutes, routerHits, routerStats } = schema;
+const { routerCalls, routerUptime, routerSlashes, routerBlockedPayers, routerRoutes, routerHits, routerStats, routerProbeInputs } = schema;
+
+// Rows read to build a pool of probe inputs. A pool is 50 inputs at most; reading more leaves room for the ones a
+// per-payer cap leaves out.
+const PROBE_INPUT_ROWS = 1000;
 
 const DAY_SECONDS = 86_400;
 const count = sql<number>`count(*)::int`;
@@ -138,6 +142,41 @@ export function routerStore(db: DB): RouterStore {
       return row ? row.at.getTime() : null;
     },
 
+    async saveProbeInput(row) {
+      const payer = row.payer.toLowerCase();
+      // One statement, so two calls for the same inputs at the same moment leave one row. The newest time is kept,
+      // and an agent's wallet is never replaced by a probe's empty one.
+      await db
+        .insert(routerProbeInputs)
+        .values({ capability: row.capability, key: inputsKey(row.inputs), inputs: row.inputs, slug: row.slug, payer, at: new Date(row.at) })
+        .onConflictDoUpdate({
+          target: [routerProbeInputs.capability, routerProbeInputs.key, routerProbeInputs.slug],
+          set: {
+            at: sql`greatest(${routerProbeInputs.at}, excluded.at)`,
+            payer: sql`case when excluded.payer <> '' then excluded.payer else ${routerProbeInputs.payer} end`,
+          },
+        });
+    },
+
+    async probeInputs(capability, since, limit, perPayer) {
+      const rows = await db
+        .select({ inputs: routerProbeInputs.inputs, payer: routerProbeInputs.payer })
+        .from(routerProbeInputs)
+        .where(and(eq(routerProbeInputs.capability, capability), sql`${routerProbeInputs.payer} <> ''`, gte(routerProbeInputs.at, new Date(since))))
+        .orderBy(desc(routerProbeInputs.at), desc(routerProbeInputs.id))
+        .limit(PROBE_INPUT_ROWS);
+      return probePool(rows, limit, perPayer);
+    },
+
+    async answeredBefore(capability, inputs, slug) {
+      const [row] = await db
+        .select({ id: routerProbeInputs.id })
+        .from(routerProbeInputs)
+        .where(and(eq(routerProbeInputs.capability, capability), eq(routerProbeInputs.key, inputsKey(inputs)), eq(routerProbeInputs.slug, slug)))
+        .limit(1);
+      return row !== undefined;
+    },
+
     async recordSlash(slug, payTo, at) {
       const wallet = payTo.toLowerCase();
       await db.insert(routerSlashes).values({ slug, payTo: wallet, at: new Date(at) });
@@ -219,8 +258,9 @@ const DAY_MS = DAY_SECONDS * 1000;
 
 /**
  * Clears out what the router no longer reads: uptime probes older than 30 days, route ids that expired more than a
- * day ago, pauses that are over, rate-limit counts older than an hour, and saved stats nothing has refreshed for a
- * day (an API that is gone). Measured calls are kept, since a slash is decided from them.
+ * day ago, pauses that are over, rate-limit counts older than an hour, saved stats nothing has refreshed for a day
+ * (an API that is gone), and probe inputs nobody paid for or answered in 30 days. Measured calls are kept, since a
+ * slash is decided from them.
  */
 export async function pruneRouterRecord(db: DB, now: number) {
   await db.delete(routerStats).where(lt(routerStats.at, new Date(now - DAY_MS)));
@@ -228,4 +268,5 @@ export async function pruneRouterRecord(db: DB, now: number) {
   await db.delete(routerRoutes).where(lt(routerRoutes.expires, new Date(now - DAY_MS)));
   await db.delete(routerBlockedPayers).where(lt(routerBlockedPayers.until, new Date(now)));
   await db.delete(routerHits).where(lt(routerHits.minute, new Date(now - 3_600_000)));
+  await db.delete(routerProbeInputs).where(lt(routerProbeInputs.at, new Date(now - 30 * DAY_MS)));
 }

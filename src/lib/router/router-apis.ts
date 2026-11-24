@@ -1,7 +1,7 @@
 import type { Gateway } from "@/db/schema";
 import { TOKEN } from "@/lib/constants";
 import {
-  CAPABILITIES, ROUTER, checkAnswer, fillPath, isCapability, mapAnswer, notReadyWait, validPathTemplate,
+  CAPABILITIES, ROUTER, checkAnswer, fillPath, isCapability, isNoData, mapAnswer, notReadyWait, validPathTemplate,
   type ApiAnswer, type Capability, type FieldMapping, type RoutableApi,
 } from "@/lib/router/router";
 import { OFFICIAL_OWNER } from "@/lib/directory/track-record";
@@ -87,7 +87,10 @@ const USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
 // Autonomo's Safe, the wallet the published Safe Swap example is quoted for. A quote moves nothing.
 const QUOTE_TAKER = "0x92a99fbd386f87277b6009bff4c56728ec5f7354";
 
-/** Inputs that always have an answer, for the format test and the paid probes. */
+/**
+ * Inputs that always have an answer, for the format test, and for a probe when no agent's input can be used: the
+ * service isn't replayed (REPLAY_INPUTS in router.ts), or nobody has paid for a call on it yet.
+ */
 export const PROBE_INPUTS: Record<Capability, Record<string, string>> = {
   "token-price": { token: TOKEN.address, chain: "robinhood" },
   "token-risk": { token: TOKEN.address, chain: "robinhood" },
@@ -106,9 +109,14 @@ export type FormatTest = { ok: boolean; reason: string; status: number | null; m
 /**
  * The format test an API passes before it can be routed: one call with the known input for its capability, which
  * must come back 2xx with every required field. `call` sends the request the way a routed call would be sent.
+ * A probe may give its own `inputs`.
  */
-export async function formatTest(settings: RouteSettings, call: (path: string) => Promise<ApiAnswer>): Promise<FormatTest> {
-  const filled = fillPath(settings.path, PROBE_INPUTS[settings.capability]);
+export async function formatTest(
+  settings: RouteSettings,
+  call: (path: string) => Promise<ApiAnswer>,
+  inputs: Record<string, string> = PROBE_INPUTS[settings.capability],
+): Promise<FormatTest> {
+  const filled = fillPath(settings.path, inputs);
   if (!filled.ok) return { ok: false, reason: filled.error, status: null, ms: null };
   const { status, body, ms, retryAfter } = await call(filled.path);
   const wait = notReadyWait(status, retryAfter);
@@ -119,17 +127,23 @@ export async function formatTest(settings: RouteSettings, call: (path: string) =
   return { ok: check.valid, reason: check.reason, status, ms };
 }
 
-/** `notReady`: the API said "not ready yet". recordProbe() in router.ts decides whether that counts. */
-export type ProbeResult = { valid: boolean; reason: string; ms: number | null; notReady: boolean };
+/**
+ * `notReady`: the API said "not ready yet". `noData`: it said it has no answer for the input (a 4xx). `real`: the
+ * agent's input the probe used, null when it used the fixed one. recordProbe() in router.ts decides what counts.
+ */
+export type ProbeResult = { valid: boolean; reason: string; ms: number | null; notReady: boolean; noData: boolean; real: { capability: string; inputs: Record<string, string> } | null };
 
 /**
- * One probe of an API: the format test's call on the known input, held to the gateway's time limit as well. On a
- * probe a 4xx is a failure too, since the input is known to have an answer.
+ * One probe of an API: the format test's call, held to the gateway's time limit as well. With `inputs`, an input an
+ * agent paid for, the API is asked for that; when its path can't be filled from them, or none are given, the fixed
+ * input is used. On the fixed input a 4xx is a failure, since that input is known to have an answer.
  */
-export async function probeApi(settings: RouteSettings, call: Parameters<typeof formatTest>[1]): Promise<ProbeResult> {
-  const t = await formatTest(settings, call);
-  if (t.ok && t.ms !== null && t.ms > ROUTER.gatewayLimitMs) return { valid: false, reason: "too slow", ms: t.ms, notReady: false };
-  return { valid: t.ok, reason: t.reason, ms: t.ms, notReady: t.wait !== undefined };
+export async function probeApi(settings: RouteSettings, call: Parameters<typeof formatTest>[1], inputs?: Record<string, string> | null): Promise<ProbeResult> {
+  const usable = inputs && fillPath(settings.path, inputs).ok ? inputs : null;
+  const real = usable ? { capability: settings.capability, inputs: usable } : null;
+  const t = await formatTest(settings, call, usable ?? undefined);
+  if (t.ok && t.ms !== null && t.ms > ROUTER.gatewayLimitMs) return { valid: false, reason: "too slow", ms: t.ms, notReady: false, noData: false, real };
+  return { valid: t.ok, reason: t.reason, ms: t.ms, notReady: t.wait !== undefined, noData: t.status !== null && isNoData(t.status), real };
 }
 
 const FIELD_PATH = /^[A-Za-z0-9_$-]+(\.[A-Za-z0-9_$-]+)*$/;
