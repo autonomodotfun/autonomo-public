@@ -5,11 +5,15 @@ import { eq, isNotNull, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Gateway } from "@/db/schema";
 import { baseStatus } from "@/lib/payments/base-pay";
-import { bondEnabled, readWalletBonds } from "@/lib/trust/bond";
+import { bondContract, bondEnabled, readBondState, readWalletBonds } from "@/lib/trust/bond";
+import { SLASH_INTERVAL_S } from "@/lib/trust/bond-rules";
 import { BURN_BPS, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/payments/burn";
 import { checkUpstream, forward, gatewayOffers, payeeOf, recordCall } from "@/lib/gateway/gateway";
 import { acceptsFor, railForAsset, USDC_BASE, x402Server } from "@/lib/payments/payments";
-import { cachedBond, createRouter, eligible, parseRetryAfter, probesDue, recordProbe, refreshStats, statsFor, uptimeDue, STILL_NOT_READY, type Router, type Stats } from "@/lib/router/router";
+import {
+  cachedBond, createRouter, eligible, parseRetryAfter, probesDue, recordProbe, recordSlashes, refreshStats, statsFor, uptimeDue, STILL_NOT_READY,
+  type Router, type Stats,
+} from "@/lib/router/router";
 import { formatTest, probeApi, toRoutableApi, type FormatTest, type RouteSettings } from "@/lib/router/router-apis";
 import type { Routable, RouteDeps } from "@/lib/router/router-http";
 import { pruneRouterRecord, routerStore } from "@/lib/router/router-store";
@@ -102,7 +106,13 @@ function unpaid(request: Request) {
   return new NextRequest(request.url, { method: "GET", headers });
 }
 
-/** Calls the API behind a gateway the way a paid call is sent: same address rules, same key, same limits. */
+/**
+ * Calls the API behind a gateway the way a paid call is sent: same address rules, same key, same limits. Routed
+ * calls and probes both go through here and nowhere else, so the API gets the same request for either: this one
+ * header and its own key. Nothing of the agent's request is passed on (no payment, no route id, no user agent), and
+ * nothing marks a probe. Keep it that way: an API that could tell a probe apart could answer probes well and paid
+ * calls badly.
+ */
 async function callGateway(g: Gateway, path: string) {
   const target = new URL(path, "https://router.invalid");
   const started = Date.now();
@@ -201,7 +211,7 @@ async function gatewayById(id: number) {
 
 /**
  * Runs the format test on one API, with a real call sent the way a routed call would be. If it passes, the API
- * becomes routable: its week of three probes a day starts, and it is eligible once it has 20 measured calls. A test
+ * becomes routable: its days of ten probes a day start, and it is eligible once it has 20 measured calls. A test
  * that fails changes nothing: an API that was routable stays so, and its probes decide.
  */
 export async function testAndEnable(id: number): Promise<{ slug: string; test: FormatTest } | null> {
@@ -300,7 +310,27 @@ async function pooled<T>(items: T[], size: number, deadline: number, job: (item:
   return ran;
 }
 
+/**
+ * Reads from the bond contract when each routable API's wallet was last slashed, and puts new slashes on the router's
+ * record. The contract keeps one date per wallet: the earliest a next slash may be opened, 30 days after the last one
+ * ran. So the last slash is that date less 30 days, with no search through the chain's history.
+ */
+async function syncSlashes(r: Router, wallets: string[]) {
+  const bond = bondContract();
+  if (!bond) return [];
+  const executed: { provider: string; at: number }[] = [];
+  await Promise.all(
+    [...new Set(wallets)].map(async (wallet) => {
+      const { nextSlashAt } = await readBondState(bond, wallet);
+      if (nextSlashAt > 0) executed.push({ provider: wallet, at: (nextSlashAt - SLASH_INTERVAL_S) * 1000 });
+    }),
+  );
+  return recordSlashes(r.store, executed);
+}
+
 export type RouterJobs = {
+  /** Wallets whose slash on the bond contract was put on the record on this run: their APIs leave routing for 30 days. */
+  slashed: string[];
   uptime: { checked: number; down: string[] };
   /** `waiting`: APIs that said "not ready yet" and will be asked once more on a later run. */
   probes: { run: number; failed: { slug: string; reason: string }[]; waiting: string[]; left: number };
@@ -310,8 +340,8 @@ export type RouterJobs = {
 };
 
 /**
- * The router's regular work: the uptime probes that are due, the probes that are due, a refresh of every API's saved
- * stats, and a tidy-up. Safe to run as
+ * The router's regular work: new slashes from the bond contract, the uptime probes that are due, the probes that are
+ * due, a refresh of every API's saved stats, and a tidy-up. Safe to run as
  * often as wanted, since each API is only probed when its own time has come. What doesn't fit in `budgetMs` is left
  * for the next run.
  *
@@ -324,6 +354,13 @@ export async function runRouterJobs(budgetMs = 45_000): Promise<RouterJobs> {
   forgetRoutables();
   const [r, all] = await Promise.all([getRouter(), routableGateways()]);
   const bySlug = new Map(all.map((row) => [row.api.slug, row]));
+
+  // First, so a slashed wallet's APIs are out before this run probes them or refreshes their stats. If the chain
+  // can't be read, the run goes on and the next one tries again.
+  const slashed = await syncSlashes(r, all.map((row) => row.api.payTo)).catch((e) => {
+    console.error("router slash sync failed", e);
+    return [] as string[];
+  });
 
   const uptime: RouterJobs["uptime"] = { checked: 0, down: [] };
   await pooled(await uptimeDue(r, started), 8, deadline, async (api) => {
@@ -351,5 +388,5 @@ export async function runRouterJobs(budgetMs = 45_000): Promise<RouterJobs> {
   const refreshed = await pooled(all, 8, deadline, async (row) => void (await refreshStats(r.store, row.api, Date.now())));
 
   await pruneRouterRecord(await getDb(), started).catch((e) => console.error("router tidy-up failed", e));
-  return { uptime, probes: { run, failed, waiting, left: due.length - run }, refreshed, ms: Date.now() - started };
+  return { slashed, uptime, probes: { run, failed, waiting, left: due.length - run }, refreshed, ms: Date.now() - started };
 }

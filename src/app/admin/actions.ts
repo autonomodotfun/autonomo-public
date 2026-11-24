@@ -418,6 +418,7 @@ export async function runRouterJobsNow() {
       (failed ? ` Failed: ${failed}.` : "") +
       (run.probes.waiting.length ? ` Not ready yet, asked again on a later run: ${run.probes.waiting.join(", ")}.` : "") +
       (run.uptime.down.length ? ` Down: ${run.uptime.down.join(", ")}.` : "") +
+      (run.slashed.length ? ` Slashed, not routed for 30 days: ${run.slashed.join(", ")}.` : "") +
       (run.probes.left ? ` ${run.probes.left} left for the next run.` : "");
   } catch (e) {
     console.error("router jobs failed", e);

@@ -170,7 +170,7 @@ export const gateways = pgTable(
     // Standard field name -> where it is in this API's own answer, such as { "price_usd": "priceUsd" }. Null when the
     // API already answers with the standard field names.
     routeMapping: jsonb("route_mapping").$type<Record<string, string>>(),
-    // Passed the format test for its capability, and when: that starts its week of three paid probes a day.
+    // Passed the format test for its capability, and when: that starts its days of ten probes a day.
     routeFormatOk: boolean("route_format_ok").notNull().default(false),
     routeListedAt: timestamp("route_listed_at", { withTimezone: true }),
     status: text("status").$type<GatewayStatus>().notNull().default("active"),

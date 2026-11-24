@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 const BOND: { title: string; note: string } = {
   title: "Provider bond",
-  note: "Creators lock $AUTONOMO and show as Bonded. If their API takes payments and doesn't deliver, part of the bond refunds the agent and the rest is burned. Not audited yet",
+  note: "Creators lock $AUTONOMO and show as Bonded. If their API takes payments and doesn't deliver, part of the bond refunds the agent and the rest is burned",
 };
 
 type Item = { title: string; note?: string };

@@ -65,12 +65,12 @@ export function routerStore(db: DB): RouterStore {
       if (call.counted) await forget(call.slug);
     },
 
-    async countedCalls(slug, since, limit, maxFailsPerPayerDay) {
-      // Each payer's failed routed calls are numbered through their UTC day, oldest first; other calls get 1. Keeping
-      // numbers up to the cap leaves out what one wallet sent past it, however the calls arrived.
-      const failed = sql`(${routerCalls.kind} = 'routed' and not ${routerCalls.valid})`;
-      const nth = sql<number>`case when ${failed} then row_number() over (
-          partition by ${routerCalls.payer}, floor(extract(epoch from ${routerCalls.at}) / ${DAY_SECONDS}), ${failed}
+    async countedCalls(slug, since, limit, maxCallsPerPayerDay) {
+      // Each payer's routed calls, valid or not, are numbered through their UTC day, oldest first; probes get 1.
+      // Keeping numbers up to the cap leaves out what one wallet sent past it, however the calls arrived.
+      const routed = sql`(${routerCalls.kind} = 'routed')`;
+      const nth = sql<number>`case when ${routed} then row_number() over (
+          partition by ${routerCalls.payer}, floor(extract(epoch from ${routerCalls.at}) / ${DAY_SECONDS}), ${routed}
           order by ${routerCalls.at}, ${routerCalls.id}
         ) else 1 end`.as("nth");
       const numbered = db
@@ -93,7 +93,7 @@ export function routerStore(db: DB): RouterStore {
       const rows = await db
         .select()
         .from(numbered)
-        .where(lte(numbered.nth, maxFailsPerPayerDay))
+        .where(lte(numbered.nth, maxCallsPerPayerDay))
         .orderBy(desc(numbered.at), desc(numbered.id))
         .limit(limit);
       return rows.map(

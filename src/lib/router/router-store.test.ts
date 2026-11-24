@@ -9,7 +9,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { schema, type DB } from "@/db";
 import {
-  ROUTER, cachedBond, createRouter, eligible, memoryStore, recordMeasured, routePaidCall, startRoute, statsFor,
+  ROUTER, cachedBond, createRouter, eligible, memoryStore, recordMeasured, recordSlashes, routePaidCall, startRoute, statsFor,
   type MeasuredCall, type RoutableApi, type RouteHooks, type RouterStore, type Stats,
 } from "@/lib/router/router";
 import { pruneRouterRecord, routerStore } from "@/lib/router/router-store";
@@ -17,7 +17,7 @@ import { pruneRouterRecord, routerStore } from "@/lib/router/router-store";
 const NOW = 1_800_000_000_000;
 const SECOND = 1000;
 const DAY = 86_400_000;
-const CAP = ROUTER.maxFailsPerPayerDay;
+const CAP = ROUTER.maxCallsPerPayerDay;
 
 let database: Promise<DB> | undefined;
 /** One in-memory Postgres for the whole file, migrated the way `npm run db:migrate` does it. */
@@ -66,7 +66,7 @@ for (const [name, open] of stores) {
     assert.equal((await store.countedCalls(slug, NOW - DAY, 20, CAP)).length, 1);
   });
 
-  test(`${name}: one payer's failed routed calls count up to the cap per day`, async () => {
+  test(`${name}: one payer's routed calls count up to the cap per day, good or bad`, async () => {
     const store = await open();
     const slug = fresh("api");
     const read = async (cap: number) => (await store.countedCalls(slug, NOW - DAY, 100, cap)).filter((r) => !r.valid);
@@ -79,12 +79,35 @@ for (const [name, open] of stores) {
     assert.equal((await read(1)).length, 4, "other payers' failures still count");
     for (let i = 0; i < 5; i++) await store.recordCall(failed(slug, day0 + DAY + i, "0xgriefer"));
     assert.equal((await read(1)).length, 5, "the same payer counts again the next day");
-    // What is never capped: valid routed calls from that payer, and failed probes.
+    // The same cap holds for good calls. That payer already counted today; a new payer counts once, with its first.
     for (let i = 0; i < 4; i++) await store.recordCall(call(slug, day0 + 200 + i, { kind: "routed", payer: "0xgriefer", settled: true }));
+    for (let i = 0; i < 4; i++) await store.recordCall(call(slug, day0 + 250 + i, { kind: "routed", payer: "0xfan", settled: true }));
+    // What is never capped: probes.
     for (let i = 0; i < 4; i++) await store.recordCall(call(slug, day0 + 300 + i, { valid: false }));
     const all = await store.countedCalls(slug, NOW - DAY, 100, 1);
-    assert.equal(all.filter((r) => r.valid).length, 4);
+    assert.deepEqual(all.filter((r) => r.valid).map((r) => [r.payer, r.at]), [["0xfan", day0 + 250]]);
     assert.equal(all.filter((r) => !r.valid && r.kind === "probe").length, 4);
+    assert.equal((await store.countedCalls(slug, NOW - DAY, 100, 3)).filter((r) => r.valid).length, 3, "a higher cap lets more of the new payer's in");
+  });
+
+  test(`${name}: good and bad calls sent at the same moment by one payer are capped together`, async () => {
+    const store = await open();
+    const slug = fresh("api");
+    await Promise.all(
+      Array.from({ length: 30 }, (_, i) => store.recordCall(i % 2 ? failed(slug, NOW, "0xbusy") : call(slug, NOW, { kind: "routed", payer: "0xbusy", settled: true }))),
+    );
+    assert.equal((await store.countedCalls(slug, NOW - DAY, 100, 1)).length, 1);
+  });
+
+  test(`${name}: slashes from the bond contract are recorded once per wallet, and only for that wallet`, async () => {
+    const store = await open();
+    const [w1, w2] = [fresh("0xw"), fresh("0xw")];
+    assert.deepEqual(await recordSlashes(store, [{ provider: w1.toUpperCase().replace("0X", "0x"), at: NOW }, { provider: w1, at: NOW - DAY }]), [w1]);
+    assert.equal(await store.lastSlash(fresh("api"), w1), NOW, "the newest of the two");
+    assert.equal(await store.lastSlash(fresh("api"), w2), null);
+    assert.deepEqual(await recordSlashes(store, [{ provider: w1, at: NOW }]), [], "already on the record");
+    assert.deepEqual(await recordSlashes(store, [{ provider: w1, at: NOW + DAY }, { provider: w2, at: NOW }]), [w1, w2]);
+    assert.equal(await store.lastSlash(fresh("api"), w2), NOW);
   });
 
   test(`${name}: failed calls sent at the same moment are still capped`, async () => {

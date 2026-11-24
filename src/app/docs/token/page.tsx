@@ -115,7 +115,7 @@ export default function TokenPage() {
           </p>
           <p>
             The rules, the limits written into the contract, and every slash with its evidence are on{" "}
-            <Link href="/bond">the bond page</Link>. The contract has not been audited yet.
+            <Link href="/bond">the bond page</Link>.
           </p>
         </Section>
       )}

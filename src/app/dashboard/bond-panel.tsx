@@ -50,9 +50,6 @@ export async function BondPanel({ owner, payee }: { owner: string; payee: string
         doesn&apos;t deliver, up to {settings.maxSlashBps / 100}% of the bond can be slashed. You get the rest back{" "}
         {steps.cooldownDays} days after asking.
       </p>
-      <p className="mt-3 rounded-md border border-warn px-3 py-2 text-warn">
-        The bond contract has not been audited. Lock only what you accept to put at that risk.
-      </p>
 
       <dl className="mt-4 grid gap-2 sm:grid-cols-3">
         <Fact label="Locked" value={`${fmtBond(bond.amount)} ${TOKEN.symbol}`} />

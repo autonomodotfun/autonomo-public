@@ -27,8 +27,13 @@ export const ROUTER = {
   uptimeWindowMs: 7 * DAY,
   /** A slashed wallet's APIs are not routed for 30 days. */
   slashQuietMs: 30 * DAY,
-  /** Paid probes: 3 a day during an API's first week, and whenever it can't be routed yet; otherwise 1 a day. */
-  newApiMs: 7 * DAY,
+  /**
+   * Probes cost nothing, so a new API gets 10 a day until it has its 20 measured calls: two days instead of a week.
+   * The fast rate stops after 3 days whatever happened, a day to spare for probes that ran late or weren't ready.
+   * After that: 3 a day while it can't be routed on its record, otherwise 1 a day.
+   */
+  newApiMs: 3 * DAY,
+  probesPerDayNew: 10,
   probesPerDayCatchingUp: 3,
   probesPerDay: 1,
   uptimeProbeEveryMs: 15 * MINUTE,
@@ -51,10 +56,11 @@ export const ROUTER = {
   maxRetries: 2,
   payerBlockMs: 24 * HOUR,
   /**
-   * One payer's failed routed calls count once per API per day. At 95% of 20 calls an API can afford exactly one
-   * failure, so one is the most a single wallet may take from it.
+   * One payer's routed calls count once per API per day, good or bad: the first of its UTC day. At 95% of 20 calls
+   * an API can afford exactly one failure, so one is the most a single wallet may take from it. And one is the most
+   * a single wallet may add, or a creator could lift its own API's record by paying for calls through the router.
    */
-  maxFailsPerPayerDay: 1,
+  maxCallsPerPayerDay: 1,
   bondCacheMs: 5 * MINUTE,
   /**
    * How long an API's saved stats are used before they are worked out again. They are also cleared whenever its
@@ -190,7 +196,7 @@ export type RoutableApi = {
   formatOk: boolean;
   unlisted: boolean;
   mapping: FieldMapping | null;
-  /** When it became routable, which starts its week of 3 probes a day. */
+  /** When it became routable, which starts its days of 10 probes a day. */
   listedAt: number;
   apiOfTheWeek: boolean;
 };
@@ -245,11 +251,12 @@ export interface RouterStore {
   savedStats(slugs: string[], since: number): Promise<Map<string, Stats>>;
   recordCall(call: MeasuredCall): Promise<void>;
   /**
-   * The newest counted calls of an API since a time, newest first, at most `limit`. Of one payer's failed routed
-   * calls on one UTC day, only the first `maxFailsPerPayerDay` are in it. The cap is applied here, when reading, and
-   * not when a call is recorded: calls sent at the same moment can't slip past a rule that looks at all of them.
+   * The newest counted calls of an API since a time, newest first, at most `limit`. Of one payer's routed calls on
+   * one UTC day, valid or not, only the first `maxCallsPerPayerDay` are in it. Probes are never capped. The cap is
+   * applied here, when reading, and not when a call is recorded: calls sent at the same moment can't slip past a
+   * rule that looks at all of them.
    */
-  countedCalls(slug: string, since: number, limit: number, maxFailsPerPayerDay: number): Promise<MeasuredCall[]>;
+  countedCalls(slug: string, since: number, limit: number, maxCallsPerPayerDay: number): Promise<MeasuredCall[]>;
   /** How many paid probes an API got since a time. */
   probesSince(slug: string, since: number): Promise<number>;
   /** An API's newest probe, counted or not. Null when it has none. */
@@ -297,19 +304,19 @@ export function memoryStore(): RouterStore {
       calls.push({ ...call, payer: call.payer.toLowerCase() });
       if (call.counted) saved.delete(call.slug);
     },
-    async countedCalls(slug, since, limit, maxFailsPerPayerDay) {
-      // Oldest first, to number each payer's failures through its day; rows recorded at the same time keep the order
-      // they were recorded in.
+    async countedCalls(slug, since, limit, maxCallsPerPayerDay) {
+      // Oldest first, to number each payer's routed calls through its day; rows recorded at the same time keep the
+      // order they were recorded in.
       const rows = calls
         .map((c, i) => ({ c, i }))
         .filter(({ c }) => c.slug === slug && c.counted && c.at >= since)
         .sort((a, b) => a.c.at - b.c.at || a.i - b.i);
-      const fails = new Map<string, number>();
+      const seen = new Map<string, number>();
       const kept = rows.filter(({ c }) => {
-        if (c.kind !== "routed" || c.valid) return true;
+        if (c.kind !== "routed") return true;
         const key = `${c.payer}:${Math.floor(c.at / DAY)}`;
-        fails.set(key, (fails.get(key) ?? 0) + 1);
-        return fails.get(key)! <= maxFailsPerPayerDay;
+        seen.set(key, (seen.get(key) ?? 0) + 1);
+        return seen.get(key)! <= maxCallsPerPayerDay;
       });
       return kept.reverse().slice(0, limit).map(({ c }) => c);
     },
@@ -400,7 +407,7 @@ function median(values: number[]) {
 
 export async function statsFor(store: RouterStore, api: Pick<RoutableApi, "slug" | "payTo">, now: number): Promise<Stats> {
   const [rows, up, lastSlash] = await Promise.all([
-    store.countedCalls(api.slug, now - ROUTER.measuredMaxAgeMs, ROUTER.measuredWindow, ROUTER.maxFailsPerPayerDay),
+    store.countedCalls(api.slug, now - ROUTER.measuredMaxAgeMs, ROUTER.measuredWindow, ROUTER.maxCallsPerPayerDay),
     store.uptime(api.slug, now - ROUTER.uptimeWindowMs),
     store.lastSlash(api.slug, api.payTo),
   ]);
@@ -548,9 +555,10 @@ export async function pick(router: Router, capability: string, now: number, excl
 // ---------- probes ----------
 
 /**
- * APIs that need a paid probe now. 3 a day during an API's first week, so it reaches 20 measured calls without having
- * traffic first, and 3 a day whenever it can't be routed on its record, so one that failed gets back in days instead
- * of weeks. Otherwise 1 a day. Spread over the day: a probe is due once 24 h / probes-per-day has passed since the last.
+ * APIs that need a probe now. 10 a day while a new API has fewer than 20 measured calls, so it gets there in two days
+ * without having traffic first (for 3 days at most). 3 a day whenever it can't be routed on its record, so one that
+ * failed gets back in days instead of weeks. Otherwise 1 a day. Spread over the day: a probe is due once
+ * 24 h / probes-per-day has passed since the last.
  */
 export async function probesDue(router: Router, now: number): Promise<RoutableApi[]> {
   const due: RoutableApi[] = [];
@@ -562,12 +570,10 @@ export async function probesDue(router: Router, now: number): Promise<RoutableAp
       if (now - last.at >= ROUTER.notReadyMaxWaitMs) due.push(api);
       continue;
     }
-    let perDay: number = ROUTER.probesPerDayCatchingUp;
-    if (now - api.listedAt >= ROUTER.newApiMs) {
-      const st = await statsFor(router.store, api, now);
-      const onRecord = st.measured >= ROUTER.measuredWindow && st.answerRate >= ROUTER.minAnswerRate;
-      if (onRecord) perDay = ROUTER.probesPerDay;
-    }
+    const st = await statsFor(router.store, api, now);
+    const onRecord = st.measured >= ROUTER.measuredWindow && st.answerRate >= ROUTER.minAnswerRate;
+    let perDay: number = onRecord ? ROUTER.probesPerDay : ROUTER.probesPerDayCatchingUp;
+    if (now - api.listedAt < ROUTER.newApiMs && st.measured < ROUTER.measuredWindow) perDay = ROUTER.probesPerDayNew;
     if ((await router.store.probesSince(api.slug, now - DAY / perDay)) === 0) due.push(api);
   }
   return due;
@@ -585,6 +591,32 @@ export async function recordProbe(router: Router, slug: string, probe: { valid: 
   const reason = waiting ? NOT_READY : probe.notReady ? STILL_NOT_READY : probe.reason;
   await recordMeasured(router.store, { slug, at: now, valid: probe.valid && !probe.notReady, ms: probe.ms, kind: "probe", payer: "", settled: false, reason, counted: !waiting });
   return waiting;
+}
+
+// ---------- slashes ----------
+
+/** The record's name for a slash of a whole wallet. An API's slug can't hold a colon, so it never matches one. */
+const walletSlash = (wallet: string) => `wallet:${wallet.toLowerCase()}`;
+
+/**
+ * Puts slashes that ran on the bond contract on the record, so the slashed wallet's APIs are not routed for 30 days.
+ * `at` is when the slash ran. The whole list can be given every time: a slash already on the record is not added
+ * again. Returns the wallets it added a slash for.
+ */
+export async function recordSlashes(store: RouterStore, executed: { provider: string; at: number }[]): Promise<string[]> {
+  const latest = new Map<string, number>();
+  for (const s of executed) {
+    const wallet = s.provider.toLowerCase();
+    latest.set(wallet, Math.max(latest.get(wallet) ?? 0, s.at));
+  }
+  const added: string[] = [];
+  for (const [wallet, at] of latest) {
+    const known = await store.lastSlash(walletSlash(wallet), wallet);
+    if (known !== null && known >= at) continue;
+    await store.recordSlash(walletSlash(wallet), wallet, at);
+    added.push(wallet);
+  }
+  return added;
 }
 
 /** APIs whose free uptime probe is due: every 15 minutes, sent straight to the API's own server. */

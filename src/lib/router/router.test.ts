@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CAPABILITIES, ROUTER, cachedBond, candidates, checkAnswer, createRouter, eligible, fillPath, mapAnswer, memoryStore, notReadyWait, openRouteByPayment,
-  parseRetryAfter, pick, probesDue, recordMeasured, recordProbe, refreshStats, routePaidCall, speed, startRoute, statsFor, uptimeDue,
+  parseRetryAfter, pick, probesDue, recordMeasured, recordProbe, recordSlashes, refreshStats, routePaidCall, speed, startRoute, statsFor, uptimeDue,
   type Outcome, type RoutableApi, type RouteHooks, type RouterStore,
 } from "@/lib/router/router";
 
@@ -156,6 +156,26 @@ test("a slash takes every API of that wallet out for 30 days", async () => {
   // Fresh probes, so the record is still inside its 30 days when the slash runs out.
   for (const s of "abc") await w.history(s, 20, { at: NOW + 20 * DAY });
   assert.equal((await w.slugs(NOW + 21 * DAY)).length, 3);
+});
+
+// The bond contract is read by the regular job (syncSlashes in router-gateway.ts), which hands what it found to this.
+test("a slash that ran on the bond contract takes the wallet's APIs out, and is recorded once", async () => {
+  const wallet = `0x${"a".repeat(40)}`;
+  const w = world([api("a", 0.01, { payTo: wallet }), api("b", 0.01, { payTo: wallet }), api("c")]);
+  for (const s of "abc") await w.history(s);
+  assert.equal((await w.slugs()).length, 3);
+  // The contract gives the wallet in mixed case; the same slash can come twice in one list.
+  const ran = { provider: wallet.toUpperCase().replace("0X", "0x"), at: NOW - DAY };
+  assert.deepEqual(await recordSlashes(w.store, [ran, ran]), [wallet]);
+  assert.deepEqual(await w.slugs(), ["c"], "both APIs of the wallet are out, the other creator's is not");
+  assert.deepEqual(await recordSlashes(w.store, [ran]), [], "the next run finds it already on the record");
+  assert.equal(await w.store.lastSlash("c", w.bySlug("c")!.payTo), null, "a wallet's slash never counts for another wallet");
+  // Back after the 30 days, with fresh probes so the record is still inside its own 30 days.
+  for (const s of "abc") await w.history(s, 20, { at: NOW + 29 * DAY });
+  assert.equal((await w.slugs(NOW + 29 * DAY + HOUR)).length, 3);
+  // A second slash, later, is a new one.
+  assert.deepEqual(await recordSlashes(w.store, [{ provider: wallet, at: NOW + 40 * DAY }]), [wallet]);
+  assert.deepEqual(await recordSlashes(w.store, []), []);
 });
 
 test("direct calls by name are never measured", async () => {
@@ -618,6 +638,29 @@ test("one wallet cannot push an API out of routing", async () => {
   assert.ok(Math.abs((await f.stats("a", NOW + DAY + SECOND)).answerRate - 15 / 20) < 1e-9);
 });
 
+// The advisor's rule of November 24, 2026: the cap on a wallet's failures holds for its good calls too. Without it,
+// a creator whose API is slipping could pay for calls through the router and push the failures out of the last 20.
+test("one wallet cannot lift an API's record", async () => {
+  const w = world([api("a")]);
+  await w.history("a"); // 20 good probes
+  const probe = (at: number, ok: boolean) => recordMeasured(w.store, { slug: "a", at, valid: ok, ms: 400, kind: "probe", payer: "", settled: false, reason: "" });
+  const paid = (payer: string, at: number) => recordMeasured(w.store, { slug: "a", at, valid: true, ms: 400, kind: "routed", payer, settled: true, reason: "ok" });
+  const rate = async (at: number) => (await statsFor(w.store, w.bySlug("a")!, at)).answerRate;
+  await probe(NOW, false);
+  await probe(NOW + SECOND, false);
+  assert.ok(Math.abs((await rate(NOW + 2 * SECOND)) - 18 / 20) < 1e-9, "two failed probes: out");
+  for (let i = 0; i < 50; i++) await paid("0xCreator", NOW + 3 * SECOND + i); // 50 good calls from one payer, same day
+  assert.ok(Math.abs((await rate(NOW + 4 * SECOND)) - 18 / 20) < 1e-9, "only one of them counts, and both failures are still in the last 20");
+  assert.deepEqual(await w.slugs(NOW + 4 * SECOND), []);
+  await paid("0xcreator", NOW + DAY); // the same payer the next day: counts once more
+  assert.equal((await statsFor(w.store, w.bySlug("a")!, NOW + DAY + SECOND)).measured, 20);
+  const rows = await w.store.countedCalls("a", 0, 100, ROUTER.maxCallsPerPayerDay);
+  assert.equal(rows.filter((r) => r.kind === "routed").length, 2);
+  // A good call and a bad one from one wallet on one day: the first of the day is the one that counts.
+  await recordMeasured(w.store, { slug: "a", at: NOW + DAY + HOUR, valid: false, ms: 400, kind: "routed", payer: "0xCREATOR", settled: false, reason: "status 500" });
+  assert.equal((await w.store.countedCalls("a", 0, 100, ROUTER.maxCallsPerPayerDay)).filter((r) => r.kind === "routed" && !r.valid).length, 0);
+});
+
 test("a payment that doesn't match gets a fresh route id for the same API", async () => {
   const f = await ready(flow());
   const out = await f.start();
@@ -664,26 +707,46 @@ test("with a mapping, the agent gets the standard fields and the API's whole ans
 
 // ---------- probes ----------
 
-test("three paid probes a day in the first week, then one", async () => {
-  const w = world([api("new", 0.01, { listedAt: NOW - 2 * DAY }), api("old")]);
+test("ten probes a day while a new API has fewer than 20 measured calls, then one", async () => {
+  const w = world([api("new", 0.01, { listedAt: NOW - HOUR }), api("old")]);
   await w.history("old", 20, { at: NOW - 2 * DAY }); // on its record, last probed two days ago
   const due = async (now: number) => (await probesDue(w.router, now)).map((a) => a.slug).sort();
+  const probe = (slug: string, at: number) => recordMeasured(w.store, { slug, at, valid: true, ms: 400, kind: "probe", payer: "", settled: false, reason: "" });
   assert.deepEqual(await due(NOW), ["new", "old"]);
-  for (const slug of ["new", "old"]) await recordMeasured(w.store, { slug, at: NOW, valid: true, ms: 400, kind: "probe", payer: "", settled: true, reason: "" });
-  assert.deepEqual(await due(NOW + 7 * HOUR), []);
-  assert.deepEqual(await due(NOW + 9 * HOUR), ["new"]);
+  for (const slug of ["new", "old"]) await probe(slug, NOW);
+  assert.deepEqual(await due(NOW + 2 * HOUR), []);
+  assert.deepEqual(await due(NOW + 3 * HOUR), ["new"], "24 h / 10 after its last probe");
   assert.deepEqual(await due(NOW + 25 * HOUR), ["new", "old"]);
+  // With its 20 calls the new API is on its record: one a day from here, like the old one.
+  await w.history("new", 20, { at: NOW + 25 * HOUR });
+  await probe("old", NOW + 25 * HOUR);
+  assert.deepEqual(await due(NOW + 28 * HOUR), []);
+  assert.deepEqual(await due(NOW + 50 * HOUR), ["new", "old"]);
 });
 
-test("a new API becomes eligible after about a week of probes", async () => {
+test("the fast rate stops after three days, even short of 20 calls", async () => {
+  const w = world([api("young", 0.01, { listedAt: NOW - DAY }), api("stuck", 0.01, { listedAt: NOW - 4 * DAY })]);
+  for (const slug of ["young", "stuck"]) await w.history(slug, 5, { at: NOW - 5 * HOUR });
+  const due = async (now: number) => (await probesDue(w.router, now)).map((a) => a.slug).sort();
+  assert.deepEqual(await due(NOW), ["young"], "the older one is on three a day: the next is 8 h after its last");
+  assert.deepEqual(await due(NOW + 4 * HOUR), ["stuck", "young"]);
+});
+
+// The regular job runs every 5 minutes, so the test moves in 5-minute steps too.
+test("a new API becomes eligible after about two days of probes", async () => {
   const w = world([api("new", 0.01, { listedAt: NOW })]);
   let t = NOW;
+  let probes = 0;
   while (!(await w.slugs(t)).length) {
-    for (const a of await probesDue(w.router, t)) await recordMeasured(w.store, { slug: a.slug, at: t, valid: true, ms: 400, kind: "probe", payer: "", settled: true, reason: "" });
-    t += HOUR;
-    assert.ok(t < NOW + 8 * DAY, "never became eligible");
+    for (const a of await probesDue(w.router, t)) {
+      await recordMeasured(w.store, { slug: a.slug, at: t, valid: true, ms: 400, kind: "probe", payer: "", settled: false, reason: "" });
+      probes += 1;
+    }
+    t += 5 * 60 * SECOND;
+    assert.ok(t < NOW + 3 * DAY, "never became eligible");
   }
-  assert.ok(t > NOW + 6 * DAY);
+  assert.equal(probes, 20);
+  assert.ok(t > NOW + 1.5 * DAY && t <= NOW + 2 * DAY, `eligible after ${((t - NOW) / DAY).toFixed(2)} days`);
 });
 
 // New in the port. With one probe a day, two failed probes kept an API out for 20 days.

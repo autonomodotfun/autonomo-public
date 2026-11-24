@@ -27,6 +27,8 @@ export default async function BondPage() {
   const bonded = Object.entries(bonds.byProject).filter(([, b]) => b.bonded);
   const maxSlash = settings.maxSlashBps / 100;
   const refund = settings.refundBps / 100;
+  // The same switch as routerEnabled() in src/lib/router/router-gateway.ts, read here so this page doesn't load the router.
+  const routerOn = process.env.ROUTER_ENABLED?.trim() === "1";
   const addresses = [
     { label: "Bond contract", address: contract },
     { label: "Owner (cancels slashes, replaces the slasher, changes the settings)", address: settings.owner },
@@ -43,10 +45,6 @@ export default async function BondPage() {
         An API creator can lock {TOKEN.symbol} as a bond, and their APIs show as <BondedBadge />. If a bonded API takes
         payments and doesn&apos;t deliver, part of the bond is slashed: {refund}% of the slash refunds the payer and the rest is
         burned. Verified shows a creator holds the token. Bonded shows they have something to lose.
-      </p>
-      <p className="mt-4 rounded-md border border-warn px-4 py-3 text-sm text-warn">
-        The bond contract has not been audited. Its source is public and tested, but a creator who bonds today takes the risk
-        of a bug nobody has found yet.
       </p>
 
       <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
@@ -78,9 +76,44 @@ export default async function BondPage() {
       <h2 className="heading mt-12 text-2xl">What gets a bond slashed</h2>
       <p className="mt-4 text-muted">
         A gateway only charges an agent when the API answers. A call that errors or times out is never charged, so an outage
-        is not a reason for a slash. A slash is for calls that were charged and came back empty, wrong, or not what the API
-        says it returns.
+        is not a reason for a slash. A slash is for calls that were charged and came back empty, wrong, or not as described.
       </p>
+      <ul className="mt-4 list-disc space-y-2 pl-5 text-muted">
+        <li>
+          <span className="text-ink">Empty.</span> The API answered, and the answer holds no data: an empty body,{" "}
+          <code>{"{}"}</code>, <code>null</code>, or an error message sent as a success.
+        </li>
+        <li>
+          <span className="text-ink">Wrong.</span> The answer states something false that anyone can check against a public
+          source as it was at the time of the call: a price far from the pool&apos;s, a balance the chain doesn&apos;t show, a
+          payment called confirmed that isn&apos;t.
+        </li>
+        <li>
+          <span className="text-ink">Not as described.</span> The answer isn&apos;t what the API says it returns. What it says
+          is its page on Autonomo and the docs that page links to, as they were on the day of the call. That means one of:
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>a field it promises is missing, or is of another kind, such as text where a number is promised</li>
+            <li>the answer is about something other than what was asked: another token, chain, wallet or site</li>
+            <li>the data is filler: placeholder or made-up values, or the same answer whatever the input</li>
+            <li>the data is older than the freshness it promises</li>
+          </ul>
+        </li>
+      </ul>
+      <p className="mt-4 text-muted">These are not reasons for a slash:</p>
+      <ul className="mt-2 list-disc space-y-2 pl-5 text-muted">
+        <li>An outage, an error or a timeout. Those calls are never charged.</li>
+        <li>A slow answer that still arrived inside the gateway&apos;s time limit.</li>
+        <li>A score, a rating or an opinion the agent disagrees with, when the API returned what it describes.</li>
+        <li>
+          A change to the API. A creator can change what an API returns by updating its page first. Each call is judged
+          against the page as it was that day.
+        </li>
+        <li>
+          A single bad answer that the creator fixes or refunds. The creator is told first and has 48 hours. A slash is for
+          an API that keeps charging for such answers, or that was built to.
+        </li>
+      </ul>
+      <p className="mt-4 text-muted">How a slash runs:</p>
       <ol className="mt-4 list-decimal space-y-2 pl-5 text-muted">
         <li>
           Autonomo&apos;s slasher opens a slash, naming the wallet, the amount and who gets the refund. The slash carries the hash
@@ -94,7 +127,10 @@ export default async function BondPage() {
           After that anyone can run it. {refund}% goes to the payer and the rest to the dead address. A slash nobody runs
           within 7 days expires.
         </li>
-        <li>The API loses its Bonded badge for 30 days, and its slash history stays on its page.</li>
+        <li>
+          The creator&apos;s APIs lose the Bonded badge for 30 days{routerOn ? " and are left out of the Router for the same 30 days" : ""}.
+          They can still be called by name, and the slash history stays on each API&apos;s page.
+        </li>
       </ol>
       <p className="mt-4 text-muted">
         When several agents lost money, the slash names Autonomo&apos;s refund wallet as the payer. That wallet passes the
