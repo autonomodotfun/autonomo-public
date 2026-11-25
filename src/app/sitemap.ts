@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { bondEnabled } from "@/lib/trust/bond";
 import { burnEnabled } from "@/lib/payments/burn";
+import { rewardsEnabled } from "@/lib/rewards/rewards";
 import { getAllSlugs } from "@/lib/directory/queries";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -34,6 +35,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/api-docs`, changeFrequency: "monthly", priority: 0.6 },
     ...(burnEnabled() ? [{ url: `${base}/burn`, changeFrequency: "daily" as const, priority: 0.7 }] : []),
     ...(bondEnabled() ? [{ url: `${base}/bond`, changeFrequency: "daily" as const, priority: 0.6 }] : []),
+    ...(rewardsEnabled() ? [{ url: `${base}/rewards`, changeFrequency: "weekly" as const, priority: 0.6 }] : []),
     ...slugs.map((s) => ({ url: `${base}/projects/${s.slug}`, lastModified: s.updatedAt, priority: 0.6 })),
   ];
 }

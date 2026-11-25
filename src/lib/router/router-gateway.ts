@@ -10,6 +10,7 @@ import { SLASH_INTERVAL_S } from "@/lib/trust/bond-rules";
 import { BURN_BPS, noteBaseBurnCall, noteBurnCall, payToFor } from "@/lib/payments/burn";
 import { checkUpstream, forward, gatewayOffers, payeeOf, recordCall } from "@/lib/gateway/gateway";
 import { acceptsFor, railForAsset, USDC_BASE, x402Server } from "@/lib/payments/payments";
+import { noteRewardsCall, refHeaderOf } from "@/lib/rewards/rewards";
 import {
   cachedBond, createRouter, eligible, parseRetryAfter, probeInputFor, probesDue, recordProbe, recordSlashes, refreshStats, statsFor, uptimeDue,
   STILL_NOT_READY,
@@ -151,6 +152,9 @@ function logPaidCall(g: Gateway, request: Request, res: Response, startedAt: num
   const rail = railForAsset(accepted.asset, accepted.network);
   const status = res.status;
   const latencyMs = Date.now() - startedAt;
+  const payer = (settlement?.payer ?? auth.from ?? null)?.toString().toLowerCase() ?? null;
+  const tx = typeof settlement?.transaction === "string" ? settlement.transaction : null;
+  const refHeader = refHeaderOf(request);
   after(async () => {
     const { payTo, basePayTo } = await payTos(g);
     // What the payee keeps: 5% less when the payment went to a splitter, on either chain.
@@ -165,10 +169,12 @@ function logPaidCall(g: Gateway, request: Request, res: Response, startedAt: num
       asset: typeof accepted.asset === "string" ? accepted.asset : null,
       amount: typeof accepted.amount === "string" ? accepted.amount : null,
       burnBps,
-      payer: (settlement?.payer ?? auth.from ?? null)?.toString().toLowerCase() ?? null,
+      payer,
       settled,
-      tx: typeof settlement?.transaction === "string" ? settlement.transaction : null,
+      tx,
     }).catch((e) => console.error("routed call log failed", e));
+    // A routed call counts for the rewards like a direct one: same ref code, same pass check.
+    if (settled) await noteRewardsCall({ gatewayId: g.id, official: g.owner === OFFICIAL_OWNER, tx, payer, refHeader });
     if (settled && burnBps > 0) {
       const note = rail === "usdc_base" ? noteBaseBurnCall : noteBurnCall;
       await note(payeeOf(g)).catch((e) => console.error("burn flush failed", e));

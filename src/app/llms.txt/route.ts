@@ -29,6 +29,8 @@ import { metadata as apiDocs } from "../api-docs/page";
 import { metadata as bond } from "../bond/page";
 import { metadata as burn } from "../burn/page";
 import { metadata as numbers } from "../numbers/page";
+import { metadata as rewards } from "../rewards/page";
+import { rewardsEnabled } from "@/lib/rewards/rewards";
 import { metadata as partners } from "../partners/page";
 import { metadata as playground } from "../playground/page";
 import { metadata as roadmap } from "../roadmap/page";
@@ -71,6 +73,7 @@ const OPTIONAL: Page[] = [
   { path: "/numbers", meta: numbers },
   ...(burnFactory() ? [{ path: "/burn", meta: burn }] : []),
   ...(bondEnabled() ? [{ path: "/bond", meta: bond }] : []),
+  ...(rewardsEnabled() ? [{ path: "/rewards", meta: rewards }] : []),
   { path: "/roadmap", meta: roadmap },
   { path: "/partners", meta: partners },
 ];

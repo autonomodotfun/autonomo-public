@@ -10,15 +10,21 @@ import { burnPercent } from "@/lib/payments/burn";
 import { platform } from "@/lib/payments/payments";
 import { privyEnabled } from "@/lib/auth/privy";
 import { authEnabled, currentOwner } from "@/lib/auth/session";
+import { rewardsEnabled } from "@/lib/rewards/rewards";
 import { Badge } from "./badge";
 import { BondPanel } from "./bond-panel";
 import { ConnectWallet, SignOut } from "./connect-wallet";
 import { PayoutWallet } from "./payout-wallet";
 import { PrivySignIn, PrivySignOut } from "./privy";
+import { RefCodePanel } from "./ref-code";
 
 export const metadata: Metadata = { title: "Dashboard", robots: { index: false } };
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ payTo?: string; payToNote?: string }> }) {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payTo?: string; payToNote?: string; refCode?: string; refNote?: string }>;
+}) {
   const owner = await currentOwner();
   const params = await searchParams;
 
@@ -196,6 +202,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {rows.length > 0 && <PayoutWallet owner={owner} payee={payeeOf(rows[0].gateway)} draft={params.payTo} note={params.payToNote} />}
 
       {rows.length > 0 && <BondPanel owner={owner} payee={payeeOf(rows[0].gateway)} />}
+
+      {/* For every signed-in wallet: an integrator brings calls without having an API of its own. */}
+      {rewardsEnabled() && <RefCodePanel owner={owner} draft={params.refCode} note={params.refNote} />}
     </div>
   );
 }

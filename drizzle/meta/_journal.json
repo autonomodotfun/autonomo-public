@@ -141,6 +141,13 @@
       "when": 1795528433358,
       "tag": "0019_router_probe_inputs",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795588804103,
+      "tag": "0020_rewards",
+      "breakpoints": true
     }
   ]
 }

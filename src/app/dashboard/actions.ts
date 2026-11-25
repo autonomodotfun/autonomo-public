@@ -11,6 +11,8 @@ import { dayPriceUsd } from "@/lib/payments/pool-price";
 import { applyPayTo, firstSafeMessage } from "@/lib/payments/pay-to";
 import { currentOwner, seal, unseal } from "@/lib/auth/session";
 import { revalidateCatalog } from "@/lib/directory/queries";
+import { forgetRefCode, rewardsEnabled } from "@/lib/rewards/rewards";
+import { registerRefCode } from "@/lib/rewards/rewards-store";
 import { safeInfo } from "@/lib/trust/verified";
 
 const { gateways, payToRequests } = schema;
@@ -304,6 +306,18 @@ export async function requestPayTo(form: FormData) {
     });
   revalidatePath("/dashboard");
   redirect(`/dashboard?${new URLSearchParams({ payToNote: "Request sent. Your APIs keep paying your current Safe until it's approved." })}#payout`);
+}
+
+/** Registers the signed-in wallet's ref code for the monthly rewards. The wallet it signed in with is who gets paid. */
+export async function registerRefCodeAction(form: FormData) {
+  const owner = await requireOwner();
+  if (!rewardsEnabled()) redirect("/dashboard");
+  const typed = str(form, "code", 40);
+  const result = await registerRefCode(await getDb(), owner, typed);
+  if (result.ok) forgetRefCode(result.code);
+  revalidatePath("/dashboard");
+  const params: Record<string, string> = result.ok ? { refNote: `Your code ${result.code} is registered.` } : { refCode: typed, refNote: result.error };
+  redirect(`/dashboard?${new URLSearchParams(params)}#ref-code`);
 }
 
 export async function cancelPayToRequest() {

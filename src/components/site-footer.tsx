@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { bondEnabled } from "@/lib/trust/bond";
 import { burnFactory } from "@/lib/payments/burn";
+import { rewardsEnabled } from "@/lib/rewards/rewards";
 import { TOKEN } from "@/lib/constants";
 import { CopyButton } from "@/components/copy-button";
 import { Logo } from "@/components/logo";
@@ -26,6 +27,7 @@ function columns(): { title: string; links: FooterLink[] }[] {
       links: [
         ...(burnFactory() ? [{ label: "Burn", href: "/burn" }] : []),
         ...(bondEnabled() ? [{ label: "Bond", href: "/bond" }] : []),
+        ...(rewardsEnabled() ? [{ label: "Rewards", href: "/rewards" }] : []),
         { label: "Numbers", href: "/numbers" },
       ],
     },

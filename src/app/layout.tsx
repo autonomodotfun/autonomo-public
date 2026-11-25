@@ -3,6 +3,7 @@ import { Barlow, Barlow_Condensed, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { bondEnabled } from "@/lib/trust/bond";
 import { burnFactory } from "@/lib/payments/burn";
+import { rewardsEnabled } from "@/lib/rewards/rewards";
 import { TOKEN } from "@/lib/constants";
 import { Logo } from "@/components/logo";
 import { TokenBar } from "@/components/token-bar";
@@ -23,13 +24,14 @@ export const metadata: Metadata = {
   twitter: { site: "@useautonomo", creator: "@useautonomo" },
 };
 
-/** The pages behind the header's More menu. Burn and Bond show only while they are switched on, as in the footer. */
+/** The pages behind the header's More menu. Burn, Bond and Rewards show only while they are switched on, as in the footer. */
 function moreLinks(): NavItem[] {
   return [
     { href: "/roadmap", label: "Roadmap", about: "What shipped and what's next", primary: true },
     { href: "/numbers", label: "Numbers", about: "Paid calls, payers and speed of each official API" },
     ...(burnFactory() ? [{ href: "/burn", label: "Burn", about: `Every ${TOKEN.symbol} burn from paid calls` }] : []),
     ...(bondEnabled() ? [{ href: "/bond", label: "Bond", about: `${TOKEN.symbol} that API creators lock as a bond` }] : []),
+    ...(rewardsEnabled() ? [{ href: "/rewards", label: "Rewards", about: `${TOKEN.symbol} handed out each month for real usage` }] : []),
     { href: "/api-docs", label: "API reference", about: "Free JSON API for finding x402 APIs" },
   ];
 }

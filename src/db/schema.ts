@@ -541,3 +541,39 @@ export const routerProbeInputs = pgTable(
   },
   (t) => [uniqueIndex("router_probe_inputs_one_idx").on(t.capability, t.key, t.slug), index("router_probe_inputs_capability_at_idx").on(t.capability, t.at)],
 );
+
+// Ref codes: who brought a paid call. A wallet registers one code from its dashboard, clients send it with a call in
+// the X-Autonomo-Ref header, and the calls made with it earn that wallet integrator rewards (src/lib/rewards).
+export const refCodes = pgTable("ref_codes", {
+  // Upper case, 3 to 20 letters or digits.
+  code: text("code").primaryKey(),
+  // Lowercased wallet that registered the code and is paid its rewards. One code per wallet.
+  wallet: text("wallet").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// What the monthly rewards need to know about each settled payment, beside its row in gateway_calls: the ref code it
+// came with and whether the payer held the Agent Pass at that moment. Kept in its own table, joined on the payment's
+// transaction, so the call log itself is untouched. Rows are only ever added.
+export const rewardsCalls = pgTable(
+  "rewards_calls",
+  {
+    id: serial("id").primaryKey(),
+    // A plain number, not a reference, so the record outlives an API that is later deleted.
+    gatewayId: integer("gateway_id").notNull(),
+    // The payment's transaction, lowercased. One row per payment.
+    tx: text("tx").notNull().unique(),
+    // Lowercased wallet that paid. For a private Gloam payment, Gloam's vault.
+    payer: text("payer").notNull(),
+    // An official Autonomo API, which earns cashback and the higher integrator rate; otherwise a creator's API.
+    official: boolean("official").notNull(),
+    // The registered code the call carried, or null: none sent, or one nobody had registered.
+    refCode: text("ref_code"),
+    // Whether the payer held the Agent Pass minimum when it paid. Null when the balance couldn't be read.
+    payerHasPass: boolean("payer_has_pass"),
+    // The minimum that was checked against, in whole tokens.
+    passMinTokens: integer("pass_min_tokens"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("rewards_calls_ref_created_idx").on(t.refCode, t.createdAt), index("rewards_calls_payer_created_idx").on(t.payer, t.createdAt), index("rewards_calls_gateway_created_idx").on(t.gatewayId, t.createdAt)],
+);

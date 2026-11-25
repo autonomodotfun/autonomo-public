@@ -15,7 +15,7 @@ export const maxDuration = 60;
 const HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "PAYMENT-SIGNATURE, X-PAYMENT, X-Autonomo-Route-Id, Content-Type, Accept",
+  "Access-Control-Allow-Headers": "PAYMENT-SIGNATURE, X-PAYMENT, X-Autonomo-Route-Id, X-Autonomo-Ref, Content-Type, Accept",
   "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-RESPONSE, X-Autonomo-Route-Id, X-Autonomo-Routed-To, X-Autonomo-Bonded",
   "Cache-Control": "private, no-store",
 };

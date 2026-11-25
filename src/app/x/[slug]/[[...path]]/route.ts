@@ -9,6 +9,7 @@ import { forward, gatewayOffers, getGateway, isOfficial, recordCall, payeeOf } f
 import { finishGloamPayment, gloamEnabledFor, gloamPaymentOf, issueGloamQuote, redeemGloamPayment } from "@/lib/payments/gloam";
 import { GLOAM_USDG, GLOAM_VAULT } from "@/lib/payments/gloam-check";
 import { acceptsFor, railForAsset, x402Server } from "@/lib/payments/payments";
+import { noteRewardsCall, refHeaderOf } from "@/lib/rewards/rewards";
 import { retiredAnswer } from "@/lib/gateway/retired";
 
 // Hosted x402 gateway: autonomo.fun/x/<slug>/<path> -> <upstream>/<path>, paid per call.
@@ -20,6 +21,8 @@ import { retiredAnswer } from "@/lib/gateway/retired";
 // straight to Autonomo's Safe there; creator APIs to the creator's splitter on Base, which keeps 5% for the mirror
 // burn (src/lib/payments/burn.ts). The burn itself happens on Robinhood Chain, from the mirror burn pot. Owners can switch
 // Base off per API (acceptBase); where Base is paid, and why it's off, is worked out in src/lib/payments/base-pay.ts.
+// A call may carry X-Autonomo-Ref, the ref code of whoever brought it. It is noted with a settled payment for the
+// monthly rewards (src/lib/rewards/rewards.ts) and never passed on to the API.
 
 // Upstream calls may take up to 25 s (see forward()); leave headroom for payment verification and settlement.
 export const maxDuration = 60;
@@ -27,7 +30,7 @@ export const maxDuration = 60;
 const HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "PAYMENT-SIGNATURE, X-PAYMENT, Content-Type, Accept",
+  "Access-Control-Allow-Headers": "PAYMENT-SIGNATURE, X-PAYMENT, X-Autonomo-Ref, Content-Type, Accept",
   "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-RESPONSE",
   "Cache-Control": "private, no-store",
 };
@@ -125,6 +128,9 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
     // What the payee keeps: 5% less when the payment went to a splitter, on either chain. Official APIs on Base are
     // paid to the Safe itself, and the mirror burn covers them.
     const burnBps = (rail === "usdc_base" ? basePayTo !== payeeOf(g) : payTo !== payeeOf(g)) ? BURN_BPS : 0;
+    const payer = (settlement?.payer ?? auth.from ?? null)?.toString().toLowerCase() ?? null;
+    const tx = typeof settlement?.transaction === "string" ? settlement.transaction : null;
+    const refHeader = refHeaderOf(request);
     after(async () => {
       await recordCall({
         gatewayId: g.id,
@@ -136,10 +142,11 @@ async function handle(request: NextRequest, ctx: { params: Promise<{ slug: strin
         asset: typeof accepted.asset === "string" ? accepted.asset : null,
         amount: typeof accepted.amount === "string" ? accepted.amount : null,
         burnBps,
-        payer: (settlement?.payer ?? auth.from ?? null)?.toString().toLowerCase() ?? null,
+        payer,
         settled,
-        tx: typeof settlement?.transaction === "string" ? settlement.transaction : null,
+        tx,
       }).catch((e) => console.error("gateway call log failed", e));
+      if (settled) await noteRewardsCall({ gatewayId: g.id, official: isOfficial(g), tx, payer, refHeader });
       if (settled && burnBps > 0) {
         const note = rail === "usdc_base" ? noteBaseBurnCall : noteBurnCall;
         await note(payeeOf(g)).catch((e) => console.error("burn flush failed", e));
@@ -200,7 +207,10 @@ async function gloamCall(
   }
 
   const burnBps = payTo === payeeOf(g) ? 0 : BURN_BPS;
+  const refHeader = refHeaderOf(request);
   after(async () => {
+    // The payer is Gloam's vault, so the call can count for a ref code but not for anyone's cashback.
+    if (succeeded) await noteRewardsCall({ gatewayId: g.id, official: isOfficial(g), tx: payment.txHash, payer: GLOAM_VAULT, refHeader, hiddenPayer: true });
     await recordCall({
       gatewayId: g.id,
       method: request.method,
