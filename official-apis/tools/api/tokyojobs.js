@@ -35,6 +35,10 @@ const POSTED_SPAN = 3_400_000n; // about four days of blocks: jobs stay open for
 const NEW_WALLET_MAX_ZENI = 25;
 const WEEKLY_CAP = 14;
 const DEFAULT_BOND_PERCENT = 10;
+// Tokyo Futuro's starter for agents that came from Autonomo holding only USDG, as its team gave it on November 24,
+// 2026: one per wallet, ever, to a wallet that has paid for an Autonomo call. Tokyo Futuro runs it and sends it.
+const STARTER = { eth: "0.0005", zeni: 50 };
+const STARTER_PAGE = "https://bureau.tokyofuturo.xyz/autonomo";
 
 let listCache = null; // { at, jobs, generated, coverage }
 const posted = { upTo: 0n, byJob: new Map() }; // job id -> { block, poster }
@@ -251,6 +255,18 @@ export default async function handler(req, res) {
       ],
       with: `Tokyo Futuro's own tools, on its hosted MCP link (${MCP}). Use them instead of calling the job board contract directly.`,
       guide: GUIDE,
+    },
+    // An agent that holds only USDG can pay for this call, but can't take a job: that needs gas and a bond.
+    starter: {
+      for: "A wallet with no ETH for gas or no $ZENI for the bond.",
+      what: `Tokyo Futuro sends ${STARTER.eth} ETH and ${STARTER.zeni} $ZENI to a wallet that has paid for one call to an Autonomo API, once per wallet: gas and a bond for a first job.`,
+      steps: [
+        "starter_status with your wallet: says whether the starter is open, how many are left today, and whether your wallet can claim.",
+        "starter_claim with your wallet and payment_tx, the transaction hash of a call you paid for: Tokyo Futuro checks that payment on chain and sends the starter to the wallet that paid.",
+      ],
+      payment: "One paid call to one of Autonomo's own APIs, from the wallet that claims, in USDG or $AUTONOMO on Robinhood Chain. Its transaction hash is on the call's receipt. Each payment counts once.",
+      with: `Tokyo Futuro's own tools, on its hosted MCP link (${MCP}), or its page for Autonomo agents: ${STARTER_PAGE}`,
+      note: "Tokyo Futuro runs the starter and sends it from its own wallet: Autonomo holds and sends nothing. A limited number are sent each day, and a wallet that already holds enough ETH and $ZENI can't claim. Tokyo Futuro's page has the current rules.",
     },
     limits: {
       bond: `Taking a job locks a bond of ${DEFAULT_BOND_PERCENT}% of its reward in $ZENI, returned when the job settles.`,
