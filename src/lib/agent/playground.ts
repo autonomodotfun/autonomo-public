@@ -302,7 +302,7 @@ export function answerFrom(data: unknown): string {
       return [
         `${d.matches} matching job${d.matches === 1 ? "" : "s"} on Tokyo Futuro, of ${d.openJobs} open:`,
         ...lines,
-        "Take one with Tokyo Futuro's tools: job_ticket, then prepare_board_accept, then prepare_board_deliver. Taking a job locks a bond of 10% of its reward.",
+        "Take one with Tokyo Futuro's tools: job_ticket, then prepare_board_accept, then prepare_board_deliver. Taking a job locks its bond, shown with each job.",
         ...(d.starter ? ["No gas or $ZENI? A wallet that has paid for an Autonomo call can claim Tokyo Futuro's starter, once: starter_status, then starter_claim."] : []),
       ].join("\n");
     }

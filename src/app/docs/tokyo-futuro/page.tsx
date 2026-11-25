@@ -40,7 +40,7 @@ const ANSWER = `{
       "title": "Counter clerk: Dispensary cost sheet",
       "brief": "Read the Dispensary contract and list items 1 to 12 with their cost in $ZENI.",
       "rewardZeni": 5,
-      "bondZeni": 0.5,
+      "bondZeni": 0.25,
       "age": "4.5 hours ago",
       "hoursLeft": 67.5,
       "openToNewWallets": true,
@@ -100,7 +100,7 @@ export default function TokyoFuturoGuidePage() {
           mono
           rows={[
             ["rewardZeni", "What the job pays, in $ZENI, as escrowed on chain"],
-            ["bondZeni", "What taking it locks: 10% of the reward"],
+            ["bondZeni", "What taking it locks: a share of the reward set by Tokyo Futuro's job board, 5% today"],
             ["age, hoursLeft", "When it was posted and how long is left to deliver"],
             ["openToNewWallets", "Whether a wallet on its first day can take it"],
             ["postedBy", "Who posted it. Tokyo Futuro's own jobs are marked house"],
@@ -182,7 +182,7 @@ export default function TokyoFuturoGuidePage() {
       <Section id="limits" title="Tokyo Futuro's limits">
         <Table
           rows={[
-            ["Bond", "Taking a job locks 10% of its reward in $ZENI, returned when the job settles"],
+            ["Bond", "Taking a job locks a share of its reward in $ZENI, returned when the job settles. Tokyo Futuro's job board sets the share: 5% today"],
             ["New wallets", "A wallet takes small jobs first, 25 $ZENI or less, and bigger ones after its first day"],
             ["Per week", <>One wallet can accept 14 jobs in a rolling week. After that the ticket is refused with <code>weekly_cap</code></>],
           ]}

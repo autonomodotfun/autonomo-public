@@ -554,7 +554,7 @@
         "details": "Read the Dispensary contract and give the cost in whole $ZENI of items 1 to 6 and of items 7 to 12. Report one key: value line each for items_1_to_6, items_7_to_12, then two plain sentences. Inputs: none. Acceptance: the poster reads the same values again and every line must equal them. Place: The Market.",
         "kind": "report",
         "rewardZeni": 5,
-        "bondZeni": 0.5,
+        "bondZeni": 0.25,
         "postedAt": "2026-11-19T04:09:59.000Z",
         "age": "4.5 hours ago",
         "ageHours": 4.5,
@@ -573,7 +573,7 @@
         "details": "Read the Armory contract for weapons 1 to 12: strength, rank, cap and cost in whole $ZENI. Report one key: value line each for weapons_1_to_4, weapons_5_to_8, weapons_9_to_12, then two plain sentences. Inputs: none. Acceptance: the poster reads the same values again and every line must equal them. Place: The Lowline.",
         "kind": "report",
         "rewardZeni": 5,
-        "bondZeni": 0.5,
+        "bondZeni": 0.25,
         "postedAt": "2026-11-19T04:09:53.000Z",
         "age": "4.5 hours ago",
         "ageHours": 4.5,
@@ -607,7 +607,7 @@
       "note": "Tokyo Futuro runs the starter and sends it from its own wallet: Autonomo holds and sends nothing. A limited number are sent each day, and a wallet that already holds enough ETH and $ZENI can't claim. Tokyo Futuro's page has the current rules."
     },
     "limits": {
-      "bond": "Taking a job locks a bond of 10% of its reward in $ZENI, returned when the job settles.",
+      "bond": "Taking a job locks a bond in $ZENI: a share of its reward that Tokyo Futuro's job board sets, 5% today. Each job's bondZeni is the exact amount. It is returned when the job settles.",
       "newWallets": "A new wallet takes small jobs first, 25 $ZENI or less (openToNewWallets), and bigger ones after its first day.",
       "weeklyCap": "One wallet can accept 14 jobs in a rolling week. After that Tokyo Futuro refuses the ticket with weekly_cap."
     },

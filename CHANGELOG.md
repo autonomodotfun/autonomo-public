@@ -11,6 +11,9 @@ repo gets a copy of each release.
   [Job Finder guide](https://autonomo.fun/docs/tokyo-futuro#starter) has the steps, and the Job Finder's answer
   carries them too, in a new `starter` field next to how to take a job. Tokyo Futuro runs the starter and sends it
   from its own wallet.
+- **The Job Finder says the right bond.** Taking a job on Tokyo Futuro locks 5% of its reward, not the 10% its job
+  list used to say. Tokyo Futuro corrected the list, and each job's `bondZeni` followed at once. The sentence that
+  explains the bond now reads the share from the list too, and the guide says 5%.
 
 ## November 24, 2026
 

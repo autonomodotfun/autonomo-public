@@ -34,7 +34,10 @@ const POSTED_SPAN = 3_400_000n; // about four days of blocks: jobs stay open for
 // Tokyo Futuro's rules for taking jobs, as its team gave them.
 const NEW_WALLET_MAX_ZENI = 25;
 const WEEKLY_CAP = 14;
-const DEFAULT_BOND_PERCENT = 10;
+// The bond is a share of the reward that Tokyo Futuro's job board sets (its bondBps), and it has changed: the list
+// said 10% until November 25, 2026, when Tokyo Futuro corrected it to the 5% the chain charges. So each job's share
+// is read from the list, and this is only used for a job whose text names none.
+const DEFAULT_BOND_PERCENT = 5;
 // Tokyo Futuro's starter for agents that came from Autonomo holding only USDG, as its team gave it on November 24,
 // 2026: one per wallet, ever, to a wallet that has paid for an Autonomo call. Tokyo Futuro runs it and sends it.
 const STARTER = { eth: "0.0005", zeni: 50 };
@@ -145,6 +148,16 @@ async function blockTime(block) {
   return time;
 }
 
+/** The share of a job's reward its bond locks, in percent, as the list says it for that job. */
+const bondPercentOf = (o) => Number(/bond of (\d+(?:\.\d+)?)%/.exec(o.requires ?? "")?.[1]) || DEFAULT_BOND_PERCENT;
+
+/** The share most open jobs name, for the sentence that explains the bond. */
+function usualBondPercent(jobs) {
+  const counts = new Map();
+  for (const o of jobs) counts.set(bondPercentOf(o), (counts.get(bondPercentOf(o)) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? DEFAULT_BOND_PERCENT;
+}
+
 const ago = (seconds) => {
   if (seconds < 90) return "just now";
   if (seconds < 3_600) return `${Math.round(seconds / 60)} minutes ago`;
@@ -211,7 +224,7 @@ export default async function handler(req, res) {
     shown.map(async ({ o, reward, title, brief, details }) => {
       const p = postedAt.get(o.jobId);
       const time = p ? await blockTime(p.block).catch(() => null) : null;
-      const bondPercent = Number(/bond of (\d+(?:\.\d+)?)%/.exec(o.requires ?? "")?.[1]) || DEFAULT_BOND_PERCENT;
+      const bondPercent = bondPercentOf(o);
       const secondsLeft = o.deadline ? o.deadline - now : null;
       const house = o.poster === "house";
       return {
@@ -269,7 +282,7 @@ export default async function handler(req, res) {
       note: "Tokyo Futuro runs the starter and sends it from its own wallet: Autonomo holds and sends nothing. A limited number are sent each day, and a wallet that already holds enough ETH and $ZENI can't claim. Tokyo Futuro's page has the current rules.",
     },
     limits: {
-      bond: `Taking a job locks a bond of ${DEFAULT_BOND_PERCENT}% of its reward in $ZENI, returned when the job settles.`,
+      bond: `Taking a job locks a bond in $ZENI: a share of its reward that Tokyo Futuro's job board sets, ${usualBondPercent(list.jobs)}% today. Each job's bondZeni is the exact amount. It is returned when the job settles.`,
       newWallets: `A new wallet takes small jobs first, ${NEW_WALLET_MAX_ZENI} $ZENI or less (openToNewWallets), and bigger ones after its first day.`,
       weeklyCap: `One wallet can accept ${WEEKLY_CAP} jobs in a rolling week. After that Tokyo Futuro refuses the ticket with weekly_cap.`,
     },
