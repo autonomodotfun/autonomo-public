@@ -3,6 +3,7 @@ import { TOKEN } from "@/lib/constants";
 import { baseCoverage } from "@/lib/gateway/gateway";
 import { formatUsd } from "@/lib/payments/networks";
 import { getStats, getTrackRecords, listAutonomoGateways, searchProjects } from "@/lib/directory/queries";
+import { thanksBannerOn } from "@/lib/directory/thanks";
 import { ApiCard, mostPaid, paidCalls, type AutonomoApi } from "@/components/api-card";
 import { Avatar, compact, ProjectList } from "@/components/project-row";
 import { Tabs, type TabItem } from "@/components/tabs";
@@ -108,6 +109,13 @@ export default async function Home() {
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
       <section className="grid gap-10 pt-16 pb-12 sm:pt-24 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-center lg:gap-12">
         <div>
+          {thanksBannerOn() && (
+            <Link href="/thanks" className="mb-6 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-accent px-3 py-1 text-sm no-underline hover:bg-surface">
+              <span className="font-mono text-xs tracking-wide text-accent uppercase">Thanksgiving</span>
+              <span className="text-ink">Thank you to everyone who paid for a call</span>
+              <span aria-hidden className="text-accent">→</span>
+            </Link>
+          )}
           <p className="font-mono text-xs tracking-wide text-accent uppercase">The agentic x402 launchpad and directory</p>
           <h1 className="heading mt-3 max-w-3xl text-5xl leading-[0.95] text-balance sm:text-7xl">
             Launch your API. Let <span className="underline decoration-brand decoration-[0.14em] underline-offset-[0.1em]">agents</span> pay.

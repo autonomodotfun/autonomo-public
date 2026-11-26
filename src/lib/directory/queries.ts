@@ -10,6 +10,7 @@ import { RETIRED_SLUGS } from "@/lib/gateway/retired";
 import { bondEnabled, readWalletBonds, type WalletBond } from "@/lib/trust/bond";
 import { holdsMinimum } from "@/lib/trust/verified";
 import { summarize, TRACK_RECORD_DAYS, type TrackRecord } from "@/lib/directory/track-record";
+import { summarizeThanks } from "@/lib/directory/thanks";
 import { PRICE_BANDS, priceBand, topic, TOPICS, topicTsQuery, type PriceBand, type Topic } from "@/lib/directory/topics";
 
 const { projects, endpoints } = schema;
@@ -444,6 +445,36 @@ async function trackRecordsFresh() {
   return out;
 }
 
+// Everyone who paid since launch, for /thanks: each wallet's settled payments by gateway and UTC day, and each
+// gateway's settled calls. The counting is summarizeThanks() in thanks.ts.
+async function thanksFresh() {
+  const db = await getDb();
+  const { gateways, gatewayCalls } = schema;
+  const day = sql<string>`to_char(date_trunc('day', ${gatewayCalls.createdAt} at time zone 'UTC'), 'YYYY-MM-DD')`;
+  const [rows, payerDays, settled] = await Promise.all([
+    db
+      .select({ id: gateways.id, owner: gateways.owner, payTo: gateways.payTo })
+      .from(gateways)
+      .innerJoin(projects, eq(gateways.projectId, projects.id))
+      .where(and(eq(gateways.listing, "listed"), eq(gateways.status, "active"), eq(projects.status, "approved"))),
+    db
+      .select({ gatewayId: gatewayCalls.gatewayId, payer: gatewayCalls.payer, day, calls: sql<number>`count(*)::int` })
+      .from(gatewayCalls)
+      .where(and(eq(gatewayCalls.settled, true), sql`${gatewayCalls.payer} is not null`))
+      .groupBy(gatewayCalls.gatewayId, gatewayCalls.payer, day),
+    db
+      .select({ gatewayId: gatewayCalls.gatewayId, settled: sql<number>`count(*)::int`, first: sql<string | null>`min(${gatewayCalls.createdAt})` })
+      .from(gatewayCalls)
+      .where(eq(gatewayCalls.settled, true))
+      .groupBy(gatewayCalls.gatewayId),
+  ]);
+  return summarizeThanks(
+    rows,
+    payerDays.map((p) => ({ gatewayId: p.gatewayId, payer: p.payer!, day: p.day, calls: p.calls })),
+    settled,
+  );
+}
+
 // ---------- cached reads ----------
 // Every page view and API call used to query the database, which kept it awake around the clock. These reads are
 // cached (shared across server instances), so most requests never reach it. Admin changes and the directory refresh
@@ -473,6 +504,7 @@ export const getProject = cache(cachedRead(getProjectFresh, "project", DAY, CATA
 export const listAutonomoGateways = cachedRead(listAutonomoGatewaysFresh, "autonomo-gateways", 300, CATALOG_TAGS.gateways);
 /** Track records keyed by gateway slug, refreshed hourly so page views don't keep the database awake. */
 export const getTrackRecords = cachedRead(trackRecordsFresh, "track-records", 3600, CATALOG_TAGS.gateways);
+export const getThanks = cachedRead(thanksFresh, "thanks", 3600, CATALOG_TAGS.gateways);
 const verifiedGatewaysCached = cachedRead(verifiedGatewaysFresh, "verified-gateways", 300, CATALOG_TAGS.gateways);
 
 /** Slugs of Verified gateways and their projects; empty while balances can't be read, so a badge never blocks a page. */

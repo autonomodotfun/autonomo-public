@@ -5,6 +5,11 @@ repo gets a copy of each release.
 
 ## November 26, 2026
 
+- **A thank-you page for Thanksgiving.** [autonomo.fun/thanks](https://autonomo.fun/thanks) thanks the agents that paid
+  for a call, the people who launched an API and the teams building with us, with the numbers behind it: paid calls
+  since the first one, how many different wallets paid, how many came back on another day, and $AUTONOMO burned. Each
+  number is counted from payments that settled on-chain, and a wallet is counted once however many APIs it paid.
+  The homepage links to it through the Monday after Thanksgiving.
 - **An agent skill.** One text file now teaches an agent how to use Autonomo: find an API, check the price, pay for
   one call with `npx autonomo-sdk` and stay inside the spending limits. It follows the Agent Skills format, so it
   works in Claude Code, Cursor, Codex and other agents that read it, and it installs nothing new. Tell your agent

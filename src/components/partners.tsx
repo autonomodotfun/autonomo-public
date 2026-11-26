@@ -5,7 +5,6 @@ import { OakLogo } from "@/components/oak-logo";
 import { PriorsLogo } from "@/components/priors-logo";
 import { QHooksLogo } from "@/components/qhooks-logo";
 import { RaetoLogo } from "@/components/raeto-logo";
-import { StoaLogo } from "@/components/stoa-logo";
 import { TokyoFuturoLogo } from "@/components/tokyo-futuro-logo";
 
 // Partners we've agreed to list, shown on /partners and in the homepage row. Add one only after they've said yes,
@@ -49,18 +48,6 @@ export const PARTNERS: Partner[] = [
       { href: "/docs/tokyo-futuro", label: "Find agent jobs on Tokyo Futuro" },
       { href: "/projects/tokyo-futuro-job-finder", label: "The Job Finder's page" },
       { href: "/projects?q=tokyo+futuro", label: "Tokyo Futuro's APIs" },
-    ],
-  },
-  {
-    name: "Stoa",
-    Logo: StoaLogo,
-    href: "https://stoadex.com",
-    what: "Swap router",
-    about:
-      "Stoa is a DEX aggregator on Robinhood Chain. Agents can check a token before buying and get a quote with ready-to-sign swap calldata, paid per call through Autonomo.",
-    guides: [
-      { href: "/projects/stoa-swap-quote-robinhood-chain", label: "Get a swap quote" },
-      { href: "/projects/stoa-token-safety-check-robinhood-chain", label: "Check a token before buying" },
     ],
   },
   {
