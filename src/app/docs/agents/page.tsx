@@ -23,6 +23,10 @@ const MCP_JSON = `{
   }
 }`;
 
+const SKILL_PROMPT = `Install the skill at ${SITE}/skill.md`;
+
+const SKILL_ADD = "npx skills add autonomodotfun/autonomo-public";
+
 const MCP_TOOLS: [string, string][] = [
   ["find_apis", "Search Autonomo's official APIs, and optionally the whole x402 directory. Free."],
   ["get_price", "Call an API without paying and show what it asks for. Free."],
@@ -67,8 +71,9 @@ export default function AgentsGuidePage() {
         Agents pay for each API call themselves, in USDG or {TOKEN.symbol} on {TOKEN.chainName}, or in USDC on Base.
         There are no API keys or accounts, just a wallet. Pick the way that fits you:
       </p>
-      <Cards>
+      <Cards cols={2}>
         <Card title="MCP server" href="#mcp" body="Claude, Cursor, Codex and other AI apps find and pay APIs for you." />
+        <Card title="Agent skill" href="#skill" body="One file that teaches your agent to find APIs, check prices and pay." />
         <Card title="Your own code" href="#code" body="Search the catalog and pay with an x402 client in a few lines." />
         <Card title="Try it first" href="#telegram" body="The Playground and Telegram bot pay for you. No wallet needed." />
       </Cards>
@@ -111,6 +116,43 @@ export default function AgentsGuidePage() {
           one. It only pays Autonomo gateways, caps each call, and stops at a daily budget (set with{" "}
           <code>AUTONOMO_DAILY_USDG</code>, which covers USDG and USDC together, and{" "}
           <code>AUTONOMO_DAILY_AUTONOMO</code>). Use a new wallet with a small balance, never your main one.
+        </p>
+      </Section>
+
+      <Section id="skill" title="Agent skill">
+        <p>
+          A skill is one text file that teaches an agent a job. Autonomo&apos;s teaches it to find an API, check the
+          price and pay for one call with the <Link href="/docs/cli">CLI</Link>, inside your spending limits. It
+          works in Claude Code, Cursor, Codex and other agents that read the{" "}
+          <a href="https://agentskills.io">Agent Skills</a> format, and it installs nothing new: the agent runs{" "}
+          <code>npx autonomo-sdk</code>.
+        </p>
+        <Step n={1} title="Install the skill">
+          <p>Tell your agent:</p>
+          <Code code={SKILL_PROMPT} lang="text" />
+          <p>Or add it with the skills command:</p>
+          <Code code={SKILL_ADD} lang="bash" />
+          <p className="text-sm text-muted">
+            By hand, save <a href="/skill.md">the file</a> as <code>.claude/skills/autonomo/SKILL.md</code> for Claude
+            Code, or in the skills folder your agent reads.
+          </p>
+        </Step>
+        <Step n={2} title="Give the agent a wallet">
+          <p>
+            The same as for the MCP server: a new wallet just for your agent, with a little USDG or {TOKEN.symbol} on{" "}
+            {TOKEN.chainName}, or USDC on Base. Set its key as <code>AUTONOMO_WALLET_KEY</code> in your own shell, never
+            in the chat. Finding APIs and checking prices work without it.
+          </p>
+        </Step>
+        <Step n={3} title="Ask">
+          <p>
+            For example: <i>&ldquo;Is token 0x… safe? Use Autonomo.&rdquo;</i> The skill tells the agent to show you
+            the price first and to wait for your yes before the first payment.
+          </p>
+        </Step>
+        <p className="text-sm text-muted">
+          A skill is instructions, not a lock. What holds in every case are the CLI&apos;s own limits (0.05 dollars a
+          call and 1 dollar a day unless you change them) and what the wallet holds, so keep that wallet small.
         </p>
       </Section>
 

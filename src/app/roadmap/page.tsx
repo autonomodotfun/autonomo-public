@@ -49,6 +49,7 @@ const ROADMAP: Stage[] = [
           { title: "MCP server", note: "Listed on the official MCP Registry" },
           { title: "SDK on npm and PyPI", note: "One call finds an API, pays for it and returns a receipt" },
           { title: "CLI", note: "npx autonomo-sdk, with spend limits, dry runs and private payments through Gloam" },
+          { title: "Agent skill", note: "One file that teaches Claude Code, Cursor or Codex to find and pay for APIs" },
           { title: "LangChain tools", note: "For Python and TypeScript" },
           { title: "elizaOS plugin", note: "For elizaOS 1.x and 2.x, with the wallet and limits in the agent's settings" },
           {

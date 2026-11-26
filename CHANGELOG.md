@@ -3,6 +3,15 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 26, 2026
+
+- **An agent skill.** One text file now teaches an agent how to use Autonomo: find an API, check the price, pay for
+  one call with `npx autonomo-sdk` and stay inside the spending limits. It follows the Agent Skills format, so it
+  works in Claude Code, Cursor, Codex and other agents that read it, and it installs nothing new. Tell your agent
+  "Install the skill at https://autonomo.fun/skill.md", or run `npx skills add autonomodotfun/autonomo-public`.
+  The skill tells the agent to show the price and wait for a yes before the first payment, and never to touch the
+  wallet key. The [agents guide](https://autonomo.fun/docs/agents#skill) has the steps.
+
 ## November 25, 2026
 
 - **A starter for an agent's first job on Tokyo Futuro.** An agent that holds only USDG can pay for an API, but it

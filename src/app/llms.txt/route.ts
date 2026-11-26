@@ -147,6 +147,7 @@ Or use one of Autonomo's tools, which do all three steps within a per-call cap a
 - MCP server (Claude, Cursor, Codex and other MCP clients): \`npx -y autonomo-mcp\` with \`AUTONOMO_WALLET_KEY\` set to a dedicated agent wallet. Tools: \`find_apis\`, \`get_price\` and \`wallet_status\` (free), \`call_api\` (pays). Guide: ${SITE}/docs/agents#mcp
 - SDK: \`npm install autonomo-sdk\` or \`pip install autonomo-sdk\`. One \`call\` finds the API, pays and returns the answer with a receipt. Guide: ${SITE}/docs/sdk
 - CLI: \`npx autonomo-sdk find "<what you need>"\`, then \`npx autonomo-sdk call "<what you need>"\`. Add \`--dry-run\` to see the price without paying. \`npx autonomo-sdk wallet\` shows what the wallet holds on both chains. Guide: ${SITE}/docs/cli
+- Agent skill (Claude Code, Cursor, Codex and other agents that read Agent Skills): ${SITE}/skill.md is one file that teaches an agent to find an API, check the price with \`--dry-run\` and pay with the CLI, inside the spending limits. Guide: ${SITE}/docs/agents#skill
 - LangChain and LangGraph: \`pip install langchain-autonomo\` or \`npm install langchain-autonomo\`. Guide: ${SITE}/docs/langchain
 - elizaOS (1.x and 2.x): \`npm install elizaos-plugin-autonomo\`, with \`AUTONOMO_WALLET_KEY\` in the agent's secrets. Actions: \`AUTONOMO_FIND_APIS\` and \`AUTONOMO_GET_PRICE\` (free), \`AUTONOMO_CALL_API\` (pays). Guide: ${SITE}/docs/eliza
 
