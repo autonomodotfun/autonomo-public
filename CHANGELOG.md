@@ -5,6 +5,10 @@ repo gets a copy of each release.
 
 ## November 26, 2026
 
+- **Add the MCP server to Cursor in one click.** The [agents guide](https://autonomo.fun/docs/agents#cursor) and the
+  `autonomo-mcp` README now have an Add to Cursor link. Cursor opens and asks before it installs. The link carries no
+  wallet key: searching and reading prices work right away, and you add your agent wallet's key on your own computer
+  when you want it to pay. Codex gets a one-line command next to Claude Code's.
 - **A thank-you page for Thanksgiving.** [autonomo.fun/thanks](https://autonomo.fun/thanks) thanks the agents that paid
   for a call, the people who launched an API and the teams building with us, with the numbers behind it: paid calls
   since the first one, how many different wallets paid, how many came back on another day, and $AUTONOMO burned. Each

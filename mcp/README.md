@@ -37,9 +37,18 @@ On Windows, start `npx` through `cmd /c`. In PowerShell, quote the `--`:
 claude mcp add autonomo -e AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY '--' cmd /c npx -y autonomo-mcp
 ```
 
-### Claude Desktop, Cursor and others
+### Cursor
 
-Add this to the client's MCP config (`claude_desktop_config.json`, `.cursor/mcp.json`, …):
+**[Add to Cursor](https://cursor.com/install-mcp?name=autonomo&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImF1dG9ub21vLW1jcCJdfQ==)**
+
+The link opens Cursor, which asks before it installs anything. It carries no wallet key, so `find_apis` and
+`get_price` work right away. To pay for calls, add the key to the server's entry in `~/.cursor/mcp.json`, as in the
+block below. Keep the key in that file in your home folder, not in a project's `.cursor/mcp.json`, so it can't end
+up in git.
+
+### Cursor by hand, Claude Desktop and others
+
+Add this to the client's MCP config (`~/.cursor/mcp.json`, `claude_desktop_config.json`, …):
 
 ```json
 {
@@ -57,7 +66,11 @@ If the client can't find `npx` on Windows, use `"command": "cmd"` and `"args": [
 
 ### Codex
 
-In `~/.codex/config.toml`:
+```bash
+codex mcp add autonomo --env AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY -- npx -y autonomo-mcp
+```
+
+Or by hand, in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.autonomo]

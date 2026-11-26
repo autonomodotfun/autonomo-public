@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cursorDeeplink } from "@/data/mcp-install";
 import { TOKEN } from "@/lib/constants";
 import { Card, Cards, Code, Page, Section, Step, Table } from "../ui";
 
@@ -12,6 +13,8 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://autonomo.fun";
 const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 const MCP_CLAUDE_CODE = "claude mcp add autonomo -e AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY -- npx -y autonomo-mcp";
+
+const MCP_CODEX = "codex mcp add autonomo --env AUTONOMO_WALLET_KEY=0xYOUR_AGENT_WALLET_KEY -- npx -y autonomo-mcp";
 
 const MCP_JSON = `{
   "mcpServers": {
@@ -95,12 +98,29 @@ export default function AgentsGuidePage() {
         <Step n={2} title="Add the server to your app">
           <p>Claude Code:</p>
           <Code code={MCP_CLAUDE_CODE} lang="bash" />
+          <p>Codex:</p>
+          <Code code={MCP_CODEX} lang="bash" />
+          <p id="cursor" className="scroll-mt-6">
+            Cursor, in one click:
+          </p>
           <p>
-            Claude Desktop, Cursor and others (<code>claude_desktop_config.json</code>, <code>.cursor/mcp.json</code>, …):
+            <a href={cursorDeeplink()} className="btn-brand inline-block px-4 py-2 text-sm no-underline">
+              Add to Cursor
+            </a>
+          </p>
+          <p className="text-sm text-muted">
+            Cursor opens and asks before it installs anything. The link carries no wallet key, so{" "}
+            <code>find_apis</code> and <code>get_price</code> work right away. To pay for calls, add the key to the
+            server&apos;s entry in <code>~/.cursor/mcp.json</code>, as in the block below. Keep the key in that file in
+            your home folder, not in a project&apos;s <code>.cursor/mcp.json</code>, so it can&apos;t end up in git.
+          </p>
+          <p>
+            Cursor by hand, Claude Desktop and others (<code>~/.cursor/mcp.json</code>,{" "}
+            <code>claude_desktop_config.json</code>, …):
           </p>
           <Code code={MCP_JSON} lang="json" />
           <p className="text-sm text-muted">
-            Without a key, <code>find_apis</code> and <code>get_price</code> still work. Windows, Codex and all settings
+            Without a key, <code>find_apis</code> and <code>get_price</code> still work. Windows and all the settings
             are covered on the <a href="https://www.npmjs.com/package/autonomo-mcp">autonomo-mcp package page</a>.
           </p>
         </Step>
