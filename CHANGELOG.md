@@ -5,6 +5,12 @@ repo gets a copy of each release.
 
 ## November 27, 2026
 
+- **A more careful mirror burn.** The daily run now states the total of Base payments from our own records only, and
+  stops without sending if the pot's on-chain total is ever higher. Each day it also checks that the pot holds no more
+  than 100 USDG and that neither shared burn address (the BuybackBurner, and the reserve Safe on Base) has been frozen
+  by a stablecoin's issuer, and it tells the team when any of that is off. The
+  [contracts README](https://github.com/autonomodotfun/autonomo-public/blob/main/contracts/robinhood/README.md) now
+  says plainly what the keeper key is trusted with.
 - **An OpenAPI file for the official APIs.** [autonomo.fun/openapi.json](https://autonomo.fun/openapi.json) describes
   each official API the way x402 catalogues read a seller: the route, its inputs with examples, a sample answer, and
   the price per call in `x-payment-info`. It is built from the live gateways, so an API that is paused or taken down

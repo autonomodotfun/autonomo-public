@@ -94,7 +94,13 @@ APIs also take USDC on Base, where there's no $AUTONOMO pool to burn in. So **`M
 - `paidElsewhere` is the running total of Base payments, in USDC's 6 decimals, which USDG shares. It can only go up, and everything ever sent can't exceed 5% of it. So the `Mirrored(usdgSent, paidElsewhere, mirroredTotal)` events show what each burn was for.
 - When the pot runs short, the app sends what it holds. The rest stays owed (`owedFor(total)`) and goes out after the next refill.
 - The keeper is the `BuybackBurner`'s own keeper, read from it, so replacing that keeper replaces this one too.
-- The USDG can only go to the `BuybackBurner`, or back to the owner (`withdraw`). A compromised keeper can at worst burn the float early. Handing over ownership takes two steps.
+- The USDG can only go to the `BuybackBurner`, or back to the owner (`withdraw`). Handing over ownership takes two steps.
+- What the keeper is trusted with: it states the total that caps `mirror`, and it sets the least a buyback accepts. So a
+  stolen keeper key could send the whole float into a buyback at a price it profits from, and a total it wrote can't be
+  lowered again. That is why the float is kept at or below 100 USDG (too small to profit from), why the app states the
+  total from its own records and stops if the pot's is ever higher, and why a compromised keeper means replacing the
+  keeper, withdrawing the float and deploying a new pot. The contract's own comment still says "at worst burn the float
+  early", which understates this; it can't change on a deployed contract.
 
 Deployed on Nov 17, 2026 from Remix with [`flat/MirrorBurnPot.flat.sol`](flat/MirrorBurnPot.flat.sol), at [`0xa93d4029fd4D6BFe2a1E739f50B4d38e1D8e777A`](https://robinhoodchain.blockscout.com/address/0xa93d4029fd4D6BFe2a1E739f50B4d38e1D8e777A):
 

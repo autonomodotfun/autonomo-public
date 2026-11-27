@@ -18,6 +18,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 import { getDb, schema } from "@/db";
 import { TOKEN } from "@/lib/constants";
+import { blacklistedProblem, floatProblem, frozenProblem, mirrorTotalProblem } from "@/lib/payments/burn-guard";
 import { USDC_BASE, USDG } from "@/lib/payments/payments";
 
 // Burn on paid calls. Each payee gets its own BurnSplitter contract (contracts/robinhood/src/BurnSplitter.sol), and gateways are
@@ -38,6 +39,7 @@ import { USDC_BASE, USDG } from "@/lib/payments/payments";
 //   BURN_KEEPER_PRIVATE_KEY The BuybackBurner's keeper: a gas-only wallet that flushes and runs buybacks.
 //   BURN_START_BLOCK        The block the contracts were deployed in, where the search for burn receipts starts.
 //   MIRROR_BURN_POT         The deployed MirrorBurnPot, for the mirror burn of payments on Base (see below).
+//   ALERT_TELEGRAM_CHAT_ID  Where the daily run's alerts go (src/lib/alerts.ts). Without it they only reach the log.
 //   BASE_SPLITTER_FACTORY   The BurnSplitterFactory deployed on Base, for creator APIs paid in USDC there (see below).
 //                           Without it, only official APIs take Base.
 
@@ -133,6 +135,8 @@ export type BurnRun = {
   buyback: { usdgIn: string; quotedBurn: string; tx: string } | null;
   receipts: number;
   errors: string[];
+  /** What a person has to act on: a stopped mirror, a float above its cap, a frozen or blacklisted shared address. */
+  alerts: string[];
 };
 
 function keeper() {
@@ -190,7 +194,7 @@ async function runBuyback(k: Keeper) {
 /** The daily backup: flushes every splitter holding enough, then buys back. Catches creators with few calls. */
 export async function runBurnKeeper(): Promise<BurnRun> {
   const k = keeper();
-  const run: BurnRun = { flushed: [], baseFlushed: [], mirror: null, buyback: null, receipts: 0, errors: [] };
+  const run: BurnRun = { flushed: [], baseFlushed: [], mirror: null, buyback: null, receipts: 0, errors: [], alerts: [] };
 
   const previous = previousBurnFactory();
   for (const payee of await payees()) {
@@ -226,6 +230,7 @@ export async function runBurnKeeper(): Promise<BurnRun> {
   try {
     run.mirror = await runMirror(k);
   } catch (e) {
+    if (e instanceof MirrorStopped) run.alerts.push(e.message);
     run.errors.push(`mirror: ${e instanceof Error ? e.message : String(e)}`);
   }
 
@@ -241,6 +246,10 @@ export async function runBurnKeeper(): Promise<BurnRun> {
   } catch (e) {
     run.errors.push(`receipts: ${e instanceof Error ? e.message : String(e)}`);
   }
+
+  const watch = await watchBurn();
+  run.alerts.push(...watch.alerts);
+  run.errors.push(...watch.errors);
   return run;
 }
 
@@ -334,6 +343,9 @@ async function paidOnBase() {
   return BigInt(total.split(".")[0]);
 }
 
+/** The mirror refused to send: the pot's on-chain total is above our records. */
+class MirrorStopped extends Error {}
+
 /** Sends what's owed for Base payments from the pot to the BuybackBurner, as far as the pot holds it. */
 async function runMirror(k: Keeper) {
   const pot = mirrorPot();
@@ -343,8 +355,12 @@ async function runMirror(k: Keeper) {
     publicClient.readContract({ address: pot, abi: potAbi, functionName: "paidElsewhere" }),
     publicClient.readContract({ address: USDG.address, abi: balanceAbi, functionName: "balanceOf", args: [pot] }),
   ]);
-  // The pot refuses a total lower than the last one, which only happens if call rows were deleted.
-  const total = counted > onChain ? counted : onChain;
+  // The total comes from our records alone. The pot's own total is only ever written by the keeper, so one above our
+  // records was written without the app (or call rows were deleted): stop, and let a person look, before sending
+  // anything on a number we can't account for. The pot itself refuses a total lower than its last one.
+  const problem = mirrorTotalProblem(counted, onChain);
+  if (problem) throw new MirrorStopped(problem);
+  const total = counted;
   const owed = await publicClient.readContract({ address: pot, abi: potAbi, functionName: "owedFor", args: [total] });
   const send = owed < held ? owed : held;
   if (send < MIN_MIRROR_USDG) return null;
@@ -352,6 +368,52 @@ async function runMirror(k: Keeper) {
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error(`mirror reverted in ${hash}`);
   return { usdgSent: send.toString(), paidOnBase: total.toString(), stillOwed: (owed - send).toString(), tx: hash };
+}
+
+// ---------- daily watch ----------
+// Reads only. Each check stands alone, so one failed read doesn't hide the others; a check that can't be read is an
+// error, because a watch that can't see is not watching.
+
+const frozenAbi = parseAbi(["function isFrozen(address) view returns (bool)"]);
+const blacklistAbi = parseAbi(["function isBlacklisted(address) view returns (bool)"]);
+const reserveAbi = parseAbi(["function reserve() view returns (address)"]);
+
+/** The daily checks on their own: what a person has to act on, and which checks could not be read. Signs nothing. */
+export async function watchBurn() {
+  const alerts: string[] = [];
+  const errors: string[] = [];
+  const check = async (name: string, read: () => Promise<string | null>) => {
+    try {
+      const problem = await read();
+      if (problem) alerts.push(problem);
+    } catch (e) {
+      errors.push(`watch ${name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const buyback = buybackBurner();
+  if (buyback) {
+    await check("USDG freeze", async () =>
+      frozenProblem(await publicClient.readContract({ address: USDG.address, abi: frozenAbi, functionName: "isFrozen", args: [buyback] }), buyback),
+    );
+  }
+
+  const baseFactory = baseSplitterFactory();
+  if (baseFactory) {
+    await check("USDC blacklist", async () => {
+      const reserve = await baseClient.readContract({ address: baseFactory, abi: reserveAbi, functionName: "reserve" });
+      const listed = await baseClient.readContract({ address: USDC_BASE.address as Address, abi: blacklistAbi, functionName: "isBlacklisted", args: [reserve] });
+      return blacklistedProblem(listed, reserve);
+    });
+  }
+
+  const pot = mirrorPot();
+  if (pot) {
+    await check("mirror float", async () =>
+      floatProblem(await publicClient.readContract({ address: USDG.address, abi: balanceAbi, functionName: "balanceOf", args: [pot] })),
+    );
+  }
+  return { alerts, errors };
 }
 
 export type MirrorState = { pot: string; held: string; mirrored: string; paidOnBase: string; owed: string };
