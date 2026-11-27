@@ -3,6 +3,13 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 27, 2026
+
+- **An OpenAPI file for the official APIs.** [autonomo.fun/openapi.json](https://autonomo.fun/openapi.json) describes
+  each official API the way x402 catalogues read a seller: the route, its inputs with examples, a sample answer, and
+  the price per call in `x-payment-info`. It is built from the live gateways, so an API that is paused or taken down
+  leaves the file and a price change shows at once. The 402 a gateway answers stays the final word on price.
+
 ## November 26, 2026
 
 - **Add the MCP server to Cursor in one click.** The [agents guide](https://autonomo.fun/docs/agents#cursor) and the

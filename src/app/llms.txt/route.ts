@@ -166,6 +166,7 @@ ${DOCS.map(link).join("\n")}
 ## Discovery API
 
 - \`GET ${SITE}/api/v1/gateways\`: every live Autonomo gateway, with prices, the path to call, Verified status and track record.
+- \`GET ${SITE}/openapi.json\`: the official APIs as an OpenAPI document, each route with its inputs, a sample answer and its price in \`x-payment-info\`. This is the file x402 catalogues read.
 - \`GET ${SITE}/api/v1/projects\`: search the x402 directory. Parameters: \`q\`, \`category\`, \`network\`, \`sort\` (popular, relevance, new, price, name), \`page\`, \`limit\` (max 100).
 - \`GET ${SITE}/api/v1/projects/{slug}\`: one project with up to 500 of its paid endpoints.
 - \`GET ${SITE}/api/v1/stats\`: totals, counts per category and the most common networks.
