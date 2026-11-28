@@ -5,6 +5,12 @@ repo gets a copy of each release.
 
 ## November 28, 2026
 
+- **A guide to the Router.** [autonomo.fun/docs/router](https://autonomo.fun/docs/router) shows how to ask Autonomo
+  for a service, such as a token's risk or a swap quote, and let it pick the API. It lists every service with its
+  inputs and the fields it answers, every status and header, and what to do when an API fails or isn't ready yet:
+  nothing is charged, and the answer names what to pay next. It comes with one complete example in JavaScript,
+  tested on every change against a stand-in that answers as the Router does. The Router is switched on, and a service
+  answers once its APIs have built their record of 20 measured calls.
 - **Page Reader reads pages built by JavaScript.** Many project sites send an almost empty page and build the rest
   in the browser, so the reader used to get a handful of words from them. It now runs such a page in a browser
   first and reads the finished page: its text, links, social accounts and the contract addresses it shows. Two

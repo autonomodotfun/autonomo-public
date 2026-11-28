@@ -16,6 +16,7 @@ import { metadata as gloam } from "../docs/gloam/page";
 import { metadata as http } from "../docs/http/page";
 import { metadata as langchain } from "../docs/langchain/page";
 import { metadata as launch } from "../docs/launch/page";
+import { metadata as router } from "../docs/router/page";
 import { metadata as officialApis } from "../docs/official-apis/page";
 import { metadata as quickstart } from "../docs/quickstart/page";
 import { metadata as qhooks } from "../docs/qhooks/page";
@@ -55,6 +56,7 @@ const DOCS: Page[] = [
   { path: "/docs/sdk", meta: sdk },
   { path: "/docs/cli", meta: cli },
   { path: "/docs/http", meta: http },
+  { path: "/docs/router", meta: router },
   { path: "/docs/langchain", meta: langchain },
   { path: "/docs/eliza", meta: eliza },
   { path: "/docs/official-apis", meta: officialApis },

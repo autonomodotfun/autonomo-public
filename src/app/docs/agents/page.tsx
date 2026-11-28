@@ -191,7 +191,8 @@ export default function AgentsGuidePage() {
           with LangChain or LangGraph? <Link href="/docs/langchain">Its tools</Link> let the agent pick and pay for APIs
           itself, and so does the <Link href="/docs/eliza">elizaOS plugin</Link>. To build it yourself, here are the two steps. No code at all? The same call is one command in{" "}
           <Link href="/docs/cli">your terminal</Link>. No x402 library for your language?{" "}
-          <Link href="/docs/http">Pay over plain HTTP</Link> shows every header and field.
+          <Link href="/docs/http">Pay over plain HTTP</Link> shows every header and field. To ask for a service and
+          let Autonomo pick the API, see <Link href="/docs/router">the Router</Link>.
         </p>
         <Step n={1} title="Find APIs to pay for">
           <p>
