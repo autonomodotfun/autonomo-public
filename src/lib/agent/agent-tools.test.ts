@@ -59,8 +59,33 @@ test("anything that isn't a Holders & Bundles answer passes through the trim unc
   assert.equal(AGENT_TOOLS.holders_bundles.forModel!("text"), "text");
 });
 
-test("only Holders & Bundles is trimmed, and the two outside checks are treated as untrusted text", () => {
-  assert.deepEqual(Object.entries(AGENT_TOOLS).filter(([, t]) => t.forModel).map(([n]) => n), ["holders_bundles"]);
+test("a page's long lists are cut for the model, with a count of what was left out, and its text is whole", () => {
+  const page = {
+    url: "https://demo.xyz/", title: "Demo", text: "word ".repeat(500).trim(), words: 500,
+    headings: Array.from({ length: 40 }, (_, i) => ({ level: 2, text: `Heading ${i}` })),
+    links: { count: 80, outside: 3, accounts: { x: ["https://x.com/demo"] }, emails: [], list: Array.from({ length: 80 }, (_, i) => ({ url: `https://demo.xyz/p${i}`, kind: "site" })) },
+    addresses: { count: 30, list: Array.from({ length: 30 }, (_, i) => ({ address: `0x${String(i).padStart(40, "0")}`, in: ["link"] })) },
+    flags: [{ code: "several_addresses", severity: "info", text: "…" }],
+  };
+  const short = AGENT_TOOLS.page_reader.forModel!(page) as typeof page & { links: { listNotShown: number }; addresses: { listNotShown: number } };
+  assert.equal(short.text, page.text);
+  assert.equal(short.links.list.length, 20);
+  assert.equal(short.links.listNotShown, 60);
+  assert.deepEqual(short.links.accounts, page.links.accounts, "the accounts are kept whole");
+  assert.equal(short.links.count, 80);
+  assert.equal(short.addresses.list.length, 10);
+  assert.equal(short.addresses.listNotShown, 20);
+  assert.equal(short.headings.length, 15);
+  assert.deepEqual(short.flags, page.flags);
+  const error = { error: "page_error", message: "The page answered 404." };
+  assert.equal(AGENT_TOOLS.page_reader.forModel!(error), error);
+  // An answer from before these lists existed passes through with empty ones.
+  const old = AGENT_TOOLS.page_reader.forModel!({ url: "https://a.b/", text: "hello" }) as { links: { list: unknown[] } };
+  assert.deepEqual(old.links.list, []);
+});
+
+test("only the two long answers are trimmed, and the two outside checks are treated as untrusted text", () => {
+  assert.deepEqual(Object.entries(AGENT_TOOLS).filter(([, t]) => t.forModel).map(([n]) => n), ["holders_bundles", "page_reader"]);
   assert.ok(UNTRUSTED_TEXT_TOOLS.has("endpoint_health") && UNTRUSTED_TEXT_TOOLS.has("website_check"));
 });
 

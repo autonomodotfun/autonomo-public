@@ -79,7 +79,7 @@ export const BAZAAR_LISTINGS: Record<keyof typeof EXAMPLES, Listing> = {
   "tx-explainer": {
     routeTemplate: "/x/tx-explainer/tx/:hash",
     description:
-      "A Robinhood Chain or Base transaction in plain English: launches and where the supply went, buys, sells and swaps, who sent what to whom, the fee in ETH and USD, and the contracts involved.",
+      "A Robinhood Chain or Base transaction in plain English: launches and where the supply went, buys, sells and swaps in pools with what reached the pool, tokens created and burned, spending permissions and ownership changes, the function called, who sent what to whom, the fee in ETH and USD, and the contracts involved. Each action carries its amounts as numbers, and each finding a fixed code.",
     tags: ["transaction", "explainer", "base", "robinhood-chain"],
     pathParams: { hash: "0x3572d00c16b869fbeec6d267e08108b2d5decdb93d90532114f66390d6099f65" },
     pathParamsSchema: { properties: { hash: { ...TX_HASH, description: "The transaction hash on Robinhood Chain or Base" } }, required: ["hash"] },
@@ -99,9 +99,15 @@ export const BAZAAR_LISTINGS: Record<keyof typeof EXAMPLES, Listing> = {
   "dev-wallet": {
     routeTemplate: "/x/dev-wallet/dev/:token",
     description:
-      "What a token's creator did with it, on Robinhood Chain or Base: tokens bought, burned, locked, sold and still held, where their ETH went, who funded the wallet and other tokens they launched. On Base the creator is found from Clanker and Zora launches. Creator fees on Robinhood Chain's launchpad.",
+      "What a token's creator did with it, on Robinhood Chain or Base: tokens bought, burned, locked, sold and still held, where their ETH went and came from, who funded the wallet and who funded that funder, up to four steps back, and how the creator's earlier launches ended. Each flag has a fixed code and the transactions behind it. On Base the creator is found from Clanker and Zora launches.",
     tags: ["dev-wallet", "creator", "token-safety", "base", "robinhood-chain"],
     ...bothChains,
+    querySchema: {
+      properties: {
+        chain: chainInput("the token is only there"),
+        depth: { type: "string", enum: ["basic"], description: "Optional. basic leaves out the funding trail, the earlier launches' outcomes and the senders' names, and answers faster" },
+      },
+    },
   },
   "holders-bundles": {
     routeTemplate: "/x/holders-bundles/holders/:token",
@@ -153,10 +159,17 @@ export const BAZAAR_LISTINGS: Record<keyof typeof EXAMPLES, Listing> = {
   },
   "page-reader": {
     routeTemplate: "/x/page-reader/page",
-    description: "The title, description and readable text of a public web page, without the menus, scripts and markup.",
-    tags: ["web", "scraping", "text", "reader"],
+    description:
+      "The title, description and readable text of a public web page, without the menus, scripts and markup, plus what a checker needs from a project's page: its links and social accounts, the contract addresses it shows, the sentences about team, supply, locks, taxes and audits, and any text hidden from a reader. It says so when a page is built in the browser and can't be read without running it.",
+    tags: ["web", "scraping", "text", "reader", "token-safety"],
     query: { url: "https://example.com" },
-    querySchema: { properties: { url: { ...HTTPS_URL, description: "The page address" } }, required: ["url"] },
+    querySchema: {
+      properties: {
+        url: { ...HTTPS_URL, description: "The page address" },
+        expect: { ...ADDRESS, description: "Optional. A contract address: the answer says whether the page shows it, and where" },
+      },
+      required: ["url"],
+    },
   },
   "ostrapad-offer-finder": {
     routeTemplate: "/x/ostrapad-offer-finder/offers",

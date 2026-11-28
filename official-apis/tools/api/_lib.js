@@ -305,11 +305,11 @@ export async function curvePrice(curve, latest, fromBlock = 0n) {
 // Graduated tokens leave their curve for a Uniswap v4 ETH pool whose hook was made by the launchpad factory.
 const POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951";
 const V4_INITIALIZE = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438"; // topics: id, currency0, currency1
-const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"; // data: amount0, amount1, sqrtPriceX96, …
+export const V4_SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"; // topics: id, sender; data: amount0, amount1, sqrtPriceX96, …
 // The hook the factory graduates tokens into (it's baked into the factory's bytecode). Anyone can deploy a hook
 // whose factory() returns the launchpad, so only this exact address counts.
 const LAUNCHPAD_HOOK = 0xe5e702641ea86f4ae6cc3cdaed2b886f976be044n;
-const signed = (w) => (w >= 2n ** 255n ? w - 2n ** 256n : w);
+export const signed = (w) => (w >= 2n ** 255n ? w - 2n ** 256n : w);
 
 const poolCache = new Map();
 /** The launchpad's ETH/token v4 pool for a graduated token, or null while it's still on its curve.

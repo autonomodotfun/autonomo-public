@@ -13,13 +13,20 @@
 //
 // A link between wallets is never proof: the funder is reported with the evidence, for the caller to check.
 //
+// Three further reads, each within a shared time limit and each left out (and named in `incomplete`) when it can't
+// finish:
+//   - the funding trail: who funded the funder, up to four steps back, stopping at an exchange, a bridge or a contract
+//   - how the creator's earlier launches ended: what they hold and sold of each, its holders and its last transfer
+//   - where the creator's ETH came from, by sender, so fees from any launchpad show up, not only this one's escrow
+// They cost up to about 27 more Blockscout requests. ?depth=basic skips them, for callers that need the old speed.
+//
 // ?chain=base reads Base instead. There the creator comes from the Clanker or Zora launch event in the transaction
 // that minted the token (otherwise whoever sent that transaction), and the creator's token moves are read from the
 // chain itself, since Base's Blockscout misses many new tokens. Creator fees aren't tracked on Base yet.
 
 import { isAddress, pad } from "viem";
 import {
-  addr, authorized, badChain, chainNotReady, chainReady, chainRequest, checkOnChain, baseLaunchesBy, baseOrigin, blockscout, blockscoutList, CHAINS, erc20, FACTORY, findLaunch,
+  addr, authorized, badChain, chainNotReady, chainReady, chainRequest, checkOnChain, baseLaunchesBy, baseOrigin, blockscout, blockscoutList, CHAINS, contractName, erc20, FACTORY, findLaunch,
   fullHistory, LAUNCHED, LAUNCHPAD_START, logsBetween, rh, sendJson, tokenMeta, TRANSFER, transferRow,
 } from "./_lib.js";
 
@@ -32,6 +39,13 @@ const SERVICE_TXS = 5000;
 const RECENT_SPAN = 9_000_000n; // ~13 days: how far launch searches look on the public RPC
 const LIST_MAX = 50; // rows of each list in the answer; totals always cover everything read
 const LOOKUPS = 3; // unknown addresses the creator sent tokens to that get a name lookup
+const TRAIL_STEPS = 4; // how far back the creator's funding is followed
+const OUTCOMES = 5; // earlier launches whose outcome is read, newest first
+const SENDERS = 8; // senders of the creator's ETH that are listed
+const SENDER_NAMES = 4; // of those, how many get a name lookup
+const QUIET_DAYS = 7; // a token with no transfer for this long has gone quiet
+const EXTRAS_MS = 9_000; // the further reads share this much time, so a report stays well inside the gateway's 25 s
+const WETH_BASE = "0x4200000000000000000000000000000000000006";
 
 const CACHE_MS = 10 * 60_000;
 const cache = new Map(); // token -> { at, status, body }
@@ -46,8 +60,160 @@ async function launchesBy(wallet, latest) {
   const recent = latest > RECENT_SPAN ? latest - RECENT_SPAN : 0n;
   const from = fullHistory() ? LAUNCHPAD_START : recent > LAUNCHPAD_START ? recent : LAUNCHPAD_START;
   const logs = await logsBetween({ address: FACTORY, topics: [LAUNCHED, null, null, pad(wallet)] }, from, latest);
-  return logs.map((l) => ({ token: addr(l.topics[1]), tx: l.transactionHash }));
+  return logs.map((l) => ({ token: addr(l.topics[1]), tx: l.transactionHash, curve: addr(l.topics[2]) }));
 }
+
+/** The earliest ETH that reached a wallet, sent directly or from inside a contract. Null when the lists hold none. */
+export function firstFunding(wallet, normal, internal, skipFrom = null) {
+  return (
+    [...normal.filter((t) => t.isError !== "1"), ...internal]
+      .filter((t) => low(t.to) === wallet && BigInt(t.value || 0) > 0n && low(t.from) !== skipFrom)
+      .sort((a, b) => Number(a.timeStamp) - Number(b.timeStamp))[0] ?? null
+  );
+}
+
+/** The ETH a wallet received, by who sent it, largest first. */
+export function incomeBySender(wallet, normal, internal) {
+  const by = new Map();
+  for (const t of [...normal.filter((x) => x.isError !== "1"), ...internal]) {
+    if (low(t.to) !== wallet || BigInt(t.value || 0) === 0n) continue;
+    const from = low(t.from);
+    const r = by.get(from) ?? { address: from, eth: 0, transactions: 0, firstTime: null, lastTime: null, lastTx: null };
+    const time = iso(t.timeStamp);
+    r.eth += eth(t.value);
+    r.transactions += 1;
+    if (!r.firstTime || time < r.firstTime) r.firstTime = time;
+    if (!r.lastTime || time >= r.lastTime) {
+      r.lastTime = time;
+      r.lastTx = t.transactionHash ?? t.hash ?? null;
+    }
+    by.set(from, r);
+  }
+  return [...by.values()].sort((a, b) => b.eth - a.eth);
+}
+
+/** Whether a funder is a person's wallet or a service, and what it launched: the same facts for every step back. */
+async function describeFunder(chain, funder, launchesOf) {
+  const [sent, code] = await Promise.all([
+    chain.client.getTransactionCount({ address: funder }).catch(() => null),
+    chain.client.getCode({ address: funder }).catch(() => undefined),
+  ]);
+  const isContract = Boolean(code && code !== "0x");
+  const isService = isContract || (sent ?? 0) > SERVICE_TXS;
+  const launches = isService ? null : await launchesOf(funder).catch(() => null);
+  return { funderTransactionsSent: sent, funderIsContract: isContract, funderIsService: isService, funderLaunches: launches && { count: launches.length, tokens: launches.slice(0, 20) } };
+}
+
+/**
+ * The funding followed back: who funded the creator, who funded that wallet, and so on. It stops at an exchange,
+ * a bridge or any contract (thousands of strangers share those, so the trail means nothing past them), at a wallet
+ * it has already seen, after TRAIL_STEPS steps, or when time runs out. Every step is a probable link, never proof.
+ */
+async function fundingTrail({ chain, dev, funding, launchesOf, deadline }) {
+  const steps = [];
+  const seen = new Set([dev]);
+  let wallet = dev;
+  let hop = funding;
+  let endedAt = hop ? "step_limit" : "not_found";
+  while (hop) {
+    steps.push({
+      step: steps.length + 1, wallet, funder: hop.funder, eth: hop.eth, time: hop.time, tx: hop.tx,
+      funderTransactionsSent: hop.funderTransactionsSent, funderIsContract: hop.funderIsContract, funderIsService: hop.funderIsService,
+      funderLaunches: hop.funderLaunches?.count ?? null, funderName: null,
+    });
+    if (hop.funderIsService) {
+      endedAt = hop.funderIsContract ? "contract" : "busy_wallet";
+      break;
+    }
+    if (seen.has(hop.funder)) {
+      endedAt = "loop";
+      break;
+    }
+    if (steps.length >= TRAIL_STEPS) break;
+    if (Date.now() > deadline) {
+      endedAt = "out_of_time";
+      break;
+    }
+    seen.add(hop.funder);
+    wallet = hop.funder;
+    // The first ETH in is among a wallet's earliest transactions: it can't send anything before it has gas.
+    const [normal, internal] = await Promise.all([
+      list("txlist", { address: wallet, page: 1, offset: 25 }, chain),
+      list("txlistinternal", { address: wallet, page: 1, offset: 25 }, chain),
+    ]);
+    const first = firstFunding(wallet, normal, internal);
+    if (!first) {
+      endedAt = "not_found";
+      break;
+    }
+    const funder = low(first.from);
+    hop = { funder, eth: eth(first.value), time: iso(first.timeStamp), tx: first.transactionHash ?? first.hash ?? null, ...(await describeFunder(chain, funder, launchesOf)) };
+  }
+  // Who the trail ends at, when the explorer has a name for it (an exchange, a bridge).
+  const last = steps.at(-1);
+  if (last?.funderIsService) {
+    const about = await blockscout(`/api/v2/addresses/${last.funder}`, {}, chain).catch(() => null);
+    last.funderName = about?.name ?? about?.public_tags?.[0]?.display_name ?? about?.ens_domain_name ?? null;
+  }
+  return { steps, endedAt };
+}
+
+/**
+ * How one earlier launch of the creator ended, from what was read about it. Shares are of that token's supply.
+ * `historyRead` is false when the explorer had none of the creator's moves in it: then only what they hold is known.
+ */
+export function outcomeOf({ launch, meta, supply, balance, moves, lastTransfer, holders, dev, paidIn, chain, now }) {
+  const pct = (raw) => (supply ? Number((raw * 1_000_000n) / supply) / 10_000 : null);
+  const totals = { minted: 0n, bought: 0n, received: 0n, burned: 0n, locked: 0n, sold: 0n, pooled: 0n, sent: 0n };
+  for (const t of moves ?? []) {
+    const incoming = low(t.to) === dev;
+    const type = classify(incoming, low(incoming ? t.from : t.to), launch.curve ?? null, chain);
+    totals[type === "sold" && !paidIn.has(low(t.hash)) ? "pooled" : type] += BigInt(t.value);
+  }
+  const historyRead = Array.isArray(moves) && moves.length > 0;
+  const lastAt = lastTransfer?.timeStamp ? Number(lastTransfer.timeStamp) * 1000 : null;
+  return {
+    token: launch.token,
+    name: meta?.name ?? null,
+    symbol: meta?.symbol ?? null,
+    ...(launch.launchpad ? { launchpad: launch.launchpad } : {}),
+    launchTx: launch.tx ?? null,
+    creatorHoldsPercent: balance === null || balance === undefined ? null : pct(balance),
+    creatorBoughtPercent: historyRead ? pct(totals.bought) : null,
+    creatorSoldPercent: historyRead ? pct(totals.sold) : null,
+    creatorBurnedPercent: historyRead ? pct(totals.burned) : null,
+    creatorSentPercent: historyRead ? pct(totals.sent) : null,
+    holders: holders === null || holders === undefined || Number.isNaN(Number(holders)) ? null : Number(holders),
+    lastTransferAt: lastAt ? new Date(lastAt).toISOString() : null,
+    daysSinceLastTransfer: lastAt ? Math.max(0, Math.floor((now - lastAt) / 86_400_000)) : null,
+    historyRead,
+  };
+}
+
+/** The outcome of the creator's most recent earlier launches, newest first. About 3 Blockscout requests each. */
+function outcomesOf({ chain, dev, launches, paidIn }) {
+  const balances = (token, fn, args) => chain.client.readContract({ address: token, abi: erc20, functionName: fn, args }).catch(() => null);
+  return Promise.all(
+    launches
+      .slice(-OUTCOMES)
+      .reverse()
+      .map(async (launch) => {
+        const [meta, supply, balance, moves, last, info] = await Promise.all([
+          tokenMeta(launch.token, chain).catch(() => null),
+          balances(launch.token, "totalSupply"),
+          balances(launch.token, "balanceOf", [dev]),
+          list("tokentx", { contractaddress: launch.token, address: dev }, chain).catch(() => null),
+          list("tokentx", { contractaddress: launch.token, page: 1, offset: 1, sort: "desc" }, chain).catch(() => null),
+          blockscout(`/api/v2/tokens/${launch.token}`, {}, chain).catch(() => null),
+        ]);
+        return outcomeOf({ launch, meta, supply, balance, moves, lastTransfer: last?.[0] ?? null, holders: info?.holders_count ?? info?.holder_count ?? null, dev, paidIn, chain, now: Date.now() });
+      }),
+  );
+}
+
+/** A promise that gives up: null once the shared time for the further reads has run out, or when it fails. */
+const within = (deadline, promise) =>
+  Promise.race([promise.catch(() => null), new Promise((done) => setTimeout(() => done(null), Math.max(0, deadline - Date.now())))]);
 
 /** What one token transfer of the creator's was: bought, burned, locked, sold, or just moved. */
 export function classify(incoming, other, launchSource, chain = CHAINS.robinhood) {
@@ -58,7 +224,7 @@ export function classify(incoming, other, launchSource, chain = CHAINS.robinhood
   return venue ? "sold" : "sent";
 }
 
-async function checkRobinhood(token) {
+async function checkRobinhood(token, extras = true) {
   const chain = CHAINS.robinhood;
   const [info, latest, meta, supply] = await Promise.all([
     blockscout(`/api/v2/addresses/${token}`),
@@ -105,11 +271,12 @@ async function checkRobinhood(token) {
     fees: { from: FEE_ESCROW, pending: pendingFees },
     launchesOf: (wallet) => launchesBy(wallet, latest),
     where: "on the launchpad",
+    extras,
     launchSearch: fullHistory() ? "the launchpad's whole history" : "the last 13 days or so",
   });
 }
 
-async function checkBase(token) {
+async function checkBase(token, extras = true) {
   const chain = CHAINS.base;
   const [meta, supply, origin] = await Promise.all([
     tokenMeta(token, chain),
@@ -155,12 +322,13 @@ async function checkBase(token) {
     fees: null,
     launchesOf: (wallet) => baseLaunchesBy(wallet),
     where: "on Clanker or Zora",
+    extras,
     launchSearch: "Clanker and Zora's whole history on Base",
   });
 }
 
 /** The report from what was read, the same on both chains. */
-async function report({ chain, token, meta, supply, dev, launchSource, moves, internal, normal, balance, ownLaunches, creator, fees, launchesOf, where, launchSearch }) {
+async function report({ chain, token, meta, supply, dev, launchSource, moves, internal, normal, balance, ownLaunches, creator, fees, launchesOf, where, launchSearch, extras = true }) {
   const feeFrom = fees?.from ?? null;
 
   const unit = 10 ** meta.decimals;
@@ -248,20 +416,69 @@ async function report({ chain, token, meta, supply, dev, launchSource, moves, in
   }
   const otherLaunches = ownLaunches?.filter((l) => l.token !== token) ?? null;
 
+  // Where the creator's ETH came from. Fees paid by any launchpad or locker show up here as a contract that paid them.
+  // Dust (a few wei sent to make an address look familiar) is counted in the total and left off the list.
+  const income = incomeBySender(dev, normal, internal).filter((r) => r.eth >= 0.000001).slice(0, SENDERS);
+  const incomeTotal = incomeBySender(dev, normal, internal).reduce((sum, r) => sum + r.eth, 0);
+
+  // The further reads share one time limit, and a report never waits on them past it.
+  const deadline = Date.now() + EXTRAS_MS;
+  const incomplete = [];
+  const [trail, outcomes, senderNames, wethIn] = extras
+    ? await Promise.all([
+        within(deadline, fundingTrail({ chain, dev, funding, launchesOf, deadline })),
+        otherLaunches?.length ? within(deadline, outcomesOf({ chain, dev, launches: otherLaunches, paidIn })) : null,
+        within(deadline, Promise.all(income.slice(0, SENDER_NAMES).map((r) => contractName(r.address, chain)))),
+        // On Base, launchpads pay creators in WETH, which never shows as ETH received.
+        chain === CHAINS.base ? within(deadline, list("tokentx", { address: dev, contractaddress: WETH_BASE }, chain)) : null,
+      ])
+    : [null, null, null, null];
+  if (extras && !trail) incomplete.push("fundingTrail");
+  if (extras && otherLaunches?.length && !outcomes) incomplete.push("otherLaunches.outcomes");
+  if (extras && chain === CHAINS.base && !wethIn) incomplete.push("received.weth");
+  const looksLikeFees = (name) => Boolean(name && /fee|locker|escrow|reward|claim|splitter|vault/i.test(name));
+  const senders = income.map((r, i) => {
+    const name = r.address === feeFrom ? "the launchpad's fee escrow" : (senderNames?.[i] ?? null);
+    return { ...r, name, likelyFees: r.address === feeFrom || looksLikeFees(name) };
+  });
+  const wethSenders = wethIn
+    ? incomeBySender(dev, [], wethIn.map((t) => ({ ...t, transactionHash: t.hash }))).slice(0, SENDERS)
+    : null;
+
   const holds = pct(balance);
   const flags = [];
-  const flag = (severity, text) => flags.push({ severity, text });
-  if (totals.sold > 0n) flag("warn", `The creator sold ${pct(totals.sold).toFixed(2)}% of the supply`);
-  if (totals.pooled > 0n) flag("info", `The creator moved ${pct(totals.pooled).toFixed(2)}% of the supply into the trading pool without being paid ETH for it in the same transaction: more likely added liquidity than a sale`);
-  if (totals.burned > 0n) flag("good", `The creator burned ${pct(totals.burned).toFixed(2)}% of the supply`);
-  if (totals.locked > 0n) flag("good", `The creator locked ${pct(totals.locked).toFixed(2)}% of the supply`);
-  if (totals.sent > 0n) flag("info", `The creator sent ${pct(totals.sent).toFixed(2)}% of the supply to other addresses: check who received it`);
-  if (holds >= 5) flag("info", `The creator still holds ${holds.toFixed(2)}% of the supply`);
-  if (claimedEth > 0) flag("info", `The creator has claimed ${claimedEth.toFixed(4)} ETH in creator fees`);
-  if (otherLaunches?.length) flag("warn", `The creator launched ${otherLaunches.length} other token${otherLaunches.length === 1 ? "" : "s"} ${where}`);
+  // `code` never changes, so a caller can act on a flag without reading its sentence. `evidence` is up to five
+  // transactions behind it, newest last.
+  const flag = (severity, text, code, evidence = []) => flags.push({ code, severity, text, evidence: evidence.filter(Boolean).slice(-5) });
+  const txsOf = (type) => rows.filter((r) => r.type === type).map((r) => r.tx);
+  if (totals.sold > 0n) flag("warn", `The creator sold ${pct(totals.sold).toFixed(2)}% of the supply`, "creator_sold", txsOf("sold"));
+  if (totals.pooled > 0n) flag("info", `The creator moved ${pct(totals.pooled).toFixed(2)}% of the supply into the trading pool without being paid ETH for it in the same transaction: more likely added liquidity than a sale`, "creator_added_liquidity", txsOf("pooled"));
+  if (totals.burned > 0n) flag("good", `The creator burned ${pct(totals.burned).toFixed(2)}% of the supply`, "creator_burned", txsOf("burned"));
+  if (totals.locked > 0n) flag("good", `The creator locked ${pct(totals.locked).toFixed(2)}% of the supply`, "creator_locked", txsOf("locked"));
+  if (totals.sent > 0n) flag("info", `The creator sent ${pct(totals.sent).toFixed(2)}% of the supply to other addresses: check who received it`, "creator_sent_tokens", txsOf("sent"));
+  if (holds >= 5) flag("info", `The creator still holds ${holds.toFixed(2)}% of the supply`, "creator_holds");
+  if (claimedEth > 0) flag("info", `The creator has claimed ${claimedEth.toFixed(4)} ETH in creator fees`, "creator_fees_claimed", claims.map((c) => c.tx));
+  if (otherLaunches?.length) flag("warn", `The creator launched ${otherLaunches.length} other token${otherLaunches.length === 1 ? "" : "s"} ${where}`, "creator_other_launches", otherLaunches.map((l) => l.tx));
   const funderCount = funding?.funderLaunches?.count ?? 0;
-  if (funderCount > 0) flag("warn", `The wallet that first funded the creator has launched ${funderCount} token${funderCount === 1 ? "" : "s"} itself: a probable link, not proof`);
-  if (!flags.length) flag("info", "Nothing stands out in what the creator did");
+  if (funderCount > 0) flag("warn", `The wallet that first funded the creator has launched ${funderCount} token${funderCount === 1 ? "" : "s"} itself: a probable link, not proof`, "funder_launched_tokens", [funding.tx]);
+  // From the further reads.
+  const backer = trail?.steps.find((st) => st.step > 1 && (st.funderLaunches ?? 0) > 0);
+  if (backer) {
+    flag("warn", `A wallet ${backer.step} steps back in the creator's funding has launched ${backer.funderLaunches} token${backer.funderLaunches === 1 ? "" : "s"} itself: a probable link, not proof`, "funding_trail_launcher", trail.steps.slice(0, backer.step).map((st) => st.tx));
+  }
+  if (outcomes?.length) {
+    const soldOn = outcomes.filter((o) => (o.creatorSoldPercent ?? 0) > 0);
+    const quiet = outcomes.filter((o) => (o.daysSinceLastTransfer ?? 0) >= QUIET_DAYS);
+    const of = `of the ${outcomes.length} earlier launch${outcomes.length === 1 ? "" : "es"} checked`;
+    if (soldOn.length) flag("warn", `The creator sold tokens from ${soldOn.length} ${of}`, "earlier_launches_sold", soldOn.map((o) => o.launchTx));
+    if (quiet.length) flag(quiet.length === outcomes.length ? "warn" : "info", `${quiet.length} ${of} ${quiet.length === 1 ? "has" : "have"} had no transfer for ${QUIET_DAYS} days or more`, "earlier_launches_quiet", quiet.map((o) => o.launchTx));
+    // Bought at launch, then moved to other wallets: what those wallets did with them isn't read here.
+    const movedOut = outcomes.filter((o) => (o.creatorSentPercent ?? 0) >= 1);
+    if (movedOut.length) flag("info", `In ${movedOut.length} ${of}, the creator moved at least 1% of the supply to other wallets: check what those wallets did with it`, "earlier_launches_moved_out", movedOut.map((o) => o.launchTx));
+  }
+  const paidBy = senders.find((r) => r.likelyFees && r.address !== feeFrom && r.eth > 0);
+  if (paidBy) flag("info", `The creator received ${paidBy.eth.toFixed(4)} ETH from ${paidBy.name}, which looks like fees`, "likely_fees_received", [paidBy.lastTx]);
+  if (!flags.length) flag("info", "Nothing stands out in what the creator did", "nothing_stands_out");
 
   return {
     status: 200,
@@ -297,8 +514,23 @@ async function report({ chain, token, meta, supply, dev, launchSource, moves, in
         recipients: sentEth.slice(0, 10),
       },
       funding,
-      otherLaunches: otherLaunches && { count: otherLaunches.length, tokens: otherLaunches.slice(0, 20) },
+      // The funding followed further back. Step 1 is `funding`, above. Null with depth=basic or when it couldn't be read.
+      fundingTrail: trail && { steps: trail.steps, endedAt: trail.endedAt },
+      // ETH the creator received, by sender. On Base, WETH too, which is how launchpads there pay creators.
+      received: {
+        totalEth: incomeTotal,
+        senders,
+        weth: wethSenders && { total: wethSenders.reduce((sum, r) => sum + r.eth, 0), senders: wethSenders },
+      },
+      otherLaunches: otherLaunches && {
+        count: otherLaunches.length,
+        tokens: otherLaunches.slice(0, 20).map(({ curve, ...l }) => l),
+        // How the most recent of them ended, newest first. Null with depth=basic or when it couldn't be read.
+        outcomes: outcomes ?? null,
+      },
       launchSearch,
+      depth: extras ? "full" : "basic",
+      incomplete,
       explorer: `${chain.explorer}/address/${dev}`,
       note: "Read from public on-chain data. 'Sent' can be a sale, a lock or a move to another wallet: check who received it. A funder is a probable link, never proof. Not financial advice.",
       updatedAt: new Date().toISOString(),
@@ -318,12 +550,13 @@ export default async function handler(req, res) {
   const asked = chainRequest(req.query);
   if (!asked) return sendJson(res, 400, badChain);
   if (!chainReady(asked.chain)) return sendJson(res, 503, chainNotReady);
-  const key = asked.key(token);
+  const basic = String(req.query.depth ?? "").trim().toLowerCase() === "basic";
+  const key = `${basic ? "basic:" : ""}${asked.key(token)}`;
   try {
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_MS) return sendJson(res, hit.status, hit.body);
     // Left out, the chain is Robinhood Chain, or Base when the token is only there (src: _lib.js checkOnChain).
-    const result = await checkOnChain(asked, token, { robinhood: checkRobinhood, base: checkBase });
+    const result = await checkOnChain(asked, token, { robinhood: (t) => checkRobinhood(t, !basic), base: (t) => checkBase(t, !basic) });
     if (cache.size > 2000) cache.clear();
     cache.set(key, { at: Date.now(), ...result });
     return sendJson(res, result.status, result.body);

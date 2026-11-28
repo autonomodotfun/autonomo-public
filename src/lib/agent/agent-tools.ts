@@ -25,6 +25,28 @@ const SAME_BLOCKS_SHOWN = 3;
  * would lose its end. The model gets the flags and summary whole, the largest holders, groups and snipers, and counts
  * for the rest.
  */
+const PAGE_LINKS_SHOWN = 20;
+const PAGE_ADDRESSES_SHOWN = 10;
+const PAGE_HEADINGS_SHOWN = 15;
+
+/**
+ * What the model gets from Page Reader: everything, with the three long lists cut down and a count for the rest.
+ * A page can carry 80 links, which the model pays for on every later turn and rarely needs.
+ */
+function pageForModel(data: unknown) {
+  if (!data || typeof data !== "object" || typeof (data as { text?: unknown }).text !== "string") return data;
+  const d = data as Record<string, unknown>;
+  const list = (v: unknown) => (Array.isArray(v) ? v : []);
+  const links = (d.links ?? {}) as Record<string, unknown>;
+  const addresses = (d.addresses ?? {}) as Record<string, unknown>;
+  return {
+    ...d,
+    headings: list(d.headings).slice(0, PAGE_HEADINGS_SHOWN),
+    links: { ...links, list: list(links.list).slice(0, PAGE_LINKS_SHOWN), listNotShown: Math.max(0, list(links.list).length - PAGE_LINKS_SHOWN) },
+    addresses: { ...addresses, list: list(addresses.list).slice(0, PAGE_ADDRESSES_SHOWN), listNotShown: Math.max(0, list(addresses.list).length - PAGE_ADDRESSES_SHOWN) },
+  };
+}
+
 function holdersForModel(data: unknown) {
   if (!data || typeof data !== "object" || !Array.isArray((data as { topHolders?: unknown }).topHolders)) return data;
   const d = data as Record<string, unknown> & { topHolders: unknown[] };
@@ -74,7 +96,7 @@ export const AGENT_TOOLS: Record<string, ToolSpec<z.ZodObject>> = {
   }),
   tx_explainer: spec({
     slug: "tx-explainer",
-    description: "A Robinhood Chain transaction in plain English: launches, curve buys and sells, transfers and fee.",
+    description: "A Robinhood Chain transaction in plain English: launches, buys and sells on the curve and in pools, tokens created and burned, permissions and ownership changes, transfers and fee.",
     input: z.strictObject({ hash: z.string().regex(/^0x[0-9a-fA-F]{64}$/).describe("Transaction hash") }),
     path: ({ hash }) => `/tx/${hash.toLowerCase()}`,
   }),
@@ -87,7 +109,7 @@ export const AGENT_TOOLS: Record<string, ToolSpec<z.ZodObject>> = {
   dev_wallet: spec({
     slug: "dev-wallet",
     description:
-      "What a token's creator did: tokens bought, burned, locked, sold and still held, creator fees claimed and waiting, where their ETH went, who funded the wallet and other tokens they launched.",
+      "What a token's creator did: tokens bought, burned, locked, sold and still held, creator fees claimed and waiting, where their ETH went and came from, who funded the wallet and who funded that funder, and how their earlier launches ended.",
     input: z.strictObject({ address: address.describe("Token contract address") }),
     path: ({ address }) => `/dev/${address.toLowerCase()}`,
   }),
@@ -142,9 +164,10 @@ export const AGENT_TOOLS: Record<string, ToolSpec<z.ZodObject>> = {
   }),
   page_reader: spec({
     slug: "page-reader",
-    description: "Title, description and readable text of a public web page.",
+    description: "Title, description and readable text of a public web page, with its links, social accounts, the contract addresses it shows and any text hidden from a reader.",
     input: z.strictObject({ url: z.url({ protocol: /^https$/ }).max(2000).describe("An https:// link") }),
     path: ({ url }) => `/page?url=${encodeURIComponent(url)}`,
+    forModel: pageForModel,
   }),
   ostrapad_offers: spec({
     slug: "ostrapad-offer-finder",

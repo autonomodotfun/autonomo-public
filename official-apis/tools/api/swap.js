@@ -293,7 +293,7 @@ function ask(handler, token) {
         return res;
       },
     };
-    const req = { method: "GET", query: { token, chain: "robinhood" }, headers: { "x-api-key": process.env.TOOLS_API_KEY ?? "" } };
+    const req = { method: "GET", query: { token, chain: "robinhood", depth: "basic" }, headers: { "x-api-key": process.env.TOOLS_API_KEY ?? "" } };
     Promise.resolve(handler(req, res)).catch(reject);
   });
 }

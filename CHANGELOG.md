@@ -5,6 +5,20 @@ repo gets a copy of each release.
 
 ## November 28, 2026
 
+- **Three official APIs read much more, for anyone checking a token.** Nothing was renamed or removed: every answer
+  has what it had, with more around it.
+  - **Page Reader** now returns a page's links and social accounts, the contract addresses it shows and where, and
+    the sentences about team, supply, locks, taxes and audits. Text hidden from a reader is left out and reported,
+    and text that reads as instructions to an AI model is flagged. Pass `expect=<address>` to ask whether the page
+    shows a given token. It still doesn't run JavaScript, but it now says so when a page is built in the browser,
+    and it reads pages that stream their content, which used to come back as "Loading…".
+  - **Tx Explainer** now says "bought" and "sold" for trades in Uniswap v4 pools on Robinhood Chain, with what
+    reached the pool and what a hook kept. It reports tokens created and burned with their share of the supply,
+    spending permissions, ownership moved or given up, pauses and code changes, and names the function called.
+  - **Dev Wallet Tracker** now follows the creator's funding up to four steps back, shows how their five most recent
+    earlier launches ended, and lists where their ETH came from. `depth=basic` gives the earlier, faster answer.
+  - All three give each finding a fixed `code`, so a program can act on it without reading the sentence, and the
+    Dev Wallet Tracker's flags carry the transactions behind them.
 - **A guide to trading through QHooks' MCP server.** [autonomo.fun/docs/qhooks](https://autonomo.fun/docs/qhooks)
   shows how to add QHooks' MCP server to an agent: it finds the route and hands back an unsigned transaction, so
   the agent signs on its own machine. The address in the guide is Autonomo's referral link, and the guide says so

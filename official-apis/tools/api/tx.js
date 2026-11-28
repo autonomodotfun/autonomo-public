@@ -16,13 +16,17 @@ const parseUnitsSafe = (amount, decimals) => {
   }
 };
 import {
-  addr, authorized, badChain, baseLaunchFromLogs, BUY, chainNotReady, chainReady, chainRequest, CHAINS, checkOnChain, contractName, ethUsd,
-  FACTORY, LAUNCHED, SELL, sendJson, short, tokenMeta, TRANSFER, USDG, words,
+  addr, authorized, badChain, baseLaunchFromLogs, blockscout, BUY, chainNotReady, chainReady, chainRequest, CHAINS, checkOnChain, contractName, erc20, ethUsd,
+  FACTORY, hasBlockscout, LAUNCHED, SELL, sendJson, short, tokenMeta, TRANSFER, USDG, WETH, words,
 } from "./_lib.js";
+import { controlEvents, isBurnAddress, methodOf, mintsAndBurns, v4Trades } from "./_txfacts.js";
 
 const KNOWN = {
   [FACTORY]: "the launchpad",
   "0x267444d099b10fb5ed7c3cc7b7c767adca574952": "the launchpad's liquidity locker",
+  "0xe5e702641ea86f4ae6cc3cdaed2b886f976be044": "the launchpad's pool hook",
+  "0xd3afeb2a57f70ef218aa82451c51b2fb0416ac9e": "the launchpad's fee escrow",
+  "0x8366a39cc670b4001a1121b8f6a443a643e40951": "the Uniswap v4 PoolManager",
   "0x402085c248eea27d92e8b30b2c58ed07f9e20001": "the x402 Permit2 proxy",
   "0x000000000022d473030f116ddee9f6b43ac78ba3": "Permit2",
 };
@@ -72,6 +76,11 @@ async function explainOn(hash, chain) {
   return { status: 200, body: await explain(tx, receipt, chain) };
 }
 
+/** What the explorer knows about a transaction (the function called, why it failed, ETH moved inside it), or null:
+ * without a key, on an error, or when it takes over 4 s. Base's explorer can be slow, and none of this is essential. */
+const explorerSays = (path, chain) =>
+  hasBlockscout() ? Promise.race([blockscout(path, {}, chain).catch(() => null), new Promise((done) => setTimeout(() => done(null), 4_000))]) : Promise.resolve(null);
+
 const usd = (n) => (n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) : n.toPrecision(2));
 const fmt = (n) => {
   const x = Number(n);
@@ -85,11 +94,29 @@ const fmt = (n) => {
 async function explain(tx, receipt, chain = CHAINS.robinhood) {
   const onBase = chain === CHAINS.base;
   const known = onBase ? KNOWN_BASE : KNOWN;
-  const [block, eth] = await Promise.all([chain.client.getBlock({ blockNumber: receipt.blockNumber }), ethUsd()]);
+  const [block, eth, seen, inside] = await Promise.all([
+    chain.client.getBlock({ blockNumber: receipt.blockNumber }),
+    ethUsd(),
+    explorerSays(`/api/v2/transactions/${tx.hash}`, chain),
+    explorerSays(`/api/v2/transactions/${tx.hash}/internal-transactions`, chain),
+  ]);
   const logs = receipt.logs;
+  // ETH that moved inside the transaction (a pool paying a seller, a router passing a fee on). Logs don't show it.
+  const ethMoves = Array.isArray(inside?.items)
+    ? inside.items
+        .filter((m) => m.success !== false && BigInt(m.value ?? 0) > 0n && m.from?.hash && m.to?.hash)
+        .map((m) => ({ from: m.from.hash.toLowerCase(), to: m.to.hash.toLowerCase(), eth: Number(formatEther(BigInt(m.value))) }))
+    : null;
+  const ethReceivedBy = (who) => (ethMoves ? ethMoves.filter((m) => m.to === who).reduce((sum, m) => sum + m.eth, 0) : null);
+  const control = controlEvents(logs);
 
   // Token metadata for every token that moved.
-  const tokens = [...new Set(logs.filter((l) => l.topics[0] === TRANSFER && l.topics.length === 3).map((l) => l.address.toLowerCase()))];
+  const tokens = [
+    ...new Set([
+      ...logs.filter((l) => l.topics[0] === TRANSFER && l.topics.length === 3).map((l) => l.address.toLowerCase()),
+      ...control.filter((e) => e.type === "approve").map((e) => e.token),
+    ]),
+  ];
   const meta = Object.fromEntries(await Promise.all(tokens.map(async (t) => [t, await tokenMeta(t, chain)])));
   const sym = (t) => (meta[t]?.symbol ? `$${meta[t].symbol}` : short(t));
 
@@ -132,14 +159,14 @@ async function explain(tx, receipt, chain = CHAINS.robinhood) {
     const m = meta[token] ?? (await tokenMeta(token, chain));
     const creator = addr(l.topics[3]);
     const launcher = creator === tx.to?.toLowerCase() ? `${label(tx.from)} (through a launcher contract)` : label(creator);
-    actions.push({ type: "launch", text: `${launcher} launched $${m.symbol ?? "?"}${m.name && m.name !== m.symbol ? ` (${m.name})` : ""} on the Robinhood Chain launchpad.`, token });
+    actions.push({ type: "launch", text: `${launcher} launched $${m.symbol ?? "?"}${m.name && m.name !== m.symbol ? ` (${m.name})` : ""} on the Robinhood Chain launchpad.`, token, details: { creator: creator === tx.to?.toLowerCase() ? tx.from.toLowerCase() : creator, launchpad: "Robinhood Chain launchpad" } });
   }
   if (onBase) {
     for (const token of tokens) {
       const launch = baseLaunchFromLogs(token, logs);
       if (!launch) continue;
       const m = meta[token];
-      actions.push({ type: "launch", text: `${label(launch.creator)} launched $${m?.symbol ?? "?"}${m?.name && m.name !== m.symbol ? ` (${m.name})` : ""} on ${launch.launchpad}.`, token });
+      actions.push({ type: "launch", text: `${label(launch.creator)} launched $${m?.symbol ?? "?"}${m?.name && m.name !== m.symbol ? ` (${m.name})` : ""} on ${launch.launchpad}.`, token, details: { creator: launch.creator, launchpad: launch.launchpad } });
     }
   }
   for (const l of logs) {
@@ -150,9 +177,29 @@ async function explain(tx, receipt, chain = CHAINS.robinhood) {
     const w = words(l.data);
     const who = label(addr(l.topics[2]));
     if (l.topics[0] === BUY) {
-      actions.push({ type: "buy", text: `${who} bought ${fmt(formatUnits(w[1], d))} ${token ? sym(token) : "tokens"} for ${fmt(formatEther(w[0]))} ETH (~$${usd(Number(formatEther(w[0])) * eth)}).`, token });
+      actions.push({
+        type: "buy",
+        text: `${who} bought ${fmt(formatUnits(w[1], d))} ${token ? sym(token) : "tokens"} for ${fmt(formatEther(w[0]))} ETH (~$${usd(Number(formatEther(w[0])) * eth)}).`,
+        token,
+        details: {
+          venue: "curve",
+          trader: addr(l.topics[2]),
+          gave: { asset: "eth", symbol: "ETH", amount: Number(formatEther(w[0])), usd: Number(formatEther(w[0])) * eth },
+          got: { asset: token ?? null, symbol: meta[token]?.symbol ?? null, amount: Number(formatUnits(w[1], d)), usd: null },
+        },
+      });
     } else {
-      actions.push({ type: "sell", text: `${who} sold ${fmt(formatUnits(w[0], d))} ${token ? sym(token) : "tokens"} for ${fmt(formatEther(w[1]))} ETH (~$${usd(Number(formatEther(w[1])) * eth)}).`, token });
+      actions.push({
+        type: "sell",
+        text: `${who} sold ${fmt(formatUnits(w[0], d))} ${token ? sym(token) : "tokens"} for ${fmt(formatEther(w[1]))} ETH (~$${usd(Number(formatEther(w[1])) * eth)}).`,
+        token,
+        details: {
+          venue: "curve",
+          trader: addr(l.topics[2]),
+          gave: { asset: token ?? null, symbol: meta[token]?.symbol ?? null, amount: Number(formatUnits(w[0], d)), usd: null },
+          got: { asset: "eth", symbol: "ETH", amount: Number(formatEther(w[1])), usd: Number(formatEther(w[1])) * eth },
+        },
+      });
     }
   }
   // Plain transfers that aren't part of a curve trade or a mint/burn.
@@ -165,9 +212,11 @@ async function explain(tx, receipt, chain = CHAINS.robinhood) {
     const amount = formatUnits(BigInt(l.data), meta[token]?.decimals ?? 18);
     transfers.push({ token, symbol: meta[token]?.symbol ?? null, from, to, amount });
     if (curveToken.has(from) || curveToken.has(to)) continue;
-    if (from === "0x0000000000000000000000000000000000000000" || to === "0x0000000000000000000000000000000000000000") continue;
+    // Tokens made (from the zero address) or destroyed (to the zero or the dead address) are a change in supply,
+    // said further down.
+    if (isBurnAddress(from) || isBurnAddress(to)) continue;
     const usdNote = token === USDG || (onBase && token === USDC_BASE) ? ` (~$${usd(Number(amount))})` : "";
-    actions.push({ type: "transfer", text: `${label(from)} sent ${fmt(amount)} ${sym(token)}${usdNote} to ${label(to)}.`, token });
+    actions.push({ type: "transfer", text: `${label(from)} sent ${fmt(amount)} ${sym(token)}${usdNote} to ${label(to)}.`, token, details: { from, to, symbol: meta[token]?.symbol ?? null, amount: Number(amount) } });
   }
   // Base launches: the launch hands its supply to pools, vaults and airdrops in a row of transfers. Said as one line:
   // where the supply ended up, with shares, and what anyone else (a creator's buy) got.
@@ -227,14 +276,76 @@ async function explain(tx, receipt, chain = CHAINS.robinhood) {
     };
     if (gave.length && got.length && !actions.some((a) => a.type === "launch")) {
       for (let i = actions.length - 1; i >= 0; i--) if (actions[i].type === "transfer") actions.splice(i, 1);
-      actions.push({ type: "swap", text: `${label(me)} swapped ${gave.map(amountOf).join(" and ")} for ${got.map(amountOf).join(" and ")}.`, token: got[0][0] });
+      const part = ([t, v]) => {
+        const size = v < 0n ? -v : v;
+        if (t === "eth") return { asset: "eth", symbol: "ETH", amount: Number(formatEther(size)), usd: Number(formatEther(size)) * eth };
+        const amount = Number(formatUnits(size, meta[t]?.decimals ?? 18));
+        return { asset: t, symbol: meta[t]?.symbol ?? null, amount, usd: t === USDC_BASE ? amount : t === WETH_BASE ? amount * eth : null };
+      };
+      actions.push({
+        type: "swap",
+        text: `${label(me)} swapped ${gave.map(amountOf).join(" and ")} for ${got.map(amountOf).join(" and ")}.`,
+        token: got[0][0],
+        details: { trader: me, gave: gave.map(part), got: got.map(part) },
+      });
       swapped = true;
     }
   }
+  // Trades in Uniswap v4 pools, read from the pool manager's own events: what was bought or sold, for how much and
+  // by whom. Robinhood Chain's graduated tokens trade there, and so does a Base swap the lines above couldn't sum up
+  // (a sale for ETH, or a trade filled for someone else).
+  const sender = tx.from.toLowerCase();
+  const stable = onBase ? USDC_BASE : USDG;
+  const wrapped = onBase ? WETH_BASE : WETH;
+  const sideAmount = (s) => Number(s.asset === "eth" ? formatEther(s.amount) : formatUnits(s.amount, meta[s.asset]?.decimals ?? 18));
+  const sideUsd = (s) => (s.asset === "eth" || s.asset === wrapped ? sideAmount(s) * eth : s.asset === stable ? sideAmount(s) : null);
+  const sideText = (s) => `${fmt(sideAmount(s))} ${s.asset === "eth" ? "ETH" : s.asset === "unknown" ? "of another asset" : sym(s.asset)}${sideUsd(s) === null ? "" : ` (~$${usd(sideUsd(s))})`}`;
+  const sideOut = (s) => ({ asset: s.asset, symbol: s.asset === "eth" ? "ETH" : (meta[s.asset]?.symbol ?? null), amount: sideAmount(s), usd: sideUsd(s) });
+  const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+  let pooledBuy = false;
+  if (!swapped && !actions.some((a) => a.type === "launch")) {
+    const tradedTokens = new Set();
+    for (const t of v4Trades(logs, chain.poolManager, wrapped)) {
+      const who = t.trader ?? sender;
+      const [first, second] = t.kind === "buy" ? [t.got, t.gave] : [t.gave, t.got];
+      const token = first.asset === "eth" || first.asset === "unknown" ? null : first.asset;
+      const details = { venue: "uniswap-v4", pool: t.pool, trader: who, sentBy: sender, gave: sideOut(t.gave), got: sideOut(t.got) };
+      // Said from the trader's side: what they ended up with, or parted with. The pool's own figure follows when it differs.
+      const theirs = token && t.traderAmount !== null && t.traderAmount !== first.amount ? { asset: token, amount: t.traderAmount } : first;
+      if (theirs !== first) {
+        details.poolAmount = sideAmount(first);
+        details[t.kind === "buy" ? "got" : "gave"] = sideOut(theirs);
+      }
+      let text = `${cap(label(who))} ${t.kind === "buy" ? "bought" : t.kind === "sell" ? "sold" : "swapped"} ${sideText(theirs)} for ${sideText(second)} in a Uniswap v4 pool.`;
+      if (theirs !== first) text += t.kind === "buy" ? ` The pool paid out ${sideText(first)}.` : ` ${cap(sideText(first))} of it reached the pool.`;
+      if (who !== sender) text += ` The transaction was sent by ${label(sender)}.`;
+      if (t.kind === "buy" && who === sender && tx.value > 0n) {
+        pooledBuy = true;
+        details.ethSentWithTransaction = Number(formatEther(tx.value));
+        // What was sent and what reached the pool differ by whatever a router or a hook took on the way in.
+        if (tx.value > t.gave.amount) text += ` ${fmt(formatEther(tx.value))} ETH was sent with the transaction and ${fmt(formatEther(t.gave.amount))} ETH reached the pool.`;
+      }
+      if (t.kind === "sell") {
+        const received = ethReceivedBy(who);
+        if (received) {
+          details.ethReceived = received;
+          text += ` ${fmt(received)} ETH reached ${label(who)}.`;
+        }
+      }
+      if (t.kept.length && token) {
+        details.kept = t.kept.map((k) => ({ address: k.address, amount: Number(formatUnits(k.amount, meta[token]?.decimals ?? 18)) }));
+        for (const k of details.kept) text += ` ${cap(label(k.address))} kept ${fmt(k.amount)} ${sym(token)} of it.`;
+      }
+      actions.push({ type: t.kind, text, token, details });
+      for (const s of [t.gave, t.got]) if (s.asset !== "eth" && s.asset !== "unknown") tradedTokens.add(s.asset);
+    }
+    // The hops that carried a trade stay in `transfers` only.
+    for (let i = actions.length - 1; i >= 0; i--) if (actions[i].type === "transfer" && tradedTokens.has(actions[i].token)) actions.splice(i, 1);
+  }
+
   // Router trades: the sender pays ETH to a router, the router buys on the curve and forwards the tokens back.
   // Say it the way a person would: "<sender> bought … via a router".
   const router = tx.to?.toLowerCase();
-  const sender = tx.from.toLowerCase();
   const routed = actions.filter((a) => (a.type === "buy" || a.type === "sell") && router && a.text.startsWith(`${label(router)} `));
   let routedTrade = false;
   for (const a of routed) {
@@ -247,19 +358,95 @@ async function explain(tx, receipt, chain = CHAINS.robinhood) {
       if (a.type === "transfer" && (a.text.startsWith(`${label(router)} sent`) && a.text.endsWith(`to ${label(sender)}.`))) actions.splice(i, 1);
     }
   }
-  if (tx.value > 0n && !routedTrade && !swapped) actions.unshift({ type: "eth", text: `${label(tx.from)} sent ${fmt(formatEther(tx.value))} ETH (~$${usd(Number(formatEther(tx.value)) * eth)}) to ${tx.to ? label(tx.to) : "a new contract"}.` });
-  if (!actions.length) actions.push({ type: "call", text: `${label(tx.from)} called ${tx.to ? label(tx.to) : "a new contract"} with no token or ETH movement.` });
+
+  // Tokens made and destroyed. A launch mints its own supply, which the launch line already says.
+  const failed = receipt.status !== "success";
+  const flags = [];
+  const flag = (code, severity, text) => flags.push({ code, severity, text, evidence: [tx.hash] });
+  const supply = mintsAndBurns(logs, new Set(actions.filter((a) => a.type === "launch").map((a) => a.token)));
+  const supplyTokens = [...new Set([...supply.minted, ...supply.burned].map((r) => r.token))].slice(0, 4);
+  const supplies = new Map(
+    await Promise.all(supplyTokens.map(async (t) => [t, await chain.client.readContract({ address: t, abi: erc20, functionName: "totalSupply" }).catch(() => null)])),
+  );
+  const shareOf = (token, amount) => (supplies.get(token) ? Number((amount * 1_000_000n) / supplies.get(token)) / 10_000 : null);
+  const shareText = (p) => (p === null ? "" : ` (${p >= 0.01 ? p.toFixed(2).replace(/\.?0+$/, "") : "under 0.01"}% of today's supply)`);
+  for (const m of supply.minted.slice(0, 5)) {
+    const amount = Number(formatUnits(m.amount, meta[m.token]?.decimals ?? 18));
+    const percent = shareOf(m.token, m.amount);
+    actions.push({ type: "mint", text: `${fmt(amount)} new ${sym(m.token)} ${amount === 1 ? "was" : "were"} created and sent to ${label(m.wallet)}${shareText(percent)}.`, token: m.token, details: { to: m.wallet, amount, percentOfSupply: percent } });
+    flag("tokens_minted", percent !== null && percent >= 5 ? "warn" : "info", `New ${sym(m.token)} were created in this transaction${shareText(percent)}`);
+  }
+  for (const b of supply.burned.slice(0, 5)) {
+    const amount = Number(formatUnits(b.amount, meta[b.token]?.decimals ?? 18));
+    const percent = shareOf(b.token, b.amount);
+    actions.push({ type: "burn", text: `${cap(label(b.wallet))} burned ${fmt(amount)} ${sym(b.token)}${shareText(percent)}.`, token: b.token, details: { from: b.wallet, amount, percentOfSupply: percent } });
+    flag("tokens_burned", "info", `${sym(b.token)} were burned in this transaction${shareText(percent)}`);
+  }
+
+  // Who may do what, changed in this transaction. A permission that was used up by a move in the same transaction
+  // is the move's own plumbing and is left out, unless it is for any amount.
+  const thing = (a) => (meta[a]?.symbol ? `the ${sym(a)} token` : label(a));
+  for (const e of control.slice(0, 8)) {
+    if (e.type === "approve") {
+      if (!e.unlimited && transfers.some((t) => t.token === e.token && t.from === e.owner)) continue;
+      const amount = e.unlimited ? null : Number(formatUnits(e.amount, meta[e.token]?.decimals ?? 18));
+      const text = e.unlimited
+        ? `${cap(label(e.owner))} let ${label(e.spender)} spend any amount of their ${sym(e.token)}.`
+        : e.amount === 0n
+          ? `${cap(label(e.owner))} took back ${label(e.spender)}'s permission to spend their ${sym(e.token)}.`
+          : `${cap(label(e.owner))} let ${label(e.spender)} spend up to ${fmt(amount)} ${sym(e.token)}.`;
+      actions.push({ type: "approve", text, token: e.token, details: { owner: e.owner, spender: e.spender, amount, unlimited: e.unlimited } });
+      if (e.unlimited) flag("unlimited_approval", "info", `${label(e.owner)} gave ${label(e.spender)} permission to spend any amount of ${sym(e.token)}`);
+    } else if (e.type === "ownership") {
+      const text = e.renounced
+        ? `Ownership of ${thing(e.contract)} was given up: its owner-only functions can't be called any more.`
+        : isBurnAddress(e.from)
+          ? `${cap(label(e.to))} was made the owner of ${thing(e.contract)}.`
+          : `Ownership of ${thing(e.contract)} moved from ${label(e.from)} to ${label(e.to)}.`;
+      actions.push({ type: "ownership", text, details: { contract: e.contract, from: e.from, to: e.to, renounced: e.renounced } });
+      flag(e.renounced ? "ownership_renounced" : "ownership_moved", e.renounced ? "good" : "info", e.renounced ? `Ownership of ${thing(e.contract)} was given up` : `${thing(e.contract)} has a new owner, ${label(e.to)}`);
+    } else if (e.type === "paused" || e.type === "unpaused") {
+      actions.push({ type: e.type, text: `${thing(e.contract)[0].toUpperCase()}${thing(e.contract).slice(1)} was ${e.type}.`, details: { contract: e.contract } });
+      flag(e.type === "paused" ? "contract_paused" : "contract_unpaused", e.type === "paused" ? "warn" : "info", `${thing(e.contract)} was ${e.type}`);
+    } else if (e.type === "upgraded") {
+      actions.push({ type: "upgrade", text: `${thing(e.contract)[0].toUpperCase()}${thing(e.contract).slice(1)} was pointed at new code (${short(e.implementation)}).`, details: { contract: e.contract, implementation: e.implementation } });
+      flag("code_changed", "warn", `The code behind ${thing(e.contract)} was replaced`);
+    } else if (e.type === "role") {
+      actions.push({ type: "role", text: `${cap(label(e.account))} was given a role on ${thing(e.contract)}.`, details: { contract: e.contract, account: e.account, role: e.role } });
+      flag("role_granted", "info", `${label(e.account)} was given a role on ${thing(e.contract)}`);
+    }
+  }
+
+  // The function that was called: the explorer's reading when the contract's code is published, else a common name.
+  const method = methodOf(tx.input, seen?.decoded_input?.method_call ?? null);
+  const called = method?.name ? `${method.name}()` : null;
+  if (tx.value > 0n && !routedTrade && !swapped && !pooledBuy) {
+    actions.unshift({
+      type: "eth",
+      text: `${label(tx.from)} sent ${fmt(formatEther(tx.value))} ETH (~$${usd(Number(formatEther(tx.value)) * eth)}) to ${tx.to ? label(tx.to) : "a new contract"}.`,
+      details: { from: sender, to: tx.to?.toLowerCase() ?? null, eth: Number(formatEther(tx.value)) },
+    });
+  }
+  if (!actions.length) {
+    actions.push({
+      type: "call",
+      text: `${label(tx.from)} called ${called ? `${called} on ` : ""}${tx.to ? label(tx.to) : "a new contract"} with no token or ETH movement.`,
+      details: { method: method?.name ?? null },
+    });
+  }
+  if (method?.changesSettings && !failed && tx.to) {
+    flag("settings_call", "info", `This transaction called ${called} on ${thing(tx.to.toLowerCase())}, a function that changes how a contract behaves or who controls it`);
+  }
 
   // On Base the fee also covers posting the transaction to Ethereum (l1Fee).
   const feeWei = receipt.gasUsed * (receipt.effectiveGasPrice ?? 0n) + (receipt.l1Fee ?? 0n);
-  const failed = receipt.status !== "success";
   // Keep the summary readable: many buys of one token in a single tx (a bundled launch) become one line.
   const lines = [];
   const buysByToken = new Map();
-  for (const a of actions) if (a.type === "buy" && a.token) buysByToken.set(a.token, [...(buysByToken.get(a.token) ?? []), a]);
+  for (const a of actions) if (a.type === "buy" && a.token && a.details?.venue === "curve") buysByToken.set(a.token, [...(buysByToken.get(a.token) ?? []), a]);
   const bundled = new Set([...buysByToken].filter(([, list]) => list.length > 3).map(([t]) => t));
   for (const a of actions) {
-    if (a.type === "buy" && bundled.has(a.token)) {
+    if (a.type === "buy" && a.details?.venue === "curve" && bundled.has(a.token)) {
       if (a !== buysByToken.get(a.token)[0]) continue;
       const list = buysByToken.get(a.token);
       const ethTotal = logs
@@ -271,12 +458,21 @@ async function explain(tx, receipt, chain = CHAINS.robinhood) {
     if (a.type === "transfer" && bundled.has(a.token)) continue;
     lines.push(a.text);
   }
-  const summary = failed ? `This transaction failed and changed nothing. ${actions[0].text}` : lines.join(" ");
+  if (bundled.size) flag("bundled_buy", "warn", "Several wallets bought the same token in this one transaction, which one sender arranged");
+  if (actions.some((a) => a.type === "launch")) flag("token_launch", "info", "A token was launched in this transaction");
+  // Why it failed, when the explorer could tell.
+  const reverted = failed ? (typeof seen?.revert_reason === "string" ? seen.revert_reason : (seen?.revert_reason?.raw ?? seen?.revert_reason?.method_call ?? null)) : null;
+  const revertReason = reverted ? String(reverted).slice(0, 200) : null;
+  if (failed) flag("failed", "info", `This transaction failed${revertReason ? ` with "${revertReason}"` : ""} and changed nothing`);
+  const summary = failed ? `This transaction failed and changed nothing${revertReason ? ` (it said: "${revertReason}")` : ""}. ${actions[0].text}` : lines.join(" ");
   return {
     hash: tx.hash,
     chain: chain.name,
     status: failed ? "failed" : "success",
     summary,
+    flags,
+    method: method && { name: method.name, signature: method.signature && method.signature.slice(0, 300), selector: method.selector, source: method.source },
+    ...(failed ? { revertReason } : {}),
     actions,
     from: tx.from.toLowerCase(),
     to: tx.to?.toLowerCase() ?? null,
@@ -286,6 +482,8 @@ async function explain(tx, receipt, chain = CHAINS.robinhood) {
     time: new Date(Number(block.timestamp) * 1000).toISOString(),
     block: Number(receipt.blockNumber),
     transfers,
+    // ETH moved inside the transaction, from the explorer; null when it couldn't be read.
+    ethMoves: ethMoves && ethMoves.slice(0, 20),
     contracts: [...named].map(([address, name]) => ({ address, name })),
     explorer: `${chain.explorer}/tx/${tx.hash}`,
   };
