@@ -6,14 +6,14 @@ build-backend = "hatchling.build"
 # It holds no code: installing it installs `autonomo`, and you still `from autonomo import Autonomo`.
 [project]
 name = "autonomo-sdk"
-version = "0.1.1"
+version = "0.1.2"
 description = "Another name for the Autonomo Python SDK (pip install autonomo): one call for AI agents to find, pay for and get a receipt from paid APIs on Autonomo."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [{ name = "Autonomo" }]
 keywords = ["x402", "autonomo", "ai-agents", "robinhood-chain", "usdg", "payments"]
-dependencies = ["autonomo>=0.1.2"]
+dependencies = ["autonomo>=0.1.3"]
 
 [project.urls]
 Homepage = "https://autonomo.fun"

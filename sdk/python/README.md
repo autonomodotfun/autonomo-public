@@ -51,8 +51,8 @@ and ETH on Robinhood Chain, and USDC on Base. It only reads.
 Autonomo(
     private_key=...,
     pay_with="auto",                                  # or "usdg" / "autonomo" / "usdc" (USDC on Base)
-    per_call={"usdg": "0.05", "autonomo": "5000"},    # the defaults
-    daily={"usdg": "1", "autonomo": "10000"},         # per UTC day; Gloam and Borro count as USDG
+    per_call={"usdg": "0.5", "autonomo": "5000"},     # the defaults
+    daily={"usdg": "5", "autonomo": "10000"},         # per UTC day; Gloam and Borro count as USDG
 )
 ```
 

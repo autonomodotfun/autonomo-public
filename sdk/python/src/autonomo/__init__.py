@@ -35,7 +35,7 @@ import httpx
 from eth_account import Account
 from eth_utils import to_checksum_address
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 __all__ = ["Autonomo", "AutonomoError", "Api", "Receipt", "CallResult", "MemoryStore", "FileStore", "rank_apis", "find_transactions", "check_borrow"]
 
 NETWORK = "eip155:4663"
@@ -71,8 +71,8 @@ TOKENS = {
     "autonomo": Token("autonomo", "AUTONOMO", "0xe83c85e1ead16fcfe85401e2b337fb4fb5b5cc96", 18),
     "usdc": Token("usdc", "USDC", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6, BASE_NETWORK, BASE_CHAIN_ID, BASE_EXPLORER, "Base"),
 }
-DEFAULT_PER_CALL = {"usdg": "0.05", "autonomo": "5000"}
-DEFAULT_DAILY = {"usdg": "1", "autonomo": "10000"}
+DEFAULT_PER_CALL = {"usdg": "0.5", "autonomo": "5000"}
+DEFAULT_DAILY = {"usdg": "5", "autonomo": "10000"}
 LIMITS = ("usdg", "autonomo")  # USDC on Base is held to the USDG (dollar) limits
 
 

@@ -32,7 +32,7 @@ const PAY = `npx autonomo-sdk risk ${TOKEN_EXAMPLE}`;
 
 const PAY_OUTPUT = `Risk Checker costs 0.01 USDG or 100 AUTONOMO or 0.01 USDC on Base. Pay from 0x…? [y/N] y
 { "token": "0x86b5…", "risk": { "level": "low", … }, … }
-Paid 0.01 USDG to Risk Checker. Today: 0.01 of 1 USDG and USDC.
+Paid 0.01 USDG to Risk Checker. Today: 0.01 of 5 USDG and USDC.
 https://robinhoodchain.blockscout.com/tx/0x…`;
 
 export default function QuickstartPage() {
@@ -110,8 +110,8 @@ export default function QuickstartPage() {
             can send. It costs only gas, and its profile is public. This is Oak&apos;s rule, not Autonomo&apos;s.
           </li>
           <li>
-            <b>Send the top-up.</b> It asks only for the paying wallet&apos;s address, never its key, and suggests about a
-            day&apos;s spend: 1 USDG at the default limits. It never refills the wallet on its own.
+            <b>Send the top-up.</b> It asks only for the paying wallet&apos;s address, never its key, and suggests a small
+            amount, about 1 USDG. It never refills the wallet on its own.
           </li>
         </ul>
         <p>
@@ -130,7 +130,7 @@ export default function QuickstartPage() {
         <p>It shows the price and asks before paying. Then it prints the answer and a receipt:</p>
         <Code code={PAY_OUTPUT} lang="output" />
         <p>
-          A call stops before anything is signed if it costs more than 0.05 USDG or USDC, or would take the day past 1
+          A call stops before anything is signed if it costs more than 0.5 USDG or USDC, or would take the day past 5
           in the two together. If
           an API fails, the payment doesn&apos;t settle, so you aren&apos;t charged. Both limits can be changed: see{" "}
           <Link href="/docs/cli#limits">Limits</Link>.

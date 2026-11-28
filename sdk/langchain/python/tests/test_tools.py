@@ -95,7 +95,7 @@ def test_call_pays_and_returns_answer_and_receipt():
 
 
 def test_over_the_per_call_cap_is_told_to_the_model_and_not_signed():
-    http, sent = _fake(price="100000")  # 0.10 USDG, above the default 0.05 cap
+    http, sent = _fake(price="600000")  # 0.60 USDG, above the default 0.5 cap
     kit = AutonomoToolkit(_client(http))
     msg = _tools(kit)["autonomo_call_api"].invoke({"type": "tool_call", "id": "c1", "name": "autonomo_call_api", "args": {"query": "newest launches"}})
     assert isinstance(msg, ToolMessage) and msg.status == "error"

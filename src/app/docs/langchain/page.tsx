@@ -117,8 +117,8 @@ export default function LangChainGuidePage() {
       <Section title="Limits">
         <Table
           rows={[
-            ["Per call", <>The most one call may cost. Default 0.05 USDG or USDC, or 5,000 {TOKEN.symbol}</>],
-            ["Per day", <>Per UTC day, shared with the SDK in <code>~/.autonomo/spend.json</code>. Default 1 in USDG and USDC together, or 10,000 {TOKEN.symbol}</>],
+            ["Per call", <>The most one call may cost. Default 0.5 USDG or USDC, or 5,000 {TOKEN.symbol}</>],
+            ["Per day", <>Per UTC day, shared with the SDK in <code>~/.autonomo/spend.json</code>. Default 5 in USDG and USDC together, or 10,000 {TOKEN.symbol}</>],
             [<><code>max_calls</code> / <code>maxCalls</code></>, "Paid calls through one toolkit, then the tool stops. Default 10; None or null for no limit"],
             [<><code>max_output_chars</code> / <code>maxOutputChars</code></>, "Longer answers are cut before they reach the model. Default 20,000 characters"],
           ]}

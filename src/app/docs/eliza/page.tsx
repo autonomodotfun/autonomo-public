@@ -123,9 +123,9 @@ export default function ElizaGuidePage() {
           rows={[
             ["AUTONOMO_WALLET_KEY", "The agent wallet's private key. Without it, the free actions only"],
             ["AUTONOMO_PAY_WITH", `usdg, autonomo, usdc (on Base), or auto: USDG first, then ${TOKEN.symbol}, then USDC on Base. Default auto`],
-            ["AUTONOMO_MAX_USDG_PER_CALL", "The most one call may cost in USDG or USDC. Default 0.05"],
+            ["AUTONOMO_MAX_USDG_PER_CALL", "The most one call may cost in USDG or USDC. Default 0.5"],
             ["AUTONOMO_MAX_AUTONOMO_PER_CALL", `The most one call may cost in ${TOKEN.symbol}. Default 5000`],
-            ["AUTONOMO_DAILY_USDG", "The most to spend per UTC day in USDG and USDC together. Default 1"],
+            ["AUTONOMO_DAILY_USDG", "The most to spend per UTC day in USDG and USDC together. Default 5"],
             ["AUTONOMO_DAILY_AUTONOMO", `The most to spend per UTC day in ${TOKEN.symbol}. Default 10000`],
             ["AUTONOMO_BORRO_ACCOUNT", "A Borro credit line to borrow from when the wallet is short of USDG"],
             ["AUTONOMO_MAX_OUTPUT_CHARS", "Longer answers are cut before they reach the model or the chat. Default 8000"],

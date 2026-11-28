@@ -170,7 +170,7 @@ def _fake(accepts, on_paid=None):
 
 
 def test_refuses_over_the_per_call_cap_before_signing():
-    client, sent = _fake([_exact(USDG, "100000", {"name": "Global Dollar", "version": "1"})])  # 0.10 USDG
+    client, sent = _fake([_exact(USDG, "600000", {"name": "Global Dollar", "version": "1"})])  # 0.60 USDG
     a = Autonomo(private_key=KEY, pay_with="usdg", http=client, spend_store=MemoryStore())
     with pytest.raises(AutonomoError) as e:
         a.call("newest launches")
@@ -180,7 +180,7 @@ def test_refuses_over_the_per_call_cap_before_signing():
 
 def test_refuses_when_todays_budget_is_used():
     store = MemoryStore()
-    store.add(datetime.now(timezone.utc).strftime("%Y-%m-%d"), "usdg", 995_000)
+    store.add(datetime.now(timezone.utc).strftime("%Y-%m-%d"), "usdg", 4_995_000)
     client, _ = _fake([_exact(USDG, "10000", {"name": "Global Dollar", "version": "1"})])
     a = Autonomo(private_key=KEY, pay_with="usdg", http=client, spend_store=store)
     with pytest.raises(AutonomoError) as e:
@@ -299,7 +299,7 @@ def test_pays_with_usdc_on_base_signed_for_base():
     r = result.receipt
     assert (r.route, r.token, r.amount) == ("usdc", "USDC", "0.01")
     assert r.explorer.startswith("https://basescan.org/tx/0x")
-    assert r.spent_today == "0.01 of 1 USDG and USDC"
+    assert r.spent_today == "0.01 of 5 USDG and USDC"
     assert store.get(_today())["usdc"] == 10_000
 
 
@@ -326,7 +326,7 @@ def test_auto_still_prefers_usdg():
 
 def test_usdc_on_base_shares_the_dollar_budget():
     store = MemoryStore()
-    store.add(_today(), "usdg", 995_000)
+    store.add(_today(), "usdg", 4_995_000)
     client, sent = _fake([_usdc()])
     a = Autonomo(private_key=KEY, pay_with="usdc", http=client, spend_store=store)
     a._base_balance = lambda token, owner: 50_000
@@ -337,7 +337,7 @@ def test_usdc_on_base_shares_the_dollar_budget():
 
 
 def test_usdc_on_base_is_held_to_the_dollar_cap():
-    client, sent = _fake([_usdc("100000")])
+    client, sent = _fake([_usdc("600000")])
     a = Autonomo(private_key=KEY, pay_with="usdc", http=client, spend_store=MemoryStore())
     a._base_balance = lambda token, owner: 10**9
     with pytest.raises(AutonomoError) as e:

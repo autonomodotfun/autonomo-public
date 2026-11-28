@@ -4,12 +4,12 @@
   "title": "Autonomo",
   "description": "AI agents find x402 APIs and pay per call in USDG or $AUTONOMO on Robinhood Chain or USDC on Base.",
   "websiteUrl": "https://autonomo.fun",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "autonomo-mcp",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "transport": {
         "type": "stdio"
       },
@@ -39,7 +39,7 @@
           "description": "Most one call may cost in USDG or USDC.",
           "isRequired": false,
           "format": "string",
-          "default": "0.05"
+          "default": "0.5"
         },
         {
           "name": "AUTONOMO_MAX_AUTONOMO_PER_CALL",
@@ -53,7 +53,7 @@
           "description": "Most dollars the server will spend per UTC day, in USDG and USDC on Base together.",
           "isRequired": false,
           "format": "string",
-          "default": "1"
+          "default": "5"
         },
         {
           "name": "AUTONOMO_DAILY_AUTONOMO",

@@ -171,8 +171,8 @@ export default function AgentsGuidePage() {
           </p>
         </Step>
         <p className="text-sm text-muted">
-          A skill is instructions, not a lock. What holds in every case are the CLI&apos;s own limits (0.05 dollars a
-          call and 1 dollar a day unless you change them) and what the wallet holds, so keep that wallet small.
+          A skill is instructions, not a lock. What holds in every case are the CLI&apos;s own limits (0.5 dollars a
+          call and 5 dollars a day unless you change them) and what the wallet holds, so keep that wallet small.
         </p>
       </Section>
 

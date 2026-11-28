@@ -10,7 +10,7 @@ import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { Autonomo, AutonomoError, type Api, type AutonomoOptions } from "autonomo-sdk";
 import { z } from "zod";
 
-export const VERSION = "0.1.1";
+export const VERSION = "0.1.2";
 
 const DEFAULT_MAX_CALLS = 10;
 const DEFAULT_MAX_OUTPUT_CHARS = 20_000;

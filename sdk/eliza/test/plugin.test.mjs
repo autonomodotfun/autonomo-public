@@ -214,7 +214,7 @@ test("1.x: it still works when the model fails", async () => {
 });
 
 test("over the per-call cap: the agent is told why, and nothing is signed", async () => {
-  const f = fakeFetch({ price: "100000" }); // 0.10 USDG, above the default 0.05 cap
+  const f = fakeFetch({ price: "600000" }); // 0.60 USDG, above the default 0.5 cap
   const { result } = await planned(plugin(f), "AUTONOMO_CALL_API", fakeRuntime(WALLET), { query: "newest launches" });
   assert.equal(result.success, false);
   assert.equal(result.data.error, "cannot_pay");

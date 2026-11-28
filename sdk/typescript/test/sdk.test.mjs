@@ -129,7 +129,7 @@ function fakeFetch({ accepts }) {
 const exact = (asset, amount, extra = {}) => ({ scheme: "exact", network: "eip155:4663", asset, amount, payTo: PAY_TO, maxTimeoutSeconds: 300, extra });
 
 test("refuses before signing when the price is over the per-call cap", async () => {
-  const f = fakeFetch({ accepts: [exact(USDG, "100000", { name: "Global Dollar", version: "1" })] }); // 0.10 USDG
+  const f = fakeFetch({ accepts: [exact(USDG, "600000", { name: "Global Dollar", version: "1" })] }); // 0.60 USDG
   const a = new Autonomo({ privateKey: KEY, payWith: "usdg", fetch: f, spendStore: memoryStore() });
   await assert.rejects(a.call("newest launches"), (e) => e instanceof AutonomoError && e.code === "cannot_pay" && /per-call cap/.test(e.message));
   assert.ok(f.calls.every((c) => !c.headers["PAYMENT-SIGNATURE"]), "nothing was signed or sent");
@@ -137,7 +137,7 @@ test("refuses before signing when the price is over the per-call cap", async () 
 
 test("refuses before signing when today's budget is used up", async () => {
   const store = memoryStore();
-  store.add(new Date().toISOString().slice(0, 10), "usdg", 995_000n); // 0.995 of 1 USDG
+  store.add(new Date().toISOString().slice(0, 10), "usdg", 4_995_000n); // 4.995 of 5 USDG
   const f = fakeFetch({ accepts: [exact(USDG, "10000", { name: "Global Dollar", version: "1" })] });
   const a = new Autonomo({ privateKey: KEY, payWith: "usdg", fetch: f, spendStore: store });
   await assert.rejects(a.call("newest launches"), (e) => e.code === "cannot_pay" && /budget/.test(e.message));
@@ -250,7 +250,7 @@ test("pays with USDC on Base when asked, signed for Base, with a Basescan receip
   assert.equal(receipt.token, "USDC");
   assert.equal(receipt.amount, "0.01");
   assert.match(receipt.explorer, /^https:\/\/basescan\.org\/tx\/0x/);
-  assert.equal(receipt.spentToday, "0.01 of 1 USDG and USDC");
+  assert.equal(receipt.spentToday, "0.01 of 5 USDG and USDC");
   assert.equal(store.get(new Date().toISOString().slice(0, 10)).usdc, 10_000n);
 });
 
@@ -277,7 +277,7 @@ test("auto still pays USDG first when the wallet holds it", async () => {
 
 test("USDC on Base shares the dollar budget with USDG", async () => {
   const store = memoryStore();
-  store.add(new Date().toISOString().slice(0, 10), "usdg", 995_000n); // 0.995 of the 1 dollar budget spent in USDG
+  store.add(new Date().toISOString().slice(0, 10), "usdg", 4_995_000n); // 4.995 of the 5 dollar budget spent in USDG
   const f = chainFetch({ accepts: [usdcOffer()], balances: { "https://base.test/": { [USDC_BASE.toLowerCase()]: 50_000n } } });
   await assert.rejects(
     withGlobalFetch(f, () => client(f, { payWith: "usdc", store }).call("newest launches", { slug: "new-launches" })),
@@ -287,7 +287,7 @@ test("USDC on Base shares the dollar budget with USDG", async () => {
 });
 
 test("USDC on Base is held to the dollar per-call cap", async () => {
-  const f = chainFetch({ accepts: [usdcOffer("100000")], balances: { "https://base.test/": { [USDC_BASE.toLowerCase()]: 500_000n } } }); // 0.10 USDC
+  const f = chainFetch({ accepts: [usdcOffer("600000")], balances: { "https://base.test/": { [USDC_BASE.toLowerCase()]: 5_000_000n } } }); // 0.60 USDC
   await assert.rejects(
     withGlobalFetch(f, () => client(f, { payWith: "usdc" }).call("newest launches", { slug: "new-launches" })),
     (e) => e.code === "cannot_pay" && /per-call cap/.test(e.message),

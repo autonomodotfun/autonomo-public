@@ -13,7 +13,7 @@
 import type { Action, ActionResult, HandlerCallback, IAgentRuntime, Memory, Plugin } from "@elizaos/core";
 import { Autonomo, AutonomoError, rankApis, type Api, type AutonomoOptions, type Receipt, type TokenName } from "autonomo-sdk";
 
-export const VERSION = "0.1.1";
+export const VERSION = "0.1.2";
 
 const DEFAULT_MAX_OUTPUT_CHARS = 8_000;
 const FIND_LIMIT = 10;

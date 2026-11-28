@@ -3,6 +3,14 @@
 What shipped on [autonomo.fun](https://autonomo.fun), newest first. Development happens in a private repo; this
 repo gets a copy of each release.
 
+## November 28, 2026
+
+- **Higher default spending limits.** The SDK, the CLI, the MCP server and the LangChain and elizaOS plugins now pay
+  up to 0.5 dollars a call and 5 dollars a day in USDG and USDC unless you set your own limits (the defaults were
+  0.05 and 1). The $AUTONOMO limits stay at 5,000 a call and 10,000 a day, and every limit can still be set lower or
+  higher. An agent that already sets its limits is not affected. Versions: `autonomo-sdk` 0.1.5 on npm, `autonomo`
+  0.1.3 on PyPI, `autonomo-mcp` 0.1.4, `langchain-autonomo` 0.1.2 and `elizaos-plugin-autonomo` 0.1.2.
+
 ## November 27, 2026
 
 - **A more careful mirror burn.** The daily run now states the total of Base payments from our own records only, and

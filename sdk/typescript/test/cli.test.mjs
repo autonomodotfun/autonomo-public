@@ -181,13 +181,13 @@ test("spend shows today's total against the limits", async () => {
   assert.equal(await c.run("spend", "--daily", "2", "--json"), EXIT.ok);
   const r = JSON.parse(c.out[0]);
   // USDG and USDC on Base share the dollar limits.
-  assert.deepEqual(r.usdg, { spent: "0.03", daily: "2", perCall: "0.05" });
+  assert.deepEqual(r.usdg, { spent: "0.03", daily: "2", perCall: "0.5" });
   assert.deepEqual(r.spentByToken, { usdg: "0.02", usdcBase: "0.01", autonomo: "0" });
   assert.deepEqual(r.autonomo, { spent: "0", daily: "10000", perCall: "5000" });
   assert.match(r.wallet, /^0x[0-9a-fA-F]{40}$/);
   const t = cli({ store });
   assert.equal(await t.run("spend"), EXIT.ok);
-  assert.match(t.out.join("\n"), /Dollars {3}0\.03 of 1 spent \(USDG 0\.02, USDC on Base 0\.01\), up to 0\.05 a call[\s\S]*none set/);
+  assert.match(t.out.join("\n"), /Dollars {3}0\.03 of 5 spent \(USDG 0\.02, USDC on Base 0\.01\), up to 0\.5 a call[\s\S]*none set/);
   assert.equal(t.calls.length, 0);
 });
 
@@ -211,7 +211,7 @@ test("--private pays through Gloam with no wallet key, counts it, and stops Gloa
   assert.deepEqual(g.state.asked, [{ url: `https://autonomo.fun/x/token-risk/risk/${ADDR}`, maxAmount: 0.011928, prefer: "gloam-cashout" }]);
   assert.deepEqual(JSON.parse(c.out[0]), { risk: "low" });
   assert.match(c.err.join("\n"), /Paying privately through Gloam/);
-  assert.match(c.err.join("\n"), /Paid 0\.010928 USDG privately through Gloam to Risk Checker\. Today: 0\.010928 of 1 USDG and USDC./);
+  assert.match(c.err.join("\n"), /Paid 0\.010928 USDG privately through Gloam to Risk Checker\. Today: 0\.010928 of 5 USDG and USDC./);
   assert.match(c.err.join("\n"), new RegExp(`/tx/${TX}`));
   assert.equal(c.paid(), false); // The wallet signed nothing.
   assert.equal(await spentToday(c), 10928n);

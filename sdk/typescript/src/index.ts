@@ -32,7 +32,7 @@ import {
 } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 
-export const VERSION = "0.1.4";
+export const VERSION = "0.1.5";
 
 const NETWORK = "eip155:4663";
 const CHAIN_ID = 4663;
@@ -55,14 +55,14 @@ export const TOKENS: Record<TokenName, Token> = {
 };
 const limitOf = (t: TokenName): LimitName => (t === "autonomo" ? "autonomo" : "usdg");
 export const DEFAULT_LIMITS = {
-  perCall: { usdg: "0.05", autonomo: "5000" },
-  daily: { usdg: "1", autonomo: "10000" },
+  perCall: { usdg: "0.5", autonomo: "5000" },
+  daily: { usdg: "5", autonomo: "10000" },
 };
 
 // ---------- Public types ----------
 
 export type Limits = {
-  /** Most to pay for one call, in whole tokens, e.g. { usdg: "0.05" }. The usdg limit covers USDC on Base too. */
+  /** Most to pay for one call, in whole tokens, e.g. { usdg: "0.5" }. The usdg limit covers USDC on Base too. */
   perCall?: Partial<Record<LimitName, string>>;
   /** Most to spend per UTC day, in whole tokens. USDC on Base, Gloam and Borro payments count against the usdg limit. */
   daily?: Partial<Record<LimitName, string>>;

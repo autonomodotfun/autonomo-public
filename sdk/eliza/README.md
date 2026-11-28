@@ -47,9 +47,9 @@ All optional. Set them in the character's secrets or settings, or in the environ
 | --- | --- | --- |
 | `AUTONOMO_WALLET_KEY` | The agent wallet's private key | none: free actions only |
 | `AUTONOMO_PAY_WITH` | `usdg`, `autonomo`, `usdc` (on Base), or `auto` (USDG first, then $AUTONOMO, then USDC on Base) | `auto` |
-| `AUTONOMO_MAX_USDG_PER_CALL` | The most one call may cost in USDG or USDC | `0.05` |
+| `AUTONOMO_MAX_USDG_PER_CALL` | The most one call may cost in USDG or USDC | `0.5` |
 | `AUTONOMO_MAX_AUTONOMO_PER_CALL` | The most one call may cost in $AUTONOMO | `5000` |
-| `AUTONOMO_DAILY_USDG` | The most to spend per UTC day in USDG and USDC together | `1` |
+| `AUTONOMO_DAILY_USDG` | The most to spend per UTC day in USDG and USDC together | `5` |
 | `AUTONOMO_DAILY_AUTONOMO` | The most to spend per UTC day in $AUTONOMO | `10000` |
 | `AUTONOMO_BORRO_ACCOUNT` | A [Borro](https://borro.markets) credit line to borrow from when the wallet is short of USDG | none |
 | `AUTONOMO_MAX_OUTPUT_CHARS` | Longer answers are cut before they reach the model or the chat | `8000` |

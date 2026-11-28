@@ -20,7 +20,7 @@ import { ExactEvmScheme } from "@x402/evm/exact/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { z } from "zod";
 
-const VERSION = "0.1.3";
+const VERSION = "0.1.4";
 const BASE = (process.env.AUTONOMO_BASE_URL || "https://autonomo.fun").replace(/\/+$/, "");
 const NETWORK = "eip155:4663";
 const RPC = process.env.AUTONOMO_RPC_URL || "https://rpc.mainnet.chain.robinhood.com";
@@ -39,8 +39,8 @@ function amountEnv(name, fallback, decimals) {
   console.error(`${name} should be a number such as ${fallback}; using ${fallback}.`);
   return parseUnits(fallback, decimals);
 }
-const USD_DAILY = amountEnv("AUTONOMO_DAILY_USDG", "1", 6);
-const USD_CAP = amountEnv("AUTONOMO_MAX_USDG_PER_CALL", "0.05", 6);
+const USD_DAILY = amountEnv("AUTONOMO_DAILY_USDG", "5", 6);
+const USD_CAP = amountEnv("AUTONOMO_MAX_USDG_PER_CALL", "0.5", 6);
 const TOKENS = {
   usdg: {
     symbol: "USDG",

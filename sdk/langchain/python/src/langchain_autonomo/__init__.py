@@ -19,7 +19,7 @@ from langchain_core.tools import BaseTool, BaseToolkit, ToolException
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 __all__ = ["AutonomoToolkit", "FindApisTool", "GetPriceTool", "CallApiTool"]
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 DEFAULT_MAX_CALLS = 10
 DEFAULT_MAX_OUTPUT_CHARS = 20_000

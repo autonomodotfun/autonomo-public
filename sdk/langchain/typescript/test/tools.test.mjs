@@ -103,7 +103,7 @@ test("a call pays and returns the answer and a receipt", async () => {
 });
 
 test("over the per-call cap: the model is told why, and nothing is signed", async () => {
-  const f = fakeFetch({ price: "100000" }); // 0.10 USDG, above the default 0.05 cap
+  const f = fakeFetch({ price: "600000" }); // 0.60 USDG, above the default 0.5 cap
   const kit = new AutonomoToolkit({ client: client(f) });
   const out = await run(byName(kit).autonomo_call_api, { query: "newest launches" });
   assert.equal(out.error, "cannot_pay");

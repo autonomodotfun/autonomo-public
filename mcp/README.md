@@ -85,9 +85,9 @@ env = { AUTONOMO_WALLET_KEY = "0xYOUR_AGENT_WALLET_KEY" }
 | --- | --- | --- |
 | `AUTONOMO_WALLET_KEY` | none | Private key of the agent's wallet. Needed only for `call_api`. |
 | `AUTONOMO_PAY_WITH` | `auto` | The token used when the agent doesn't say. `auto` pays with the first the wallet can afford: USDG, then $AUTONOMO, then USDC on Base. Or name one: `usdg`, `autonomo`, or `usdc` for Base. |
-| `AUTONOMO_MAX_USDG_PER_CALL` | `0.05` | Most one call may cost in USDG or USDC. |
+| `AUTONOMO_MAX_USDG_PER_CALL` | `0.5` | Most one call may cost in USDG or USDC. |
 | `AUTONOMO_MAX_AUTONOMO_PER_CALL` | `5000` | Most one call may cost in $AUTONOMO. |
-| `AUTONOMO_DAILY_USDG` | `1` | Most dollars the server will spend per UTC day, in USDG and USDC on Base together. |
+| `AUTONOMO_DAILY_USDG` | `5` | Most dollars the server will spend per UTC day, in USDG and USDC on Base together. |
 | `AUTONOMO_DAILY_AUTONOMO` | `10000` | Most $AUTONOMO the server will spend per UTC day. |
 | `AUTONOMO_RPC_URL` | Robinhood Chain's public RPC | Another Robinhood Chain RPC. |
 | `AUTONOMO_BASE_RPC_URL` | `https://mainnet.base.org` | Another Base RPC, for USDC balances. |
@@ -96,7 +96,7 @@ env = { AUTONOMO_WALLET_KEY = "0xYOUR_AGENT_WALLET_KEY" }
 ## Safety
 
 - It only pays Autonomo gateways (`autonomo.fun/x/...`), and only in USDG or $AUTONOMO on Robinhood Chain, or USDC on Base.
-- Each call is capped at 0.05 USDG or USDC, or 5,000 $AUTONOMO, whatever the API asks, unless you change the caps
+- Each call is capped at 0.5 USDG or USDC, or 5,000 $AUTONOMO, whatever the API asks, unless you change the caps
   above. USDG and USDC share one daily dollar budget.
 - It signs only what it checked: the same token, amount and payee as in the price it read. If the API's price or
   payee changes in between, nothing is signed.

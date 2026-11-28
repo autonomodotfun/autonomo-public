@@ -39,8 +39,8 @@ Without a wallet key, `get_tools()` gives only the two free tools.
 ```python
 AutonomoToolkit(
     private_key=...,
-    per_call={"usdg": "0.05", "autonomo": "5000"},   # the most one call may cost (the defaults)
-    daily={"usdg": "1", "autonomo": "10000"},        # per UTC day, kept in ~/.autonomo/spend.json
+    per_call={"usdg": "0.5", "autonomo": "5000"},    # the most one call may cost (the defaults)
+    daily={"usdg": "5", "autonomo": "10000"},        # per UTC day, kept in ~/.autonomo/spend.json
     max_calls=10,                                    # paid calls through this toolkit, then it stops (None: no limit)
     max_output_chars=20_000,                         # longer answers are cut before they reach the model
 )

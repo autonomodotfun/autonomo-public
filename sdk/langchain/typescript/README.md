@@ -39,8 +39,8 @@ Without a wallet key, `getTools()` gives only the two free tools.
 new AutonomoToolkit({
   privateKey: "0x…",
   limits: {
-    perCall: { usdg: "0.05", autonomo: "5000" },   // the most one call may cost (the defaults)
-    daily: { usdg: "1", autonomo: "10000" },       // per UTC day, kept in ~/.autonomo/spend.json
+    perCall: { usdg: "0.5", autonomo: "5000" },    // the most one call may cost (the defaults)
+    daily: { usdg: "5", autonomo: "10000" },       // per UTC day, kept in ~/.autonomo/spend.json
   },
   maxCalls: 10,             // paid calls through this toolkit, then it stops (null: no limit)
   maxOutputChars: 20_000,   // longer answers are cut before they reach the model

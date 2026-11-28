@@ -30,7 +30,7 @@ const PAY = `npx autonomo-sdk risk ${TOKEN_EXAMPLE}`;
 
 const PAY_OUTPUT = `Risk Checker costs 0.01 USDG or 100 AUTONOMO or 0.01 USDC on Base. Pay from 0x…? [y/N] y
 { "token": "0x86b5…", "risk": { "level": "low", … }, … }
-Paid 0.01 USDG to Risk Checker. Today: 0.01 of 1 USDG and USDC.
+Paid 0.01 USDG to Risk Checker. Today: 0.01 of 5 USDG and USDC.
 https://robinhoodchain.blockscout.com/tx/0x…`;
 
 const CALL = `npx autonomo-sdk call "explain this transaction" 0x…
@@ -47,7 +47,7 @@ const WALLET_OUTPUT = `Wallet 0x…
 
 const PAY_BASE = `npx autonomo-sdk risk ${TOKEN_EXAMPLE} --pay-with usdc`;
 
-const PAY_BASE_OUTPUT = `Paid 0.01 USDC to Risk Checker. Today: 0.02 of 1 USDG and USDC.
+const PAY_BASE_OUTPUT = `Paid 0.01 USDC to Risk Checker. Today: 0.02 of 5 USDG and USDC.
 https://basescan.org/tx/0x…`;
 
 const READ_BASE = `npx autonomo-sdk risk 0x… --chain base
@@ -169,8 +169,8 @@ export default function CliGuidePage() {
             ["--dry-run", "Show the price instead of paying"],
             ["--yes", "Don't ask before paying"],
             ["--json", "One object on stdout: the answer and the receipt"],
-            ["--max <dollars>", "Most to pay for one call, in USDG or USDC. Default 0.05"],
-            ["--daily <dollars>", "Most to spend per UTC day, in USDG and USDC together. Default 1"],
+            ["--max <dollars>", "Most to pay for one call, in USDG or USDC. Default 0.5"],
+            ["--daily <dollars>", "Most to spend per UTC day, in USDG and USDC together. Default 5"],
             ["--max-autonomo, --daily-autonomo", `The same two limits in ${TOKEN.symbol}. Defaults 5,000 and 10,000`],
             ["--pay-with <token>", `usdg, autonomo, usdc or auto. Default: USDG, then ${TOKEN.symbol}, then USDC on Base`],
             ["--chain <chain>", "robinhood or base: the chain an API reads. See Pay on Base"],

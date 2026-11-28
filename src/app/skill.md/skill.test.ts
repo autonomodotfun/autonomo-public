@@ -46,7 +46,7 @@ test("the limits the skill states are the CLI's defaults", () => {
   const [, perCall, perCallToken, daily, dailyToken] =
     sdk.match(/DEFAULT_LIMITS = \{\s*perCall: \{ usdg: "([\d.]+)", autonomo: "(\d+)" \},\s*daily: \{ usdg: "([\d.]+)", autonomo: "(\d+)" \}/) ?? [];
   assert.ok(perCall && perCallToken && daily && dailyToken, "couldn't read DEFAULT_LIMITS from the SDK");
-  assert.ok(body.includes(`${perCall} dollars a call and ${daily} dollar a day`), "the money rules state other dollar defaults");
+  assert.ok(body.includes(`${perCall} dollars a call and ${daily} dollar${daily === "1" ? "" : "s"} a day`), "the money rules state other dollar defaults");
   assert.ok(body.includes(`${perCallToken} a call\n   and ${dailyToken} a day in $AUTONOMO`), "the money rules state other $AUTONOMO defaults");
   for (const value of [perCall, daily, perCallToken, dailyToken]) {
     assert.ok(body.includes(`(default ${value})`), `the options table doesn't state the default ${value}`);

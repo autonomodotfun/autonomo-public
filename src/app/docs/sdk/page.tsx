@@ -352,8 +352,8 @@ export default function SdkGuidePage() {
         <Table
           mono
           rows={[
-            ["perCall / per_call", "Most for one call. Default 0.05 USDG and 5,000 AUTONOMO. The USDG cap covers USDC on Base too"],
-            ["daily", "Most per UTC day. Default 1 USDG and 10,000 AUTONOMO. USDC on Base, Gloam and Borro payments count as USDG"],
+            ["perCall / per_call", "Most for one call. Default 0.5 USDG and 5,000 AUTONOMO. The USDG cap covers USDC on Base too"],
+            ["daily", "Most per UTC day. Default 5 USDG and 10,000 AUTONOMO. USDC on Base, Gloam and Borro payments count as USDG"],
           ]}
         />
         <p>

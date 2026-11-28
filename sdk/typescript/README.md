@@ -110,8 +110,8 @@ new Autonomo({
   privateKey,
   payWith: "auto", // or "usdg" / "autonomo" / "usdc" (USDC on Base)
   limits: {
-    perCall: { usdg: "0.05", autonomo: "5000" }, // the defaults
-    daily: { usdg: "1", autonomo: "10000" }, // per UTC day; Gloam and Borro count as USDG
+    perCall: { usdg: "0.5", autonomo: "5000" }, // the defaults
+    daily: { usdg: "5", autonomo: "10000" }, // per UTC day; Gloam and Borro count as USDG
   },
 });
 ```

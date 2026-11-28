@@ -128,7 +128,7 @@ test("pays with USDC on Base when asked: signed for Base, with a Basescan link",
     assert.equal(await signer(paid[0], "USD Coin", "2", 8453), WALLET);
     assert.deepEqual(r.json.paid, { amount: "0.01", token: "USDC on Base", chain: "Base", from: WALLET, to: PAY_TO });
     assert.match(r.json.tx, /^https:\/\/basescan\.org\/tx\/0x/);
-    assert.equal(r.json.spentToday, "0.01 of 1 dollars (USDG and USDC)");
+    assert.equal(r.json.spentToday, "0.01 of 5 dollars (USDG and USDC)");
     assert.deepEqual(r.json.data, { ok: true });
   });
 });
@@ -169,15 +169,15 @@ test("USDG and USDC on Base share the daily dollar budget and the per-call cap",
     assert.match(second.text, /Daily budget reached: 0\.01 of 0\.015 dollars \(USDG and USDC\)/);
     assert.equal(paid.length, 1);
   });
-  await withServer({ offers: [usdcOffer("60000")], balances: { [USDC.toLowerCase()]: 10n ** 9n } }, async ({ tool, paid }) => {
+  await withServer({ offers: [usdcOffer("600000")], balances: { [USDC.toLowerCase()]: 10n ** 9n } }, async ({ tool, paid }) => {
     const over = await tool("call_api", call("usdc"));
-    assert.match(over.text, /above this server's cap of 0\.05 USDG\/USDC per call/);
+    assert.match(over.text, /above this server's cap of 0\.5 USDG\/USDC per call/);
     assert.equal(paid.length, 0);
   });
   // The cap is a setting.
-  await withServer({ offers: [usdcOffer("60000")], balances: { [USDC.toLowerCase()]: 10n ** 9n }, env: { AUTONOMO_MAX_USDG_PER_CALL: "0.1" } }, async ({ tool, paid }) => {
+  await withServer({ offers: [usdcOffer("600000")], balances: { [USDC.toLowerCase()]: 10n ** 9n }, env: { AUTONOMO_MAX_USDG_PER_CALL: "1" } }, async ({ tool, paid }) => {
     assert.ok(!(await tool("call_api", call("usdc"))).isError);
-    assert.equal(paid[0].accepted.amount, "60000");
+    assert.equal(paid[0].accepted.amount, "600000");
   });
 });
 
@@ -201,8 +201,8 @@ test("wallet_status reads both chains, shows the limits and signs nothing", asyn
     assert.equal(r.json.wallet, WALLET);
     assert.deepEqual(r.json.robinhoodChain, { usdg: "1.25", autonomo: "4500", eth: "0" });
     assert.deepEqual(r.json.base, { usdc: "0.5" });
-    assert.equal(r.json.spentToday.dollars, "0 of 1 (USDG 0, USDC on Base 0)");
-    assert.deepEqual(r.json.perCallCap, { dollars: "0.05", autonomo: "5000" });
+    assert.equal(r.json.spentToday.dollars, "0 of 5 (USDG 0, USDC on Base 0)");
+    assert.deepEqual(r.json.perCallCap, { dollars: "0.5", autonomo: "5000" });
     assert.equal(paid.length, 0);
     assert.ok(rpcMethods.every((m) => ["eth_call", "eth_getBalance", "eth_chainId"].includes(m)), "only reads");
   });

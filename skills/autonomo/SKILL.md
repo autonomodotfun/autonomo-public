@@ -36,7 +36,7 @@ These come first. Follow them every time.
 4. **Never touch the wallet key.** The key is read from `AUTONOMO_WALLET_KEY` in the environment. Do not print it,
    do not write it to a file, do not pass it as a flag, and do not ask the user to paste it into the chat. If it is
    not set, tell the user to set it themselves (see "The wallet" below).
-5. **Keep the limits.** The defaults are 0.05 dollars a call and 1 dollar a day in USDG and USDC, and 5000 a call
+5. **Keep the limits.** The defaults are 0.5 dollars a call and 5 dollars a day in USDG and USDC, and 5000 a call
    and 10000 a day in $AUTONOMO. Raise a limit (`--max`, `--daily`, `--max-autonomo`, `--daily-autonomo`) only to
    a number the user gave you.
 6. **A failed call is not charged.** Do not repeat a paid call in a loop. If a call fails twice, stop and tell the
@@ -136,8 +136,8 @@ one of the codes below.
 |---|---|
 | `--dry-run` | Show the price instead of paying |
 | `--json` | One JSON object on stdout |
-| `--max <dollars>` | Most to pay for one call in USDG or USDC (default 0.05) |
-| `--daily <dollars>` | Most to spend per UTC day in USDG and USDC together (default 1) |
+| `--max <dollars>` | Most to pay for one call in USDG or USDC (default 0.5) |
+| `--daily <dollars>` | Most to spend per UTC day in USDG and USDC together (default 5) |
 | `--max-autonomo <amount>` | Most to pay for one call in $AUTONOMO (default 5000) |
 | `--daily-autonomo <amount>` | Most to spend per UTC day in $AUTONOMO (default 10000) |
 | `--pay-with <token>` | `usdg`, `autonomo`, `usdc` or `auto` |
