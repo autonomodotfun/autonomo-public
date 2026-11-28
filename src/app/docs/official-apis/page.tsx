@@ -25,7 +25,7 @@ const OFFICIAL_APIS: { name: string; slug: string; path: string; about: string }
   { name: "Gas Now", slug: "gas-now", path: "/gas", about: "The current gas price and what it costs in ETH and USD to send ETH, send USDG, buy on a launchpad curve or launch a token, measured from recent transactions" },
   { name: "Endpoint Health", slug: "endpoint-health", path: "/endpoint?url=<https link>", about: "Is an x402 API up and payable right now? One unpaid call reports the answer time and whether its payment request is complete: scheme, network, asset, amount and payee" },
   { name: "Website Check", slug: "website-check", path: "/site?url=<link or domain>", about: "A trust check for a website: domain age and registrar, certificate, where it redirects and whether the name imitates a well-known one, with a caution level" },
-  { name: "Page Reader", slug: "page-reader", path: "/page?url=<https link>", about: "Title, description and readable text of a public web page, plus its links and social accounts, the contract addresses it shows, what it says about team, supply, locks and taxes, and any text hidden from a reader" },
+  { name: "Page Reader", slug: "page-reader", path: "/page?url=<https link>", about: "Title, description and readable text of a public web page, plus its links and social accounts, the contract addresses it shows, what it says about team, supply, locks and taxes, and any text hidden from a reader. Pages built by their own JavaScript are run in a browser first" },
   {
     name: "Tokyo Futuro Job Finder",
     slug: "tokyo-futuro-job-finder",

@@ -17,7 +17,7 @@ All gateways use the same upstream base, `https://tools.autonomo.fun/v1`, and th
 | `gas-now` | `/v1/gas?chain=robinhood\|base` | The gas price now, and what sending ETH, sending USDG, a curve buy and a launch cost in ETH and USD, from what recent real transactions used. With `chain=base`: sending ETH and USDC, a v4 swap and a Clanker launch, each with Base's L1 fee |
 | `endpoint-health` | `/v1/endpoint?url=https://…&method=GET\|POST` | Is an x402 API up and payable right now: one unpaid call, the answer time, and whether each payment option it offers is complete enough to pay. Never pays |
 | `website-check` | `/v1/site?url=https://…` | A trust check for a website: domain age and registrar, certificate, where the site ends up, and whether the name resembles a well-known one, with a caution level |
-| `page-reader` | `/v1/page?url=https://…&expect=<address>` | Title, description and readable text of a public web page, plus its links and social accounts (`links`), the addresses it shows and where (`addresses`), sentences on team, supply, locks, taxes and audits (`mentions`), text hidden from a reader (`hiddenText`), whether it needs JavaScript (`rendering`), and `flags` with fixed codes. With `expect`, whether the page shows that contract address |
+| `page-reader` | `/v1/page?url=https://…&expect=<address>&render=auto\|never` | Title, description and readable text of a public web page, plus its links and social accounts (`links`), the addresses it shows and where (`addresses`), sentences on team, supply, locks, taxes and audits (`mentions`), text hidden from a reader (`hiddenText`), and `flags` with fixed codes. A page built by its own JavaScript is run in a browser and read again (`rendering.rendered`); `render=never` skips that. With `expect`, whether the page shows that contract address |
 | `safe-swap` | `/v1/swap/quote?token_in=<address\|ETH>&token_out=<address\|ETH>&amount_in=<base units>&taker=<wallet>&slippage_bps=100`, then `/v1/swap/build/<quote_id>` | Check a Robinhood Chain token, then swap it. The quote runs Holders & Bundles, Dev Wallet Tracker and the Risk Checker on the token being bought, gets KyberSwap's best route and the route back, and answers a verdict (ok, caution, block) with the price, the minimum out and a `quote_id` valid 60 seconds. The build answers unsigned transactions for that quote (an exact approval when one is missing, then the swap) for the agent to sign. Needs `BLOCKSCOUT_KEY` |
 | `ostrapad-offer-finder` | `/v1/offers?q=<what you need>&max_price=<USDG>&limit=<1-20>` | Matching offers from AI agents for hire on Ostrapad: price, delivery time, who judges the work and each provider's record, as Ostrapad shows them, with a link to each agent's Ostrapad page. Read from Ostrapad's public listings (approved by their provider vaults, records from Ostrapad's contract). An Autonomo API, not an official Ostra one. No match is a 404, so it isn't charged |
 | `tokyo-futuro-job-finder` | `/v1/jobs?q=<the work you're after>&min_reward=<ZENI>&max_reward=<ZENI>&sort=new\|reward&limit=<1-20>` | Open jobs an agent can take on Tokyo Futuro, the job market for AI agents on Robinhood Chain: reward and bond in $ZENI, when each job was posted (from the job board contract), time left, whether a new wallet can take it, and how to take it with Tokyo Futuro's own tools. Read from Tokyo Futuro's public list at most once a minute; rewards are the amounts escrowed on chain, never numbers from job text. Jobs posted by Tokyo Futuro's own Citizens are marked house. Built with Tokyo Futuro. No match is a 404, so it isn't charged |
@@ -71,9 +71,27 @@ All need `x-api-key: <TOOLS_API_KEY>` (open when the variable isn't set, for loc
   through IANA's list (data.iana.org/rdap/dns.json).
 - Page reader safety: https only, no credentials, every hop (redirects included) must resolve to a public address,
   max 3 redirects, 2 MB, 10 s, HTML or plain text only.
-- Page reader, what it reads and what it can't. It doesn't run JavaScript or load stylesheets. A page built in the
-  browser comes back nearly empty, and the answer then says `rendering.needsJavaScript` and adds whatever the page
-  ships as data (`__NEXT_DATA__`, JSON-LD, `<noscript>`) to the text, with `textFrom` naming where it came from.
+- Page reader and pages built by JavaScript (`api/_render.js`). A page that comes back with under 40 readable words
+  and looks like an app (an empty app container, a "switch JavaScript on" note, or three scripts or more) is sent
+  to Cloudflare's Browser Run: one POST to its `/content` endpoint, which loads the page, runs its scripts and
+  returns the finished HTML. That HTML is read by the same code and replaces the first reading when it has more
+  words. The answer then has `rendering.rendered: true`, `renderMs`, `readableWordsBefore` and a
+  `rendered_in_browser` flag. Measured on Nov 28, 2026: two app-only sites went from 8 and 0 readable words to 2,250
+  and 486, in about 6.5 s each; a page that doesn't need it is not sent and answers as fast as before.
+  - **When it doesn't happen.** `rendering.renderNote` says why: `not_set_up` (no account or token), `turned_off`
+    (`render=never`), `busy` (Cloudflare's rate limit), `timeout`, `refused`, `error`, `daily_limit`, or
+    `no_more_text` (the finished page had no more words, which is what a site that turns automated browsers away
+    looks like). The first reading then stands, with `needsJavaScript` and whatever the page ships as data
+    (`__NEXT_DATA__`, JSON-LD, `<noscript>`) added to the text, `textFrom` naming where it came from.
+  - **Set-up.** `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_BROWSER_TOKEN` (an API token with the one permission
+    "Browser Run - Edit"; `CLOUDFLARE_API_KEY` is read too). Without both, nothing is sent anywhere.
+  - **Cost and limits.** Cloudflare bills browser time: on Workers Paid, 10 hours a month, then $0.09 an hour, about
+    $0.0001 a page. The free plan gives 10 minutes a day and 1 request every 10 seconds, too few for two callers at
+    once. The page gets up to 14 s in the browser, and fetching plus rendering stay under 22 s. `PAGE_RENDER_DAILY_MAX`
+    (default 2000) is a soft brake per running copy of the API.
+  - **What leaves us.** The page's address goes to Cloudflare, and nothing about the caller. The page is loaded
+    from Cloudflare's network, and its browser always says it is a bot.
+- Page reader, what it still can't read. It doesn't load stylesheets.
   Content a page streams in (`<div hidden id="S:0">`, as React does) counts as the page's own words. Hidden text is
   what the element itself hides (`hidden`, `display:none`, `visibility:hidden`, `opacity:0`, `font-size:0`, far
   off-screen, or a class such as `sr-only`); it is left out of `text` and reported in `hiddenText`. Closed menus

@@ -160,13 +160,14 @@ export const BAZAAR_LISTINGS: Record<keyof typeof EXAMPLES, Listing> = {
   "page-reader": {
     routeTemplate: "/x/page-reader/page",
     description:
-      "The title, description and readable text of a public web page, without the menus, scripts and markup, plus what a checker needs from a project's page: its links and social accounts, the contract addresses it shows, the sentences about team, supply, locks, taxes and audits, and any text hidden from a reader. It says so when a page is built in the browser and can't be read without running it.",
+      "The title, description and readable text of a public web page, without the menus, scripts and markup, plus what a checker needs from a project's page: its links and social accounts, the contract addresses it shows, the sentences about team, supply, locks, taxes and audits, and any text hidden from a reader. A page built by its own JavaScript is run in a browser first and read as a visitor would see it.",
     tags: ["web", "scraping", "text", "reader", "token-safety"],
     query: { url: "https://example.com" },
     querySchema: {
       properties: {
         url: { ...HTTPS_URL, description: "The page address" },
         expect: { ...ADDRESS, description: "Optional. A contract address: the answer says whether the page shows it, and where" },
+        render: { type: "string", enum: ["auto", "never"], description: "Optional. auto (the default) runs a page in a browser when it needs JavaScript; never reads it only as it was sent, which is faster" },
       },
       required: ["url"],
     },

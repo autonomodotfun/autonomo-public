@@ -5,6 +5,12 @@ repo gets a copy of each release.
 
 ## November 28, 2026
 
+- **Page Reader reads pages built by JavaScript.** Many project sites send an almost empty page and build the rest
+  in the browser, so the reader used to get a handful of words from them. It now runs such a page in a browser
+  first and reads the finished page: its text, links, social accounts and the contract addresses it shows. Two
+  app-only sites we tried went from 8 and 0 readable words to 2,250 and 486. The answer says when this happened
+  (`rendering.rendered`), a page that doesn't need it answers as fast as before, and `render=never` turns it off. A
+  site that turns automated browsers away still can't be read, and the answer says so.
 - **Three official APIs read much more, for anyone checking a token.** Nothing was renamed or removed: every answer
   has what it had, with more around it.
   - **Page Reader** now returns a page's links and social accounts, the contract addresses it shows and where, and
