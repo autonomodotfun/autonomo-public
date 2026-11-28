@@ -27,6 +27,7 @@ export const NAV: NavGroup[] = [
       { href: "/docs/cli", label: "CLI", about: "From your terminal, with dry runs and spending limits." },
       { href: "/docs/agents#mcp", label: "MCP server", about: "For Claude, Cursor, Codex and other MCP clients." },
       { href: "/docs/agents#skill", label: "Agent skill", about: "One file that teaches your agent to find and pay for APIs." },
+      { href: "/docs/http", label: "Plain HTTP", about: "No SDK: two requests and one signature, in any language." },
     ],
   },
   {

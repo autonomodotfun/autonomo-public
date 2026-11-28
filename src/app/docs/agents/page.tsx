@@ -46,6 +46,8 @@ for (const p of data) {
   console.log(p.name, p.website, p.minPriceUsd);
 }`;
 
+const USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+
 const BUYER_INSTALL = "npm install @x402/fetch @x402/core @x402/evm viem";
 
 const BUYER_CODE = `import { wrapFetchWithPayment } from "@x402/fetch";
@@ -59,6 +61,12 @@ const signer = privateKeyToAccount(process.env.AGENT_PRIVATE_KEY as \`0x\${strin
 
 const client = new x402Client();
 client.register("eip155:*", new ExactEvmScheme(signer));
+
+// The client pays only tokens on its own list, and USDG on Robinhood Chain is not on it.
+// This allows USDG, up to $0.50 a call (500000 in its smallest unit).
+client.setSpendControls({
+  allowedAssets: [{ network: "eip155:4663", asset: "${USDG}", maxAmountPerPayment: "500000" }],
+});
 
 const fetchWithPayment = wrapFetchWithPayment(fetch, client);
 
@@ -182,7 +190,8 @@ export default function AgentsGuidePage() {
           pays within your limits, privately with Gloam or on Borro credit if you want, and returns a receipt. Building
           with LangChain or LangGraph? <Link href="/docs/langchain">Its tools</Link> let the agent pick and pay for APIs
           itself, and so does the <Link href="/docs/eliza">elizaOS plugin</Link>. To build it yourself, here are the two steps. No code at all? The same call is one command in{" "}
-          <Link href="/docs/cli">your terminal</Link>.
+          <Link href="/docs/cli">your terminal</Link>. No x402 library for your language?{" "}
+          <Link href="/docs/http">Pay over plain HTTP</Link> shows every header and field.
         </p>
         <Step n={1} title="Find APIs to pay for">
           <p>
@@ -206,21 +215,26 @@ export default function AgentsGuidePage() {
         <h3 className="pt-2 font-medium">Paying with USDG</h3>
         <p>
           USDG (Global Dollar) on {TOKEN.chainName} supports EIP-3009, so each payment is a single signature: no approval
-          step and no gas for the agent. Hold USDG on {TOKEN.chainName} and the x402 client above handles the rest.
+          step and no gas for the agent. The x402 client pays only tokens on its own list unless you allow more, so
+          the code above allows USDG with <code>setSpendControls</code>, with a limit for each call. Without those
+          lines the client refuses a USDG price.
         </p>
         <h3 className="pt-2 font-medium">Paying with USDC on Base</h3>
         <p>
           Most Autonomo APIs also list USDC on Base in their <code>402</code>, at the same dollar price. It works like
           USDG: one EIP-3009 signature, no approval and no gas, settled by Coinbase&apos;s x402 facilitator. An x402
-          client pays the first option it can sign, and USDG is listed first, so a wallet that only holds USDC on Base
-          needs a client told to pick the Base option: <code>x402Client</code> takes a function for that. The{" "}
-          <Link href="/docs/sdk#pay-on-base">SDK</Link> does this for you.
+          client pays the first option it is allowed to, and USDG is listed first. For a wallet that only holds USDC on
+          Base, leave out the <code>setSpendControls</code> lines: USDC on Base is on the client&apos;s own list, so it
+          pays that option, up to $1 a call unless you set a lower limit. The{" "}
+          <Link href="/docs/sdk#pay-on-base">SDK</Link> picks the chain for you.
         </p>
         <h3 className="pt-2 font-medium">Paying with {TOKEN.symbol}</h3>
         <p>
           {TOKEN.symbol} payments run on {TOKEN.chainName} through Permit2. Before the first payment, the paying wallet
           approves the Permit2 contract (<code>{PERMIT2}</code>) to spend its {TOKEN.symbol}, once, which needs a little ETH
-          on {TOKEN.chainName} for gas. After that, each call is a signature and the agent pays no gas.
+          on {TOKEN.chainName} for gas. After that, each call is a signature and the agent pays no gas. With the x402
+          client, allow the token the same way as USDG, and give the client a function that picks it:{" "}
+          {TOKEN.symbol} is listed after USDG.
         </p>
         <h3 className="pt-2 font-medium">Paying privately with Gloam</h3>
         <p>

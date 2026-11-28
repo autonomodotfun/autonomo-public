@@ -13,6 +13,7 @@ import { metadata as directory } from "../docs/directory/page";
 import { metadata as eliza } from "../docs/eliza/page";
 import { metadata as faq } from "../docs/faq/page";
 import { metadata as gloam } from "../docs/gloam/page";
+import { metadata as http } from "../docs/http/page";
 import { metadata as langchain } from "../docs/langchain/page";
 import { metadata as launch } from "../docs/launch/page";
 import { metadata as officialApis } from "../docs/official-apis/page";
@@ -52,6 +53,7 @@ const DOCS: Page[] = [
   { path: "/docs/agents", meta: agents },
   { path: "/docs/sdk", meta: sdk },
   { path: "/docs/cli", meta: cli },
+  { path: "/docs/http", meta: http },
   { path: "/docs/langchain", meta: langchain },
   { path: "/docs/eliza", meta: eliza },
   { path: "/docs/official-apis", meta: officialApis },

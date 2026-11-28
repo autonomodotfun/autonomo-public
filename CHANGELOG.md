@@ -5,6 +5,17 @@ repo gets a copy of each release.
 
 ## November 28, 2026
 
+- **A guide to paying over plain HTTP.** [autonomo.fun/docs/http](https://autonomo.fun/docs/http) shows how to
+  pay an Autonomo API with no SDK: two HTTP requests and one signature, in USDG on Robinhood Chain or USDC on
+  Base. It lists every header and field, and has a complete example in JavaScript and one in Python, each a single
+  file with one package for signing. Both examples refuse a price over their limit and a token they weren't told to
+  pay with, and both are tested on every change: the payment each one sends is compared, field for field, with what
+  the official x402 client sends.
+- **The x402 client sample pays USDG again.** Newer versions of the x402 client pay only tokens on their own list,
+  and USDG on Robinhood Chain isn't on it, so the sample in
+  [Pay from your own code](https://autonomo.fun/docs/agents#code) was paying USDC on Base instead, or nothing for
+  a wallet with only USDG. The sample now allows USDG with a limit for each call, and the guide says what to do
+  for USDC on Base and $AUTONOMO.
 - **Higher default spending limits.** The SDK, the CLI, the MCP server and the LangChain and elizaOS plugins now pay
   up to 0.5 dollars a call and 5 dollars a day in USDG and USDC unless you set your own limits (the defaults were
   0.05 and 1). The $AUTONOMO limits stay at 5,000 a call and 10,000 a day, and every limit can still be set lower or
