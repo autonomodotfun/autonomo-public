@@ -18,6 +18,7 @@ import { metadata as langchain } from "../docs/langchain/page";
 import { metadata as launch } from "../docs/launch/page";
 import { metadata as officialApis } from "../docs/official-apis/page";
 import { metadata as quickstart } from "../docs/quickstart/page";
+import { metadata as qhooks } from "../docs/qhooks/page";
 import { metadata as qwallet } from "../docs/qwallet/page";
 import { metadata as docs } from "../docs/page";
 import { metadata as safe } from "../docs/safe/page";
@@ -62,6 +63,7 @@ const DOCS: Page[] = [
   { path: "/docs/borro", meta: borro },
   { path: "/docs/tokyo-futuro", meta: tokyoFuturo },
   { path: "/docs/qwallet", meta: qwallet },
+  { path: "/docs/qhooks", meta: qhooks },
   { path: "/docs/launch", meta: launch },
   { path: "/docs/self-hosted", meta: selfHosted },
   { path: "/docs/safe", meta: safe },

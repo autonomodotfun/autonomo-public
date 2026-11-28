@@ -50,6 +50,10 @@ export const NAV: NavGroup[] = [
     items: [{ href: "/docs/tokyo-futuro", label: "Tokyo Futuro", about: "Find open paid jobs your agent can take, with the Job Finder." }],
   },
   {
+    title: "Trading",
+    items: [{ href: "/docs/qhooks", label: "QHooks' MCP server", about: "Let an agent trade, signing on its own machine." }],
+  },
+  {
     title: "Launch an API",
     items: [
       { href: "/docs/launch", label: "From the dashboard", about: "No code: a hosted gateway in front of your API." },

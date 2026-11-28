@@ -60,6 +60,7 @@ export const PARTNERS: Partner[] = [
     guides: [
       { href: "/projects/qproof", label: "Check a token with QProof" },
       { href: "/docs/qwallet", label: "Keep an agent's savings in a QWallet" },
+      { href: "/docs/qhooks", label: "Trade through QHooks' MCP" },
     ],
   },
   {

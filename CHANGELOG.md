@@ -5,6 +5,12 @@ repo gets a copy of each release.
 
 ## November 28, 2026
 
+- **A guide to trading through QHooks' MCP server.** [autonomo.fun/docs/qhooks](https://autonomo.fun/docs/qhooks)
+  shows how to add QHooks' MCP server to an agent: it finds the route and hands back an unsigned transaction, so
+  the agent signs on its own machine. The address in the guide is Autonomo's referral link, and the guide says so
+  before the command: Autonomo is credited 20% of QHooks' fee on spot trades by traders it referred, the trader
+  pays the same either way, and the address without the referral is given too. Autonomo places no trades. The
+  QHooks card on the Partners page links to it.
 - **A guide to paying over plain HTTP.** [autonomo.fun/docs/http](https://autonomo.fun/docs/http) shows how to
   pay an Autonomo API with no SDK: two HTTP requests and one signature, in USDG on Robinhood Chain or USDC on
   Base. It lists every header and field, and has a complete example in JavaScript and one in Python, each a single
